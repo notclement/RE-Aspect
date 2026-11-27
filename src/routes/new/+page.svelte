@@ -325,6 +325,7 @@
 	{#if step === 0}
 		<section>
 			<p class="muted lead">Add the <strong>developer's floor plan</strong>, plus anything that helps: site plan or location map (for north), and interior photos (we'll use them to place furniture). Up to {MAX_PHOTOS} photos.</p>
+			<p class="tip"><Icon name="info" size={16} /><span><strong>Tip:</strong> use a floor plan that shows <strong>dimensions</strong> (e.g. "9550" mm lines) or a scale bar — the AI reads them so the plan comes out at true size. Without them we fit it to the sq ft.</span></p>
 			{#if photos.length + adding < MAX_PHOTOS}
 				<button
 					class="drop"
@@ -934,5 +935,21 @@
 	}
 	.busy p {
 		max-width: 340px;
+	}
+	.tip {
+		display: flex;
+		gap: 8px;
+		align-items: flex-start;
+		margin: 0 0 14px;
+		padding: 10px 12px;
+		font-size: 14px;
+		border-radius: var(--radius-sm);
+		background: color-mix(in srgb, var(--ochre) 16%, var(--surface));
+		color: var(--text);
+	}
+	.tip :global(svg) {
+		flex-shrink: 0;
+		margin-top: 2px;
+		color: var(--ochre);
 	}
 </style>

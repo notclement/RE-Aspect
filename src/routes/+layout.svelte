@@ -16,7 +16,7 @@
 	let { children }: LayoutProps = $props();
 
 	// Pages that render full-screen, without the nav shell.
-	const BARE = ['/login', '/welcome'];
+	const BARE = ['/login', '/welcome', '/s']; // /s = public share page (no account needed)
 	const bare = $derived(BARE.includes(page.url.pathname));
 
 	onMount(() => {
@@ -31,6 +31,7 @@
 	$effect(() => {
 		const path = page.url.pathname;
 		if (auth.status === 'loading' || !profile.loaded) return;
+		if (path === '/s') return; // public read-only share links work signed out
 		// A scanned agency QR (/join?code=…) survives the sign-in: keep the code until /join handles it.
 		if (path === '/join') {
 			const c = validateInviteCode(page.url.searchParams.get('code') ?? '');

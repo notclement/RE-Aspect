@@ -174,6 +174,12 @@
 		}
 		plan.outline = pts;
 		if (backdrop) plan.imageScale = imgScale * k;
+		// Drawn by hand: size fitted to the sq ft (unless an AI trace already read the plan's dimensions).
+		if (Math.abs(k - 1) > 0.01) {
+			plan.scaleSource = 'area';
+			plan.scaleNote = undefined;
+		}
+		plan.source = 'manual';
 		draft = [];
 		mode = 'window';
 		commit(before);

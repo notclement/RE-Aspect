@@ -42,10 +42,11 @@ const json = (req: Request, body: unknown, status = 200) =>
 const PROMPT = (sizeSqft: number) => `Trace this apartment floor plan (north is up) for a sunlight simulator.
 The unit's total floor area is about ${sizeSqft} sq ft.
 Return ONLY a JSON object, no prose:
-{"outline": [[x,y], ...], "walls": [{"a":[x,y],"b":[x,y]}], "rooms": [{"name":"Living / Dining","x":x,"y":y}]}
+{"outline": [[x,y], ...], "walls": [{"a":[x,y],"b":[x,y]}], "rooms": [{"name":"Living / Dining","x":x,"y":y}], "scale": {"a":[x,y],"b":[x,y],"mm":9550}}
 - outline: the unit's external boundary, corners in order, excluding outside ledges / balconies.
 - walls: straight interior walls between rooms (one segment each).
 - rooms: room name at the room's centre.
+- scale: the LONGEST dimension line printed on the plan that you can read clearly (or a drawn scale bar): its two end ticks and its value in millimetres. Use null if the plan shows no dimensions.
 Coordinates are 0–1000 relative to the image (0,0 top-left, 1000,1000 bottom-right). Follow the thick drawn walls, not dimension lines; ignore legends and text outside the unit. Do not include windows, doors or furniture.`;
 
 function parseJson(text: string): Record<string, unknown> {
@@ -176,7 +177,30 @@ function buildPlan(ai: Record<string, unknown>, W: number, H: number, sizeSqft: 
 	if (outlinePx.length < 3) throw new Error('No outline found');
 	const areaPx = polyArea(outlinePx);
 	if (areaPx < 100) throw new Error('Outline too small');
-	const s = Math.sqrt((sizeSqft * 929.03) / areaPx); // cm per image pixel
+	// Scale (cm per image pixel): from a dimension line / scale bar on the plan when it's believable,
+	// otherwise fitted so the traced outline matches the unit's sq ft.
+	const sArea = Math.sqrt((sizeSqft * 929.03) / areaPx);
+	let s = sArea;
+	let scaleSource: 'dimensions' | 'area' = 'area';
+	let scaleNote = '';
+	const sc = (ai.scale ?? null) as Record<string, unknown> | null;
+	if (sc && typeof sc === 'object') {
+		const a = npt(sc.a);
+		const b = npt(sc.b);
+		const mm = Number(sc.mm);
+		if (a && b && Number.isFinite(mm) && mm >= 500 && mm <= 60000) {
+			const pa = toPx(a);
+			const pb = toPx(b);
+			const dPx = Math.hypot(pb[0] - pa[0], pb[1] - pa[1]);
+			const sDim = dPx > 30 ? mm / 10 / dPx : 0;
+			// Believable = within 0.6–1.6× of the sq-ft fit (outlines often exclude ledges, so they can differ a bit).
+			if (sDim > 0 && sDim / sArea > 0.6 && sDim / sArea < 1.6) {
+				s = sDim;
+				scaleSource = 'dimensions';
+				scaleNote = `${Math.round(mm).toLocaleString('en-US')} mm dimension on the plan`;
+			}
+		}
+	}
 	const cm = (p: Pt): Pt => [Math.round(p[0] * s), Math.round(p[1] * s)];
 	const outline = outlinePx.map(cm);
 
@@ -220,7 +244,7 @@ function buildPlan(ai: Record<string, unknown>, W: number, H: number, sizeSqft: 
 			return { kind, x: Math.round(x - w / 2), y: Math.round(y - d / 2), w: Math.round(w), d: Math.round(d), h: Math.round(h), color: COLORS[kind], r: kind === 'plant' ? Math.round(w / 2) : 6 };
 		})
 		.filter((i) => !!i);
-	return { v: 1, outline, walls, windows: [], doors: [], items: [], rooms, imageScale: Math.round(s * 10000) / 10000 };
+	return { v: 1, outline, walls, windows: [], doors: [], items: [], rooms, imageScale: Math.round(s * 10000) / 10000, scaleSource, ...(scaleNote ? { scaleNote } : {}), source: 'ai' };
 }
 
 // Projects on the new API keys expose them as JSON maps, e.g. {"default":"sb_secret_…"}.

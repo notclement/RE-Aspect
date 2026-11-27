@@ -28,6 +28,12 @@ export interface PlanData {
 	rooms: { name: string; x: number; y: number }[];
 	/** Floor-plan backdrop placement (cm per image pixel), used by Studio while tracing. */
 	imageScale?: number;
+	/** How the plan got its size: read from a dimension/scale bar on the floor plan, or fitted to the sq ft. */
+	scaleSource?: 'dimensions' | 'area';
+	/** e.g. "9,550 mm dimension line" (shown in "How we worked this out"). */
+	scaleNote?: string;
+	/** Who drew the outline: the AI from the floor plan, or the user in Studio. */
+	source?: 'ai' | 'manual';
 }
 
 export const emptyPlan = (): PlanData => ({ v: 1, outline: [], walls: [], windows: [], doors: [], items: [], rooms: [] });
@@ -109,7 +115,16 @@ export function sanitizePlan(raw: unknown): PlanData | null {
 		})
 		.filter((rm): rm is PlanData['rooms'][number] => !!rm);
 	const imageScale = num(r.imageScale, 0.01, 100) ?? undefined;
-	return { v: 1, outline, walls, windows, doors, items, rooms, ...(imageScale ? { imageScale } : {}) };
+	const scaleSource = r.scaleSource === 'dimensions' || r.scaleSource === 'area' ? r.scaleSource : undefined;
+	const scaleNote = cleanName(r.scaleNote, 60) || undefined;
+	const source = r.source === 'ai' || r.source === 'manual' ? r.source : undefined;
+	return {
+		v: 1, outline, walls, windows, doors, items, rooms,
+		...(imageScale ? { imageScale } : {}),
+		...(scaleSource ? { scaleSource } : {}),
+		...(scaleNote ? { scaleNote } : {}),
+		...(source ? { source } : {})
+	};
 }
 
 /** Is point p inside polygon poly (ray casting)? */
