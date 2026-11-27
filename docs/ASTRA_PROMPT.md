@@ -6,11 +6,34 @@ Copy everything below the line into Astra. Attach the files from `reference/` (i
 
 You are building the **view module** of RE:Aspect, an existing web app that shows how sunlight moves through an apartment during the day (Singapore first). The rest of the app is already built. Your job is three visual views of one unit. The code must drop into the existing codebase **without edits on our side**, so follow the contract below exactly.
 
+## 0. TOP PRIORITY: speed and efficiency
+
+Speed beats looks. If a visual effect costs frame time, load time or battery, leave it out. The app runs mostly on **mid-range phones**, often on mobile data. Hard budgets (we will measure them):
+
+| Budget | Limit |
+|---|---|
+| **TopDownView** | **No three.js, no WebGL.** Plain SVG (or Canvas 2D). Its own code ≤ **25 KB gzipped**. |
+| **Plan3DView + WalkView** | Share **one** lazily loaded three.js chunk. Their own code (excluding three) ≤ **40 KB gzipped**. Import only what you use (`three/src/...` named imports or a minimal re-export) so the three chunk is as small as possible. |
+| First frame after the chunk loads | ≤ **300 ms** on a mid-range phone (Snapdragon 7-class, 2022). |
+| While dragging / walking | Steady **60 fps** (≤ 16 ms per frame). Never below 30 fps. |
+| While scrubbing the time slider | ≤ **8 ms** per update: only update lighting (a floor light texture / uniforms / light direction). **Never rebuild geometry** when only the sun changes. |
+| Draw calls | ≤ **60** per frame for a typical unit: merge all static walls into one mesh per material, use instancing or merged geometry for furniture. |
+| GPU memory | ≤ **80 MB**. Textures ≤ 1024 px, generated once and reused. |
+| Idle | **0 frames** rendered when nothing changes (render on demand only). Stop completely when the tab is hidden or the view is off-screen (`visibilitychange` + `IntersectionObserver`). |
+
+Also:
+- `WebGLRenderer({ antialias: devicePixelRatio < 2, powerPreference: 'low-power' })`, pixel ratio capped at **min(devicePixelRatio, 2)** (1.5 on low-end phones if fps drops).
+- **No real-time shadow maps by default.** Use our precomputed sunlit-floor `patches` and `furniture.shadows` as a floor light/shadow texture (or decal geometry). An optional soft directional shadow is allowed only if it stays within the budgets above.
+- No post-processing passes (no SSAO, bloom or SSR). Fake ambient occlusion with vertex colours or a baked gradient.
+- No per-frame allocations (reuse vectors and matrices), and no layout reads in the render loop.
+- Build geometry once per `unit` change. Cache it and dispose of it on destroy.
+- Keep the code small: no helper libraries, no loaders, no GLTF, no fonts. Simple procedural low-poly furniture.
+
 ## 1. Tech stack (fixed — do not change)
 
 - **SvelteKit 3 + Svelte 5 runes** (`$props`, `$state`, `$derived`, `$effect`, snippets; no Svelte 4 syntax: no `export let`, no `$:`, no `on:click` — use `onclick`), **TypeScript**, Vite 8, `@sveltejs/adapter-static`, client-only (`ssr = false`).
 - Import alias for our library is **`#lib/...` with explicit extensions**, e.g. `import { sunPatches } from '#lib/light.ts'`, `import type { Unit } from '#lib/sample-unit.ts'`, `import Foo from './Foo.svelte'`.
-- One new runtime dependency is allowed: **`three`** (for 3D plan and Walk). Import it **dynamically inside `onMount`** (`const THREE = await import('three')`) so it never enters the first page load. No other dependencies, no CDN, no network requests, no external fonts, images or textures (generate textures procedurally or inline tiny SVG/data URLs).
+- One new runtime dependency is allowed: **`three`** (for 3D plan and Walk only — never in TopDownView). Import it **dynamically inside `onMount`** (`const THREE = await import('three')`) so it never enters the first page load. No other dependencies, no CDN, no network requests, no external fonts, images or textures (generate textures procedurally or inline tiny SVG/data URLs).
 - Must not touch `window`/`document` at import time (only in `onMount`/`$effect`).
 
 ## 2. What to deliver
@@ -101,7 +124,7 @@ let { unit, sun, patches, dark, furniture, eyeLevelCm, walkSpeed, lookSensitivit
 - Natural (non-inverted) look direction.
 
 ### All three
-- **Sunlight updates live** when `sun` / `patches` / `dark` change (the user scrubs a time slider below your view; it must stay smooth). Render **on demand** (only when props change or the user interacts), not a constant 60 fps loop; target 60 fps on a mid-range phone while interacting; cap devicePixelRatio at 2.
+- **Sunlight updates live** when `sun` / `patches` / `dark` change (the user scrubs a time slider below your view; it must stay smooth). Follow the budgets in section 0: render on demand, update lighting only, never rebuild geometry on a sun change.
 - Clean up everything in `onDestroy` (dispose geometries, materials, renderer, listeners) — users switch views often.
 - Work with incomplete data: no walls, no items, no doors, no balcony, 3-point outlines, odd angles (walls are not always axis-aligned).
 - Colours come from these CSS variables (they change with our light/dark themes): `--floor`, `--floor-line`, `--wall`, `--wall-top`, `--glass`, `--balcony`, `--ochre` (sun), `--forest` (accent), `--muted`, `--text`, `--surface`. Read them with `getComputedStyle` on mount and when they change; fall back to: floor `#e9dfcb`, wall `#3a4139`, wall top `#59625a`, glass `#9fb8b9`, sun `#F6C453`.
@@ -112,7 +135,9 @@ let { unit, sun, patches, dark, furniture, eyeLevelCm, walkSpeed, lookSensitivit
 
 ## 5. Quality bar
 
-Professional, calm, architectural-visualisation look (think a clean real-estate brochure model): soft ambient occlusion feel, gentle shadows, warm sunlight, no harsh outlines, no clutter. It must still feel instant on a phone.
+Speed first (section 0), then looks: a calm, clean architectural model (real-estate brochure feel): soft baked shading, warm sunlight, no harsh outlines, no clutter. When in doubt, choose the cheaper option.
+
+In INTEGRATION.md, report the gzipped size of each view's code and of the three.js chunk, plus the fps you measured on a phone.
 
 ## 6. Test fixture
 
