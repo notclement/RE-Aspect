@@ -1,6 +1,7 @@
 import { getSupabase, supabaseConfigured } from '#lib/supabase.ts';
 import { profile, sanitizeSettings } from './profile.svelte';
 import { theme } from './theme.svelte.ts';
+import { syncProjects, signOutProjects } from './projects.svelte.ts';
 
 export type AuthStatus = 'loading' | 'signed-in' | 'signed-out' | 'preview';
 
@@ -49,6 +50,7 @@ class Auth {
 		}
 		await this.loadProfile();
 		this.status = 'signed-in';
+		void syncProjects();
 	}
 
 	/** Pull name + plan from the `profiles` table (server is the source of truth for the plan). */
@@ -58,13 +60,21 @@ class Auth {
 			const sb = await getSupabase();
 			const { data, error } = await sb
 				.from('profiles')
-				.select('name, plan, is_admin, settings')
+				.select('name, plan, pro_until, is_admin, settings')
 				.eq('id', this.userId)
 				.maybeSingle();
 			if (error) throw error;
 			if (data) {
-				const plan = data.plan === 'pro' || data.plan === 'agency' ? data.plan : 'free';
-				profile.update({ plan, isAdmin: data.is_admin === true, ...(data.name ? { name: data.name } : {}) });
+				// Granted Pro ends at pro_until (null = no end date; 'infinity' = lifetime).
+				const until: string | null = typeof data.pro_until === 'string' ? data.pro_until : null;
+				const expired = until !== null && until !== 'infinity' && new Date(until).getTime() < Date.now();
+				const plan = data.plan === 'agency' ? 'agency' : data.plan === 'pro' && !expired ? 'pro' : 'free';
+				profile.update({
+					plan,
+					proUntil: plan === 'pro' ? until : null,
+					isAdmin: data.is_admin === true,
+					...(data.name ? { name: data.name } : {})
+				});
 				if (!data.is_admin) profile.setViewAs(null);
 				// Settings follow the account: use the saved ones; first time on this account, upload this device's.
 				const saved = sanitizeSettings(data.settings);
@@ -121,7 +131,8 @@ class Auth {
 		if (supabaseConfigured) {
 			// Forget this account's details in the browser so the next person to sign in doesn't inherit them.
 			profile.setViewAs(null);
-			profile.update({ name: '', plan: 'free', isAdmin: false });
+			profile.update({ name: '', plan: 'free', proUntil: null, isAdmin: false });
+			signOutProjects();
 		}
 		this.status = supabaseConfigured ? 'signed-out' : 'preview';
 	}

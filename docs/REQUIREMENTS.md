@@ -33,6 +33,10 @@
 - Sun timeline has an **ⓘ Sun info** button opening a sheet (bottom sheet on phones) with the full sun position, daylight length, location and data sources; the old Sun info panel under the plan is gone. On phones the timeline is compact (time + small arc + icon Auto sun button).
 - The Sun timeline card includes a **sun position** panel: big time + "Morning/Afternoon sunlight", the day's sun-path arc (sunrise → sunset) with the sun marked, altitude, azimuth, rise/set.
 - **Account menu on the avatar** (top right): name, email, current role, Profile, Settings, Sign out; admins also get **View the app as** (Free / Pro / Agency member / Agency Lead / Admin). Settings has no profile card. The ☰ menu holds only Projects (+ signed-in name, Sign out).
+- **Profile → Usage**: projects used of included (bar), extra-project price, AI re-runs per function (0 used until the AI tools ship), plan + Pro expiry / lifetime.
+- **Project details**: Name, Unit, Type (dropdown: HDB, EC, Condo, Landed terrace/semi-D/bungalow, Cluster, Shophouse, Commercial, Other), Address, Description, Notes, Size. Saved to the `projects` table (migration 0003) so they follow the account.
+- **Admin panel** (`/admin`, avatar menu → Admin panel): all users with email, plan, Pro expiry, joined, last sign-in, project count; tap a user for their projects; grant **Pro 1 month** (adds to remaining time) / **Pro lifetime** / **Remove Pro**. All via admin-only server functions that check `is_admin`.
+- Demo 1 is **Dakota One** (Blk 88B Jalan Satu, HDB 3-room Type-2B, traced from HDB's plan; orientation assumed south-facing windows).
 - Projects page counts the open projects (demos included) and hides "Set up your first project" when any exist.
 - Project cards show a **thumbnail of the actual plan** with today's sunniest-hour light.
 - Display name is asked only once (first sign-in with no name); returning sign-ins go straight to Projects.

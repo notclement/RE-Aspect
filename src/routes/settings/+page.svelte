@@ -33,7 +33,7 @@
 {#if profile.data.isAdmin}
 	<h3>Admin</h3>
 	<div class="card admin">
-		<p class="role"><Icon name="shield" size={18} /> You're an <strong>Admin</strong></p>
+		<p class="role"><Icon name="shield" size={18} /> You're an <strong>Admin</strong> <a class="btn adminlink" href="/admin">Admin panel</a></p>
 		<label class="muted small" for="viewas">View the app as</label>
 		<div class="roles" id="viewas" role="radiogroup" aria-label="View the app as">
 			{#each roles as [id, label] (id)}
@@ -312,6 +312,10 @@
 		font-weight: 600;
 		color: var(--sky);
 		text-decoration: none;
+	}
+	.adminlink {
+		margin-left: auto;
+		min-height: 40px;
 	}
 	.admin .role {
 		display: flex;

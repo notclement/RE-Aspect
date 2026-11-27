@@ -22,6 +22,7 @@ export const ROLE_LABELS: Record<RoleView, string> = {
 export interface Profile {
 	name: string;
 	plan: PlanId;
+	proUntil: string | null; // granted Pro end date (ISO), 'infinity' = lifetime, null = none
 	bodyHeightCm: number; // walkthrough eye level ≈ height − 12 cm
 	areaUnit: 'sqft' | 'sqm';
 	clock: '12h' | '24h';
@@ -36,6 +37,7 @@ const KEY = 'rea.profile';
 const DEFAULTS: Profile = {
 	name: '',
 	plan: 'free',
+	proUntil: null,
 	bodyHeightCm: 170,
 	areaUnit: 'sqft',
 	clock: '12h',

@@ -9,6 +9,7 @@
 	import PlanView from '#lib/components/PlanView.svelte';
 	import SunTimeline from '#lib/components/SunTimeline.svelte';
 	import SunInfoSheet from '#lib/components/SunInfoSheet.svelte';
+	import { PROPERTY_TYPES, isPropertyType, propertyTypeLabel } from '#lib/config/property-types.ts';
 	import Collapse from '#lib/components/Collapse.svelte';
 	import { sampleById } from '#lib/sample-unit.ts';
 	import { projectDetails, saveProjectDetails, type ProjectDetails } from '#lib/stores/projects.svelte.ts';
@@ -32,7 +33,7 @@
 
 	// ---- edit project details
 	let editing = $state(false);
-	let form = $state<ProjectDetails>({ name: '', unitNo: '', address: '', description: '', notes: '' });
+	let form = $state<ProjectDetails>({ name: '', unitNo: '', address: '', propertyType: 'hdb', description: '', notes: '' });
 	let errors = $state<Partial<Record<keyof ProjectDetails, string>>>({});
 	let detailsOpen = $state(false);
 	function startEdit() {
@@ -55,11 +56,14 @@
 			description: description.ok ? undefined : description.error,
 			notes: notes.ok ? undefined : notes.error
 		};
-		if (!(name.ok && unitNo.ok && address.ok && description.ok && notes.ok)) return;
-		saveProjectDetails(unit.id, {
+		const propertyType = isPropertyType(form.propertyType) ? form.propertyType : null;
+		if (!propertyType) errors.propertyType = 'Please choose a type.';
+		if (!(name.ok && unitNo.ok && address.ok && description.ok && notes.ok && propertyType)) return;
+		void saveProjectDetails(unit.id, {
 			name: name.value,
 			unitNo: unitNo.value,
 			address: address.value,
+			propertyType,
 			description: description.value,
 			notes: notes.value
 		});
@@ -216,6 +220,13 @@
 					{#if errors.unitNo}<span class="error">{errors.unitNo}</span>{/if}
 				</div>
 				<div class="field">
+					<label for="pd-type">Type</label>
+					<select id="pd-type" bind:value={form.propertyType}>
+						{#each PROPERTY_TYPES as t (t.id)}<option value={t.id}>{t.label}</option>{/each}
+					</select>
+					{#if errors.propertyType}<span class="error">{errors.propertyType}</span>{/if}
+				</div>
+				<div class="field">
 					<label for="pd-addr">Address</label>
 					<input id="pd-addr" maxlength="120" bind:value={form.address} />
 					{#if errors.address}<span class="error">{errors.address}</span>{/if}
@@ -239,13 +250,11 @@
 			<dl>
 				<dt>Name</dt><dd>{details.name}</dd>
 				<dt>Unit</dt><dd>{details.unitNo || '—'}, Level {unit.level}</dd>
+				<dt>Type</dt><dd>{propertyTypeLabel(details.propertyType)}</dd>
 				<dt>Address</dt><dd>{details.address || '—'}</dd>
 				<dt>Description</dt><dd class="pre">{details.description || '—'}</dd>
 				<dt>Notes</dt><dd class="pre">{details.notes || '—'}</dd>
 				<dt>Size</dt><dd>{unit.sizeSqft.toLocaleString()} sq ft</dd>
-				<dt>Ceiling</dt><dd>{(unit.ceiling / 100).toFixed(2)} m · windows: lower 1/3 wall, upper 2/3 glass</dd>
-				<dt>Sunrise · sunset</dt><dd>{fmtMin(times.sunrise)} · {fmtMin(times.sunset)}</dd>
-				<dt>Model</dt><dd>Standalone unit — neighbouring buildings not modelled</dd>
 			</dl>
 			<button class="btn editbtn" onclick={startEdit}>Edit details</button>
 		{/if}
@@ -383,6 +392,14 @@
 	}
 	.editbtn {
 		margin-top: 14px;
+	}
+	.edit select {
+		min-height: 44px;
+		padding: 0 10px;
+		border-radius: var(--radius-sm);
+		border: 1px solid var(--line);
+		background: var(--surface);
+		font-size: 16px;
 	}
 	.edit textarea {
 		padding: 10px 12px;

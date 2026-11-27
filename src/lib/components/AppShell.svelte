@@ -16,7 +16,7 @@
 	let open = $state(false);
 
 	// Settings / Profile / New unit get a back button that returns to wherever you came from.
-	const SUB_PAGES = ['/settings', '/profile', '/anchor'];
+	const SUB_PAGES = ['/settings', '/profile', '/anchor', '/admin'];
 	const isSub = $derived(SUB_PAGES.includes(page.url.pathname));
 	let inAppSteps = 0;
 	afterNavigate((n) => {
@@ -82,6 +82,9 @@
 							{/each}
 						</div>
 					</div>
+				{/if}
+				{#if profile.data.isAdmin}
+					<a role="menuitem" href="/admin" class:on={page.url.pathname === '/admin'}><Icon name="shield" />Admin panel</a>
 				{/if}
 				{#each acctLinks as l (l.href)}
 					<a role="menuitem" href={l.href} class:on={page.url.pathname === l.href}><Icon name={l.icon} />{l.label}</a>

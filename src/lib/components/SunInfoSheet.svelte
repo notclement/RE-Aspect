@@ -56,6 +56,7 @@
 			<dt>Daylight</dt><dd>{dayLen === null ? '—' : `${Math.floor(dayLen / 60)} h ${dayLen % 60} min`}</dd>
 			<dt>Location</dt><dd>{unit.lat.toFixed(4)}, {unit.lon.toFixed(4)}</dd>
 			<dt>Plan rotation</dt><dd>{unit.bearing}° from true north</dd>
+			<dt>Surroundings</dt><dd>Neighbouring buildings aren't modelled — the unit is treated as unobstructed</dd>
 		</dl>
 
 		<h3>Where this comes from</h3>

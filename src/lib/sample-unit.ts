@@ -70,56 +70,91 @@ const it = (kind: Item['kind'], x: number, y: number, ww: number, d: number, h: 
 	r: r * S
 });
 
-export const SAMPLE_UNIT: Unit = {
-	id: 'sample',
-	name: 'Sample Residence',
-	unitNo: '#12-04',
-	level: 12,
-	ceiling: CEILING,
-	sizeSqft: 1076,
-	lat: 1.3521,
-	lon: 103.8198,
-	bearing: 0,
-	outline: [p(20, 20), p(380, 20), p(380, 260), p(20, 260)],
+/**
+ * Demo 1 — Dakota One, Blk 88B Jalan Satu (S392088), HDB 3-room Type-2B (68 m² / 732 sq ft).
+ * Traced from HDB's Type-2B floor plan at its real dimensions (9550 × 8850 mm overall).
+ * Orientation assumed: corridor/entrance side faces north into the block, bedroom windows face south.
+ */
+const HDB_CEILING = 260;
+// Plan drawing pixels → cm (the drawing is 14.15 mm per pixel; origin = top-left corner of the flat).
+const d = (px: number, py: number): [number, number] => [Math.round((px - 255) * 1.415), Math.round((py - 172) * 1.416)];
+const dw = (x1: number, y1: number, x2: number, y2: number, t = 12): Wall => ({ a: d(x1, y1), b: d(x2, y2), t });
+const dwin = (x1: number, y1: number, x2: number, y2: number, n: [number, number], room: number[][]): Opening => ({
+	a: d(x1, y1),
+	b: d(x2, y2),
+	normal: n,
+	sill: Math.round(HDB_CEILING / 3),
+	head: HDB_CEILING,
+	room: room.map(([x, y]) => d(x, y))
+});
+const DK_MAIN = [[255, 172], [480, 172], [480, 485], [255, 485]];
+const DK_BED2 = [[480, 172], [690, 172], [690, 400], [480, 400]];
+const DK_LIVING = [[690, 262], [930, 262], [930, 705], [745, 705], [745, 622], [692, 622], [692, 485], [540, 485], [540, 400], [690, 400]];
+const DK_KITCHEN = [[462, 622], [745, 622], [745, 795], [462, 795]];
+const cm = (kind: Item['kind'], x: number, y: number, w: number, dd: number, h: number, color: string, r = 8): Item => ({ kind, x, y, w, d: dd, h, color, r });
+
+export const DAKOTA_UNIT: Unit = {
+	id: 'dakota-one',
+	name: 'Dakota One',
+	unitNo: '#10-125',
+	level: 10,
+	ceiling: HDB_CEILING,
+	sizeSqft: 732,
+	lat: 1.3096,
+	lon: 103.8866,
+	bearing: 180,
+	outline: [d(255, 172), d(690, 172), d(690, 262), d(930, 262), d(930, 705), d(745, 705), d(745, 795), d(462, 795), d(462, 622), d(255, 622)],
 	walls: [
-		w(20, 20, 380, 20), w(380, 20, 380, 260), w(20, 260, 380, 260), w(20, 20, 20, 260),
-		w(130, 20, 130, 80), w(20, 110, 100, 110),
-		w(180, 20, 180, 90), w(180, 90, 230, 90),
-		w(250, 20, 250, 60), w(250, 90, 250, 180), w(250, 210, 250, 260),
-		w(250, 140, 380, 140)
+		// outside walls (structural ones thicker)
+		dw(255, 172, 690, 172, 18), dw(690, 172, 690, 262, 22), dw(690, 262, 930, 262, 18), dw(930, 262, 930, 705, 22),
+		dw(930, 705, 905, 705), dw(820, 705, 745, 705), dw(745, 705, 745, 795, 22), dw(745, 795, 462, 795, 22),
+		dw(462, 795, 462, 622, 14), dw(462, 622, 255, 622, 22), dw(255, 622, 255, 172, 22),
+		// bedrooms
+		dw(480, 172, 480, 400), dw(447, 400, 600, 400), dw(690, 262, 690, 400),
+		// bathrooms
+		dw(255, 485, 380, 485), dw(410, 485, 540, 485), dw(410, 485, 410, 622),
+		// household shelter (thick RC walls)
+		dw(540, 485, 692, 485, 20), dw(692, 485, 692, 622, 20), dw(540, 485, 540, 622, 20), dw(540, 622, 692, 622, 20)
 	],
 	windows: [
-		win(40, 260, 230, 260, [0, 1], [[20, 110], [130, 110], [130, 80], [180, 80], [180, 90], [250, 90], [250, 260], [20, 260]]), // living, south
-		win(270, 260, 360, 260, [0, 1], rect(250, 140, 380, 260)), // bedroom 2, south
-		win(380, 40, 380, 120, [1, 0], rect(250, 20, 380, 140)), // bedroom 1, east
-		win(380, 160, 380, 240, [1, 0], rect(250, 140, 380, 260)), // bedroom 2, east
-		win(30, 20, 110, 20, [0, -1], rect(20, 20, 130, 110)) // kitchen, north
+		dwin(272, 172, 475, 172, [0, -1], DK_MAIN), // main bedroom, front
+		dwin(255, 275, 255, 465, [-1, 0], DK_MAIN), // main bedroom, side
+		dwin(490, 172, 680, 172, [0, -1], DK_BED2), // bedroom 2
+		dwin(700, 262, 920, 262, [0, -1], DK_LIVING), // living / dining, front
+		dwin(930, 375, 930, 598, [1, 0], DK_LIVING), // living / dining, side
+		dwin(462, 640, 462, 775, [-1, 0], DK_KITCHEN) // kitchen, to the service yard
 	],
 	rooms: [
-		{ name: 'Kitchen', x: 75, y: 70 },
-		{ name: 'Living / Dining', x: 135, y: 150 },
-		{ name: 'Bath', x: 215, y: 75 },
-		{ name: 'Bedroom 1', x: 315, y: 130 },
-		{ name: 'Bedroom 2', x: 315, y: 250 }
-	].map((r) => ({ ...r, x: r.x * S, y: r.y * S })),
-	items: [
-		it('counter', 25, 25, 100, 14, 90, '#C9CBC2', 1),
-		it('counter', 25, 25, 14, 80, 90, '#C9CBC2', 1),
-		it('rug', 58, 168, 80, 44, 1, '#CDBFA8', 2),
-		it('sofa', 40, 218, 110, 30, 80, '#9DAE8F', 5),
-		it('table', 68, 178, 54, 24, 45, '#EFE8DA', 3),
-		it('console', 42, 116, 80, 10, 50, '#8E6F52', 1),
-		it('table', 158, 124, 58, 36, 75, '#9C7A57', 3),
-		it('bed', 300, 36, 72, 84, 50, '#B7BE9C', 4),
-		it('wardrobe', 256, 26, 12, 40, 210, '#7F7766', 1),
-		it('bed', 304, 170, 64, 76, 50, '#B7BE9C', 4),
-		it('desk', 256, 216, 40, 14, 75, '#9C7A57', 1),
-		it('bath', 186, 26, 22, 30, 60, '#E9ECE6', 2),
-		it('plant', 140, 238, 10, 10, 90, '#6E8A5E', 5),
-		it('plant', 360, 124, 10, 10, 90, '#6E8A5E', 5)
+		{ name: 'Main bedroom', ...xy(d(368, 320)) },
+		{ name: 'Bedroom 2', ...xy(d(585, 300)) },
+		{ name: 'Living / Dining', ...xy(d(835, 450)) },
+		{ name: 'Bath 1', ...xy(d(330, 555)) },
+		{ name: 'Bath 2', ...xy(d(475, 555)) },
+		{ name: 'Shelter', ...xy(d(616, 555)) },
+		{ name: 'Kitchen', ...xy(d(604, 715)) }
 	],
-	balcony: { x: 60 * S, y: 260 * S, w: 180 * S, d: 28 * S }
+	items: [
+		cm('bed', 70, 40, 160, 200, 50, '#B7BE9C', 12),
+		cm('wardrobe', 255, 230, 55, 160, 210, '#7F7766', 3),
+		cm('bed', 335, 110, 107, 190, 50, '#B7BE9C', 12),
+		cm('desk', 495, 20, 105, 50, 75, '#9C7A57', 3),
+		cm('console', 625, 160, 40, 170, 50, '#8E6F52', 3),
+		cm('rug', 690, 175, 130, 175, 1, '#CDBFA8', 6),
+		cm('sofa', 840, 150, 90, 215, 80, '#9DAE8F', 16),
+		cm('table', 725, 165 + 70, 60, 60, 45, '#EFE8DA', 10),
+		cm('table', 725, 470, 150, 85, 75, '#9C7A57', 8),
+		cm('plant', 905, 140, 36, 36, 90, '#6E8A5E', 18),
+		cm('counter', 300, 822, 386, 58, 90, '#C9CBC2', 3),
+		cm('counter', 630, 650, 58, 170, 90, '#C9CBC2', 3),
+		cm('bath', 20, 560, 90, 62, 60, '#E9ECE6', 8),
+		cm('bath', 232, 560, 80, 62, 60, '#E9ECE6', 8)
+	],
+	// The air-con ledge (outside the flat) — drawn like a balcony.
+	balcony: { x: d(290, 625)[0], y: d(290, 625)[1], w: 177, d: 92 }
 };
+function xy([x, y]: [number, number]) {
+	return { x, y };
+}
 
 /** Demo 2 — west-facing studio loft: open plan, long afternoon sun. */
 export const LOFT_UNIT: Unit = {
@@ -208,7 +243,7 @@ export const HDB_UNIT: Unit = {
 	balcony: { x: 60 * S, y: 240 * S, w: 200 * S, d: 22 * S }
 };
 
-export const SAMPLE_UNITS: Unit[] = [SAMPLE_UNIT, LOFT_UNIT, HDB_UNIT];
+export const SAMPLE_UNITS: Unit[] = [DAKOTA_UNIT, LOFT_UNIT, HDB_UNIT];
 export function sampleById(id: string | null | undefined): Unit {
-	return SAMPLE_UNITS.find((u) => u.id === id) ?? SAMPLE_UNIT;
+	return SAMPLE_UNITS.find((u) => u.id === id) ?? DAKOTA_UNIT;
 }
