@@ -1,0 +1,25 @@
+# RE:Aspect — notes for Claude
+
+Full requirements: `docs/REQUIREMENTS.md` (read it before changing behaviour).
+
+## Stack
+- **SvelteKit 3 + Svelte 5 runes**, TypeScript, Vite 8, `@sveltejs/adapter-static`.
+  - Kit 3 specifics: the config lives in `vite.config.ts` (no `svelte.config.js`); the lib alias is `#lib/...` (not `$lib`). Imports use explicit extensions (`#lib/validate.ts`, `./Foo.svelte`).
+  - Env vars are declared in `src/env.ts` via `defineEnvVars` and imported from `$app/env/public`.
+  - The service worker uses `$app/service-worker`, `$app/manifest` and `$app/env`.
+- `ssr = false`, `prerender = true` (root `+layout.ts`): every route is a static client-side shell for Cloudflare Pages.
+- Supabase (auth, Postgres, edge functions) is loaded lazily (`src/lib/supabase.ts`). Without env vars the app runs in **preview mode** (local data, no sign-in).
+
+## Rules
+- Keep the first load tiny (< 120 KB gz). Lazy-load heavy things (Supabase, maps, 3D, modules) with `Spinner`.
+- Every user input goes through `src/lib/validate.ts`; repeat the checks server-side.
+- Plan limits live in `src/lib/config/plans.ts` (UI mirror) and **must** be enforced server-side. `FREE_LAUNCH` gives everyone Pro for now.
+- Never commit secrets. Only *publishable* keys go into public env vars. The AI key and Supabase secret key live in Supabase secrets.
+- Touch targets ≥ 44 px, inputs ≥ 16 px font (stops iOS zoom), `touch-action: manipulation` globally.
+- Light and dark mode via CSS variables in `src/app.css` (`[data-theme='dark']`).
+- Natural gestures only (no inverted controls). The time slider stays visible in Sun View, 3D and Walk.
+
+## Commands
+- `npm run dev`: local dev at http://localhost:5173
+- `npm run check`: type check (`npx tsc -p tsconfig.service-worker.json --noEmit` for the service worker)
+- `npm run build`: static build into `build/`

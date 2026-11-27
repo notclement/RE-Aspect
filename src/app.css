@@ -1,0 +1,186 @@
+/* RE:Aspect design tokens — see docs/REQUIREMENTS.md and the design brief. */
+:root {
+	--ink: #1b1a17;
+	--paper: #fbf8f3;
+	--surface: #ffffff;
+	--surface-2: #f3eee6;
+	--line: #e7dfd2;
+	--muted: #8b8273;
+	--text: #1b1a17;
+	--sun: #f2a93b;
+	--dusk: #e46f4e;
+	--sky: #6c8ebf;
+	--shade: #26324a;
+	--gold: #c8963e;
+
+	--radius: 12px;
+	--radius-sm: 8px;
+	--shadow: 0 4px 14px rgba(40, 30, 10, 0.08);
+	--rail-w: 76px;
+	--tabs-h: 64px;
+	--safe-b: env(safe-area-inset-bottom, 0px);
+	--safe-t: env(safe-area-inset-top, 0px);
+
+	--font: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+	color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+	--paper: #151412;
+	--surface: #1f1d1a;
+	--surface-2: #2a2724;
+	--line: #34302b;
+	--muted: #a39a8b;
+	--text: #f3eee6;
+	--ink: #0e0d0c;
+	--shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+	color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+}
+
+html,
+body {
+	margin: 0;
+	height: 100%;
+	background: var(--paper);
+	color: var(--text);
+	font-family: var(--font);
+	font-size: 15px;
+	line-height: 1.5;
+	-webkit-font-smoothing: antialiased;
+	-webkit-text-size-adjust: 100%;
+	/* No double-tap zoom, no 300 ms tap delay. */
+	touch-action: manipulation;
+	-webkit-tap-highlight-color: transparent;
+	overscroll-behavior-y: none;
+}
+
+h1,
+h2,
+h3 {
+	line-height: 1.2;
+	margin: 0 0 0.5em;
+	letter-spacing: -0.01em;
+}
+
+a {
+	color: inherit;
+}
+
+button,
+input,
+select {
+	font: inherit;
+	color: inherit;
+}
+
+.btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	min-height: 44px;
+	padding: 0 18px;
+	border-radius: 10px;
+	border: 1px solid var(--line);
+	background: var(--surface);
+	font-weight: 600;
+	cursor: pointer;
+	text-decoration: none;
+	transition: transform 0.08s ease;
+}
+.btn:active {
+	transform: scale(0.98);
+}
+.btn:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+.btn.primary {
+	background: var(--dusk);
+	border-color: var(--dusk);
+	color: #fff;
+}
+.btn.dark {
+	background: var(--text);
+	border-color: var(--text);
+	color: var(--paper);
+}
+.btn.wide {
+	width: 100%;
+}
+
+.card {
+	background: var(--surface);
+	border: 1px solid var(--line);
+	border-radius: var(--radius);
+	padding: 16px;
+}
+
+.muted {
+	color: var(--muted);
+}
+
+.field {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	margin-bottom: 14px;
+}
+.field label {
+	font-size: 12px;
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	color: var(--muted);
+}
+.field input {
+	min-height: 44px;
+	padding: 0 12px;
+	border-radius: 10px;
+	border: 1px solid var(--line);
+	background: var(--surface);
+	font-size: 16px; /* ≥16px stops iOS auto-zoom on focus */
+}
+.field input:focus {
+	outline: 2px solid var(--sun);
+	outline-offset: 1px;
+}
+.field .error {
+	color: var(--dusk);
+	font-size: 13px;
+}
+
+.tag {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: 0.06em;
+	padding: 3px 8px;
+	border-radius: 6px;
+	background: var(--surface-2);
+	color: var(--muted);
+}
+.tag.pro {
+	background: var(--dusk);
+	color: #fff;
+}
+.tag.lead {
+	background: #fbebc8;
+	color: #7a5414;
+	border: 1px solid var(--gold);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	* {
+		animation-duration: 0.01ms !important;
+		transition-duration: 0.01ms !important;
+	}
+}
