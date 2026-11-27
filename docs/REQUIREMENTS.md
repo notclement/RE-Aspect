@@ -41,6 +41,8 @@
 - **Profile photo**: Profile → Add/Change photo; centre-cropped and shrunk to a 128 px WebP (≈3–8 KB, max 16 KB) in the browser before upload; shown in the avatar circle and admin list.
 - Account menu closes on any tap outside it or Escape.
 - Phase 1 (New project wizard + Studio): see `docs/PHASE1.md`. Studio has **no sun preview**; keep everything lightweight and snappy on phones and desktops.
+- New project steps: **Photos → Details → Floor plan → Review**; every step shows **Next**, only Review shows **Create project**.
+- Floor plan step: AI (`detect-north` edge function, max 30 checks per user per day) looks at all photos for north arrows / site plans and **pre-turns the plan**, saying "Based on the images provided … turned N° clockwise" with its evidence; the user can adjust or just tap Next. Manual turns are never overridden (an Apply button appears instead).
 - New project photos: one big drag-and-drop area (tap to choose on phones). Placeholders are generic (never a real project). Unit number can be just "125" — combined with the floor level as #05-125.
 - Address search goes through the `geocode` edge function: OneMap when `ONEMAP_EMAIL`/`ONEMAP_PASSWORD` secrets are set (OneMap now requires a login token), otherwise OpenStreetMap searched from the user's browser (Nominatim blocks cloud servers). Searches on a full postal code, Enter or the Search button (no search-as-you-type).
 - Studio: **Rotate plan** goes back to re-rotate the floor plan (from the original photo kept on the device; clears a traced outline/walls/windows, keeps furniture). **Done** with no furniture asks "Add furniture?" and highlights the Furniture tool.

@@ -23,7 +23,7 @@
 	$effect(() => nav.set({ label: 'New project' }));
 
 	const MAX_PHOTOS = 15;
-	const steps = ['Photos', 'Details', 'Floor plan'] as const;
+	const steps = ['Photos', 'Details', 'Floor plan', 'Review'] as const;
 	let step = $state(0);
 
 	// ── Step 1: photos ───────────────────────────────────────────────────────
@@ -165,8 +165,54 @@
 	function next() {
 		if (step === 0 && !photos.length) return void (photoError = 'Add at least the floor plan photo.');
 		if (step === 1 && !validateDetails()) return;
+		if (step === 2 && !planPhoto) return;
 		step++;
 		window.scrollTo({ top: 0 });
+		if (step === 2) void detectNorth();
+	}
+
+	// ── AI north check: look at all photos for north arrows / site plans, pre-turn the plan ─────────
+	type North = { state: 'idle' | 'checking' | 'found' | 'none' | 'off'; angle: number; confidence: string; evidence: string; forPlan: string | null };
+	let north = $state<North>({ state: 'idle', angle: 0, confidence: '', evidence: '', forPlan: null });
+	let userTurned = $state(false);
+	function setAngle(a: number) {
+		const n = ((a % 360) + 360) % 360;
+		const q = Math.round(n / 90);
+		turns = q % 4;
+		fine = Math.max(-45, Math.min(45, n - q * 90));
+	}
+	const suggestionApplied = $derived(north.state === 'found' && ((((angle % 360) + 360) % 360) === north.angle));
+	async function detectNorth() {
+		const pid = planId;
+		if (!pid || !planPhoto || north.forPlan === pid) return;
+		if (!supabaseConfigured || auth.status !== 'signed-in') return void (north = { ...north, state: 'off', forPlan: pid });
+		north = { state: 'checking', angle: 0, confidence: '', evidence: '', forPlan: pid };
+		try {
+			const floorPlan = (await shrinkPhoto(planPhoto.img.dataUrl, 1536, 0.8)).dataUrl;
+			const others = await Promise.all(
+				photos.filter((p) => p.id !== pid).slice(0, 6).map(async (p) => (await shrinkPhoto(p.img.dataUrl, 1024, 0.72)).dataUrl)
+			);
+			const sb = await getSupabase();
+			const { data, error } = await sb.functions.invoke('detect-north', { body: { floorPlan, others } });
+			if (planId !== pid) return; // user picked another photo meanwhile
+			const d = (data ?? {}) as { found?: boolean; angle?: number; confidence?: string; evidence?: string; reason?: string };
+			if (error || !d.found || !Number.isFinite(d.angle)) {
+				north = { state: d.reason === 'no-key' || error ? 'off' : 'none', angle: 0, confidence: '', evidence: String(d.evidence ?? ''), forPlan: pid };
+				return;
+			}
+			north = { state: 'found', angle: Number(d.angle), confidence: String(d.confidence ?? 'low'), evidence: String(d.evidence ?? '').slice(0, 160), forPlan: pid };
+			if (!userTurned) setAngle(north.angle);
+		} catch {
+			if (planId === pid) north = { ...north, state: 'off', forPlan: pid };
+		}
+	}
+	function pickPlan(id: string) {
+		if (planId === id) return;
+		planId = id;
+		turns = 0;
+		fine = 0;
+		userTurned = false;
+		void detectNorth();
 	}
 
 	async function create() {
@@ -343,29 +389,68 @@
 				</div>
 			</div>
 		</section>
-	{:else}
+	{:else if step === 2}
 		<section>
-			<p class="muted lead">Tap the <strong>floor plan</strong>, then turn it so the unit's <strong>north points up</strong>. Tip: use the north arrow on the site plan or location map.</p>
+			<p class="muted lead">Tap the <strong>floor plan</strong>, then turn it so the unit's <strong>north points up</strong>.</p>
 			<div class="pick">
 				{#each photos as p (p.id)}
-					<button class:on={p.id === planId} onclick={() => ((planId = p.id), (turns = 0), (fine = 0))} aria-label="Use as floor plan">
+					<button class:on={p.id === planId} onclick={() => pickPlan(p.id)} aria-label="Use as floor plan">
 						<img src={p.img.dataUrl} alt="" decoding="async" />
 						{#if p.id === planId}<span class="badge">Floor plan</span>{/if}
 					</button>
 				{/each}
 			</div>
 			{#if planPhoto}
+				{#if north.state === 'checking'}
+					<div class="ai checking"><Spinner size={16} /><span>Looking at your photos for north arrows and site plans…</span></div>
+				{:else if north.state === 'found'}
+					<div class="ai found">
+						<Icon name="check" size={18} />
+						<div>
+							<strong>{suggestionApplied ? 'Turned for you' : 'Suggested turn'}: {north.angle}° clockwise</strong>
+							<span>Based on the images provided{north.evidence ? ` — ${north.evidence}` : ''}.{north.confidence === 'low' ? ' Low confidence — please check.' : ''} Adjust if needed, or just tap Next.</span>
+						</div>
+						{#if !suggestionApplied}<button class="btn" onclick={() => setAngle(north.angle)}>Apply</button>{/if}
+					</div>
+				{:else if north.state === 'none'}
+					<div class="ai none"><Icon name="info" size={18} /><span>No north arrow or site plan found in your photos — please turn the plan yourself. Tip: a site plan or location map with a north arrow helps.</span></div>
+				{:else}
+					<p class="muted small tip">Tip: use the north arrow on the site plan or location map.</p>
+				{/if}
 				<div class="stage">
 					<div class="north" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22"><path d="M12 2l7 19-7-5-7 5z" fill="currentColor" /></svg>N</div>
 					<img src={planPhoto.img.dataUrl} alt="Floor plan" style:transform="rotate({angle}deg)" />
 				</div>
 				<div class="rot">
-					<button class="btn" onclick={() => (turns = (turns + 3) % 4)} aria-label="Turn left 90°"><span class="flip"><Icon name="back" size={18} /></span>90°</button>
-					<input type="range" min="-45" max="45" step="0.5" bind:value={fine} aria-label="Fine turn" />
-					<button class="btn" onclick={() => (turns = (turns + 1) % 4)} aria-label="Turn right 90°">90°<span class="flip r"><Icon name="back" size={18} /></span></button>
+					<button class="btn" onclick={() => ((turns = (turns + 3) % 4), (userTurned = true))} aria-label="Turn left 90°"><span class="flip"><Icon name="back" size={18} /></span>90°</button>
+					<input type="range" min="-45" max="45" step="0.5" bind:value={fine} oninput={() => (userTurned = true)} aria-label="Fine turn" />
+					<button class="btn" onclick={() => ((turns = (turns + 1) % 4), (userTurned = true))} aria-label="Turn right 90°">90°<span class="flip r"><Icon name="back" size={18} /></span></button>
 				</div>
-				<p class="muted small center">{angle === 0 ? 'Not turned' : `Turned ${angle > 0 ? angle : 360 + angle}° clockwise`} · <button class="link" onclick={() => ((turns = 0), (fine = 0))}>Reset</button></p>
+				<p class="muted small center">{angle === 0 ? 'Not turned' : `Turned ${((angle % 360) + 360) % 360}° clockwise`} · <button class="link" onclick={() => ((turns = 0), (fine = 0), (userTurned = true))}>Reset</button></p>
 			{/if}
+		</section>
+	{:else}
+		<section class="review">
+			<p class="muted lead">Check everything, then create the project.</p>
+			<div class="card rv">
+				{#if planPhoto}
+					<div class="rvimg"><img src={planPhoto.img.dataUrl} alt="Floor plan" style:transform="rotate({angle}deg)" /><span class="n">N ↑</span></div>
+				{/if}
+				<dl>
+					<dt>Name</dt><dd>{name || '—'}</dd>
+					<dt>Address</dt><dd>{address || '—'}{#if place}<span class="ok small"> · location found</span>{/if}</dd>
+					<dt>Unit</dt><dd>{[unitNo, level ? `Level ${level}` : ''].filter(Boolean).join(' · ') || '—'}</dd>
+					<dt>Type</dt><dd>{PROPERTY_TYPES.find((t) => t.id === propertyType)?.label}</dd>
+					<dt>Size</dt><dd>{size ? `${size} sq ft` : '—'} · ceiling {ceiling} m</dd>
+					<dt>Photos</dt><dd>{photos.length} (floor plan + {photos.length - 1} more)</dd>
+					<dt>North</dt><dd>Plan turned {((angle % 360) + 360) % 360}° clockwise{north.state === 'found' && suggestionApplied ? ' (AI suggestion)' : ''}</dd>
+				</dl>
+				<div class="rvlinks">
+					<button class="link" onclick={() => (step = 1)}>Edit details</button>
+					<button class="link" onclick={() => (step = 2)}>Edit floor plan</button>
+				</div>
+			</div>
+			<p class="muted small">Next, the AI traces walls and windows and places furniture, then Studio opens so you can check it. Your photos are deleted as soon as that's done.</p>
 			{#if createError}<p class="error">{createError}</p>{/if}
 		</section>
 	{/if}
@@ -407,7 +492,21 @@
 		color: var(--muted);
 		font-weight: 600;
 		font-size: 14px;
+		white-space: nowrap;
 		cursor: pointer;
+	}
+	@media (max-width: 420px) {
+		.steps {
+			gap: 3px;
+		}
+		.steps button {
+			font-size: 12.5px;
+			gap: 4px;
+		}
+		.steps button span {
+			width: 20px;
+			height: 20px;
+		}
 	}
 	.steps button span {
 		width: 22px;
@@ -530,6 +629,108 @@
 		border: 1px solid var(--line);
 		background: var(--surface);
 		font-size: 16px;
+	}
+	.ai {
+		display: flex;
+		align-items: flex-start;
+		gap: 10px;
+		padding: 10px 12px;
+		border-radius: var(--radius-sm);
+		margin-bottom: 10px;
+		font-size: 13px;
+		line-height: 1.4;
+	}
+	.ai > div {
+		flex: 1;
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+	}
+	.ai strong {
+		font-size: 14px;
+	}
+	.ai .btn {
+		min-height: 40px;
+		align-self: center;
+	}
+	.ai.checking {
+		align-items: center;
+		background: var(--surface-2);
+		color: var(--muted);
+	}
+	.ai.found {
+		background: color-mix(in srgb, var(--forest) 12%, var(--surface));
+		color: var(--text);
+		border: 1px solid color-mix(in srgb, var(--forest) 35%, transparent);
+	}
+	.ai.found > :global(svg) {
+		color: var(--forest);
+		margin-top: 2px;
+	}
+	.ai.none {
+		background: var(--ochre-soft);
+	}
+	.tip {
+		margin: 0 0 10px;
+	}
+	.rv {
+		display: grid;
+		grid-template-columns: 140px 1fr;
+		gap: 16px;
+		align-items: start;
+	}
+	.rvimg {
+		position: relative;
+		aspect-ratio: 1;
+		display: grid;
+		place-items: center;
+		overflow: hidden;
+		border-radius: var(--radius-sm);
+		background: var(--canvas);
+	}
+	.rvimg img {
+		max-width: 80%;
+		max-height: 80%;
+		background: #fff;
+	}
+	.rvimg .n {
+		position: absolute;
+		top: 4px;
+		left: 50%;
+		transform: translateX(-50%);
+		font-size: 11px;
+		font-weight: 700;
+		color: var(--forest);
+	}
+	.rv dl {
+		display: grid;
+		grid-template-columns: 80px 1fr;
+		gap: 6px 10px;
+		margin: 0;
+		font-size: 14px;
+	}
+	.rv dt {
+		color: var(--muted);
+	}
+	.rv dd {
+		margin: 0;
+		overflow-wrap: anywhere;
+	}
+	.rvlinks {
+		grid-column: 1 / -1;
+		display: flex;
+		gap: 16px;
+	}
+	.rvlinks .link {
+		min-height: 44px;
+	}
+	@media (max-width: 520px) {
+		.rv {
+			grid-template-columns: 1fr;
+		}
+		.rvimg {
+			max-width: 200px;
+		}
 	}
 	.searchrow {
 		display: flex;

@@ -12,7 +12,7 @@ Full requirements: `docs/REQUIREMENTS.md` (read it before changing behaviour).
 
 ## Backend files
 - `supabase/migrations/*.sql` — run in order in the Supabase SQL editor (test first, live on promotion).
-- `supabase/functions/process-project` — AI tracing; `supabase/functions/geocode` — address search (OneMap via `ONEMAP_EMAIL`/`ONEMAP_PASSWORD` secrets, else the app falls back to OpenStreetMap from the browser). Deployed via the dashboard editor; Verify JWT with legacy secret OFF — they check the user themselves.
+- `supabase/functions/process-project` — AI tracing; `supabase/functions/detect-north` — suggests the floor plan's north rotation from the photos (daily limit via `ai_daily_take`); `supabase/functions/geocode` — address search (OneMap via `ONEMAP_EMAIL`/`ONEMAP_PASSWORD` secrets, else the app falls back to OpenStreetMap from the browser). Deployed via the dashboard editor; Verify JWT with legacy secret OFF — they check the user themselves.
 
 ## Rules
 - Keep the first load tiny (< 120 KB gz). Lazy-load heavy things (Supabase, maps, 3D, modules) with `Spinner`.
