@@ -78,10 +78,7 @@
 		text-decoration: none;
 	}
 	.art {
-		margin: 4px -20px 0;
-	}
-	.art :global(.room-art) {
-		border-radius: 0;
+		margin-top: 8px;
 	}
 	.copy {
 		display: flex;
@@ -156,8 +153,7 @@
 			margin: 0;
 		}
 		.art :global(.room-art) {
-			border-radius: var(--radius);
-			height: 380px !important;
+			height: 400px !important;
 		}
 		.copy {
 			margin-top: 0;

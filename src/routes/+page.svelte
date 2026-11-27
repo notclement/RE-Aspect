@@ -208,7 +208,7 @@
 		max-width: 560px;
 	}
 	.first :global(.room-art) {
-		border-radius: 0;
+		margin-top: 16px;
 	}
 	.first-body {
 		display: flex;
