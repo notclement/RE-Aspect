@@ -10,6 +10,7 @@ export { ShaderMaterial } from 'three/src/materials/ShaderMaterial.js';
 export { CanvasTexture } from 'three/src/textures/CanvasTexture.js';
 export { Color } from 'three/src/math/Color.js';
 export { Vector2 } from 'three/src/math/Vector2.js';
+export { Vector3 } from 'three/src/math/Vector3.js';
 export { ShapeUtils } from 'three/src/extras/ShapeUtils.js';
 export { DoubleSide, LinearFilter, SRGBColorSpace } from 'three/src/constants.js';
 export { DataTexture } from 'three/src/textures/DataTexture.js';

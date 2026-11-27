@@ -103,6 +103,13 @@
 	});
 	const level = $derived(mine ? mine.level : unit.level);
 	let shareOpen = $state(false);
+	// One quiet line under the title: address (skipped when it just repeats the name) · level · unit · size.
+	const metaLine = $derived.by(() => {
+		const norm = (t: string) => t.toLowerCase().replace(/[^a-z0-9]/g, '');
+		const addr = details.address && norm(details.address) !== norm(details.name) ? details.address : '';
+		const size = mine ? mine.sizeSqft : unit.sizeSqft;
+		return [addr, level !== null ? `Level ${level}` : '', details.unitNo, size ? `${size.toLocaleString()} sq ft` : '', mine ? '' : 'Demo'].filter(Boolean).join(' · ');
+	});
 </script>
 
 <svelte:head><title>{details.name} · RE:Aspect</title></svelte:head>
@@ -111,23 +118,17 @@
 	<h1>{details.name}</h1>
 	<div class="hactions">
 		{#if !needsTrace}
-			<button class="btn" onclick={() => (shareOpen = true)}><Icon name="share" size={18} /> Share</button>
+			<button class="btn" onclick={() => (shareOpen = true)} title="Share" aria-label="Share"><Icon name="share" size={18} /><span class="lbl">Share</span></button>
 		{/if}
 		{#if mine}
-			<a class="btn" href="/studio?id={mine.id}"><Icon name="plan" size={18} /> Edit in Studio</a>
-			<button class="btn trash" onclick={() => (confirmDelete = true)} aria-label="Delete project"><Icon name="trash" size={18} /></button>
+			<a class="btn" href="/studio?id={mine.id}" title="Edit in Studio" aria-label="Edit in Studio"><Icon name="plan" size={18} /><span class="lbl">Edit in Studio</span></a>
+			<button class="btn trash" onclick={() => (confirmDelete = true)} title="Delete project" aria-label="Delete project"><Icon name="trash" size={18} /></button>
 		{/if}
 	</div>
 </div>
-{#if details.address || level !== null}
-	<p class="loc"><Icon name="pin" size={15} />{[details.address, level !== null ? `Level ${level}` : ''].filter(Boolean).join(' · ')}</p>
-{/if}
-<p class="sub muted">
-	{#if mine}
-		{[details.unitNo, mine.sizeSqft ? `${mine.sizeSqft.toLocaleString()} sq ft` : ''].filter(Boolean).join(' · ')}
-	{:else}
-		{[details.unitNo, `${unit.sizeSqft.toLocaleString()} sq ft`].filter(Boolean).join(' · ')} · Demo project
-	{/if}
+<p class="meta">
+	<Icon name="pin" size={14} />
+	<span>{metaLine}</span>
 </p>
 
 {#if needsTrace}
@@ -260,17 +261,41 @@
 	.error {
 		color: #b5483a;
 	}
-	.loc {
+	.meta {
 		display: flex;
-		align-items: center;
+		align-items: flex-start;
 		gap: 6px;
-		margin: 2px 0 4px;
+		margin: 2px 0 14px;
 		font-size: 14px;
 		color: var(--muted);
 	}
-	.sub {
-		margin: 0 0 14px;
-		font-size: 14px;
+	.meta :global(svg) {
+		flex-shrink: 0;
+		margin-top: 2px;
+	}
+	.hactions .btn {
+		gap: 6px;
+	}
+	@media (max-width: 640px) {
+		h1 {
+			font-size: 26px;
+			line-height: 1.15;
+		}
+		.titlerow {
+			align-items: flex-start;
+		}
+		.hactions {
+			gap: 6px;
+			margin-top: 4px;
+		}
+		.hactions .btn {
+			width: 44px;
+			padding: 0;
+			justify-content: center;
+		}
+		.hactions .lbl {
+			display: none;
+		}
 	}
 	.details {
 		margin-top: 10px;

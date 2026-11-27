@@ -86,7 +86,7 @@
 	});
 </script>
 
-<button class="scrim" aria-label="Cancel" onclick={oncancel}></button>
+<button class="scrim" title="Cancel" aria-label="Cancel" onclick={oncancel}></button>
 <div class="dlg" role="dialog" aria-modal="true" aria-labelledby="crop-title">
 	<h2 id="crop-title">Choose your photo</h2>
 	<p class="muted small">Drag the square to move it · pinch or use the slider to resize</p>

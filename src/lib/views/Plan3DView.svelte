@@ -23,6 +23,27 @@
 	export function getScale() {
 		return scale;
 	}
+	/** RE:Aspect: centre the unit and make it as big as fits, keeping the current viewing angle. */
+	export function fit() {
+		const f = view?.fitScale();
+		scale = f ?? 1;
+		onzoom?.(scale);
+	}
+	// RE:Aspect: open fitted (centred, as big as fits) once the 3D engine is ready.
+	$effect(() => {
+		let tries = 0;
+		const id = setInterval(() => {
+			const f = view?.fitScale();
+			if (f || ++tries > 40) {
+				clearInterval(id);
+				if (f && scale === 1) {
+					scale = f;
+					onzoom?.(scale);
+				}
+			}
+		}, 150);
+		return () => clearInterval(id);
+	});
 	export function reset() {
 		scale = 1;
 		view?.reset();

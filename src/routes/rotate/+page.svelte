@@ -71,9 +71,9 @@
 		<img src={img.original ?? img.dataUrl} alt="Floor plan" style:transform="translate(var(--px, 0), var(--py, 0)) scale(var(--z, 1)) rotate({img.original ? angle : angle - (img.angle ?? 0)}deg)" />
 	</div>
 	<div class="rot">
-		<button class="btn" onclick={() => (turns = (turns + 3) % 4)} aria-label="Turn left 90°">⟲ 90°</button>
+		<button class="btn" onclick={() => (turns = (turns + 3) % 4)} title="Turn left 90°" aria-label="Turn left 90°">⟲ 90°</button>
 		<input type="range" min="-45" max="45" step="0.5" bind:value={fine} aria-label="Fine turn" />
-		<button class="btn" onclick={() => (turns = (turns + 1) % 4)} aria-label="Turn right 90°">90° ⟳</button>
+		<button class="btn" onclick={() => (turns = (turns + 1) % 4)} title="Turn right 90°" aria-label="Turn right 90°">90° ⟳</button>
 	</div>
 	{#if traced && angle !== (img.angle ?? 0)}
 		<p class="warn">Saving a new rotation clears the outline, walls and windows you traced (furniture stays), because they won't line up any more.</p>

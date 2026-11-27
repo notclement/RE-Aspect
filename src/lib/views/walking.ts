@@ -211,7 +211,9 @@ export function walkingInput(
 		'pointermove',
 		(e) => {
 			if (drag !== e.pointerId || document.pointerLockElement === canvas) return;
-			look(e.clientX - x, e.clientY - y);
+			// RE:Aspect: touch drags turn 2.5× faster than mouse (a swipe across a phone is short).
+			const k = e.pointerType === 'touch' ? 2.5 : 1;
+			look((e.clientX - x) * k, (e.clientY - y) * k);
 			x = e.clientX;
 			y = e.clientY;
 		},

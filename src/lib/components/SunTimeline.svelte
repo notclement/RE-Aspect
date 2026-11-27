@@ -8,6 +8,7 @@
 	import { profile } from '#lib/stores/profile.svelte.ts';
 
 	let {
+		sliderFirst = false,
 		minutes = $bindable(16 * 60),
 		date = $bindable(''),
 		cycleSeconds = 25,
@@ -19,6 +20,7 @@
 		exposure = null,
 		oninfo
 	}: {
+		sliderFirst?: boolean;
 		minutes?: number;
 		date?: string;
 		cycleSeconds?: number;
@@ -93,7 +95,7 @@
 	let dateInput: HTMLInputElement;
 </script>
 
-<section class="tl">
+<section class="tl" class:first={sliderFirst}>
 	<div class="head">
 		<Icon name="clock" size={20} />
 		<strong>Sun timeline</strong>
@@ -109,14 +111,14 @@
 			/>
 		</label>
 		{#if oninfo}
-			<button class="info" onclick={oninfo} aria-label="Sun info"><Icon name="info" size={20} /></button>
+			<button class="info" onclick={oninfo} title="Sun info" aria-label="Sun info"><Icon name="info" size={20} /></button>
 		{/if}
 	</div>
 	{#if withArc && sun && lat !== null && lon !== null}
 		<SunArc {date} {minutes} {lat} {lon} {sunrise} {sunset} altitude={sun.altitude} azimuth={sun.azimuth} {fmt} {exposure} onpick={(m) => (manual(), (minutes = Math.round(m)))} />
 	{/if}
 	<div class="row">
-		<button class="auto" class:on={playing} onclick={toggle} aria-pressed={playing} aria-label={playing ? 'Pause auto sun' : 'Auto sun'}>
+		<button class="auto" class:on={playing} onclick={toggle} aria-pressed={playing} title={playing ? 'Pause auto sun' : 'Auto sun'} aria-label={playing ? 'Pause auto sun' : 'Auto sun'}>
 			<Icon name={playing ? 'pause' : 'playo'} size={16} />
 			<span class="autolbl">{playing ? 'Pause' : 'Auto sun'}</span>
 		</button>
@@ -184,6 +186,17 @@
 		display: flex;
 		align-items: center;
 		gap: 12px;
+	}
+	/* Slider on top (so it's on screen with the plan); date, arc and stats below it. */
+	.tl.first {
+		display: flex;
+		flex-direction: column;
+	}
+	.tl.first .row {
+		order: -1;
+		padding-bottom: 10px;
+		margin-bottom: 12px;
+		border-bottom: 1px solid var(--line);
 	}
 	.auto {
 		display: inline-flex;

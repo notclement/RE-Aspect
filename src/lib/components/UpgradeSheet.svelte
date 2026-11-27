@@ -24,7 +24,7 @@
 </script>
 
 <svelte:window onkeydown={(e) => e.key === 'Escape' && onclose()} />
-<button class="scrim" aria-label="Not now" onclick={onclose}></button>
+<button class="scrim" title="Not now" aria-label="Not now" onclick={onclose}></button>
 <div class="dlg" role="dialog" aria-modal="true" aria-labelledby="up-title">
 	<span class="ic"><Icon name="sparkle" size={22} /></span>
 	<h2 id="up-title">{title}</h2>

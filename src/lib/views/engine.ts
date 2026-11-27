@@ -85,13 +85,23 @@ export function create(
 			camera.position.set(nav.x, clamp(s.eye, 3, s.unit.ceiling - 3), nav.y);
 			camera.rotation.set(pitch, -az, 0, 'YXZ');
 		} else {
+			place(s.scale);
+		}
+		renderer.render(scene, camera);
+		return moving;
+	}
+	/** Orbit camera for a zoom scale (RE:Aspect: split out so "fit" can measure it). */
+	function place(scale: number) {
+		const s = settings();
+		if (!model) return;
+		{
 			const b = model.b,
 				targetY = Math.min(100, s.unit.ceiling * 0.32);
 			// Enclose the complete footprint and wall tops, independent of orbit and aspect.
 			// RE:Aspect: fit the footprint more tightly so the unit fills the view (was a loose bounding sphere).
 			const radius = Math.hypot(b.w / 2, b.h / 2) * 0.82 + Math.min(230, s.unit.ceiling) * 0.15;
 			const fov = Math.atan(Math.tan((camera.fov * rad) / 2) * Math.min(1, camera.aspect));
-			const dist = radius / (Math.sin(fov) * s.scale),
+			const dist = radius / (Math.sin(fov) * scale),
 				horizontal = dist * Math.cos(tilt);
 			camera.position.set(
 				b.cx + Math.sin(az) * horizontal,
@@ -100,8 +110,29 @@ export function create(
 			);
 			camera.lookAt(b.cx, targetY, b.cy);
 		}
-		renderer.render(scene, camera);
-		return moving;
+	}
+	/** RE:Aspect: the zoom scale at which the whole unit (floor to wall tops) fills ~90 % of the view. */
+	function fitScale(): number | null {
+		const s = settings();
+		if (!model || walk || !width || !height) return null;
+		const b = model.b,
+			hTop = s.unit.ceiling;
+		const v = new T.Vector3();
+		let scale = 1;
+		for (let i = 0; i < 5; i++) {
+			place(scale);
+			camera.updateMatrixWorld();
+			let m = 0;
+			for (const x of [b.x, b.x + b.w])
+				for (const z of [b.y, b.y + b.h])
+					for (const y of [0, hTop]) {
+						v.set(x, y, z).project(camera);
+						m = Math.max(m, Math.abs(v.x), Math.abs(v.y));
+					}
+			if (!(m > 0)) break;
+			scale = clamp(scale * (0.9 / m), 0.7, 2.5);
+		}
+		return scale;
 	}
 	const stage = surface(
 		canvas,
@@ -150,6 +181,7 @@ export function create(
 		);
 	return {
 		reset,
+		fitScale,
 		lighting() {
 			dirty = true;
 			stage.invalidate();

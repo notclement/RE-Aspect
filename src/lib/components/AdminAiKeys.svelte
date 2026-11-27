@@ -166,7 +166,7 @@
 					{:else}
 						<span class="row-actions">
 							{#if k.active}<span class="tag on">Active</span>{:else}<button class="btn" onclick={() => use(k.id)} disabled={busy}>Use this</button>{/if}
-							<button class="btn icon" aria-label="Delete {k.label}" onclick={() => (confirmDelete = k.id)}><Icon name="trash" size={18} /></button>
+							<button class="btn icon" title="Delete {k.label}" aria-label="Delete {k.label}" onclick={() => (confirmDelete = k.id)}><Icon name="trash" size={18} /></button>
 						</span>
 					{/if}
 				</li>

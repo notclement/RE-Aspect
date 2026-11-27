@@ -67,7 +67,7 @@
 		</div>
 		<Icon name="chevron" />
 	</a>
-	<button class="del" onclick={() => (toDelete = { id: p.id, name: p.name })} aria-label="Delete {p.name}"><Icon name="trash" size={18} /></button>
+	<button class="del" onclick={() => (toDelete = { id: p.id, name: p.name })} title="Delete {p.name}" aria-label="Delete {p.name}"><Icon name="trash" size={18} /></button>
 	</div>
 {/each}
 {#if toDelete}<ConfirmDelete id={toDelete.id} name={toDelete.name} onclose={() => (toDelete = null)} />{/if}

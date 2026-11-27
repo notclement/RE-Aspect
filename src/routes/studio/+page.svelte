@@ -779,9 +779,9 @@
 			{/if}
 			<span class="state muted">{savedAt === 'saving' ? 'Saving…' : 'Saved'}</span>
 			{#if backdrop}
-				<button class="mini" class:on={showBackdrop} onclick={() => (showBackdrop = !showBackdrop)} aria-pressed={showBackdrop} aria-label="Show floor plan photo"><Icon name="image" size={18} /></button>
+				<button class="mini" class:on={showBackdrop} onclick={() => (showBackdrop = !showBackdrop)} aria-pressed={showBackdrop} title="Show floor plan photo" aria-label="Show floor plan photo"><Icon name="image" size={18} /></button>
 			{/if}
-			<button class="mini" onclick={fit} aria-label="Fit to screen"><Icon name="grid" size={18} /></button>
+			<button class="mini" onclick={fit} title="Fit to screen" aria-label="Fit to screen"><Icon name="grid" size={18} /></button>
 			<button class="btn primary done" onclick={done}><Icon name="check" size={18} />Done</button>
 		</div>
 
@@ -871,8 +871,8 @@
 			</button>
 		{/if}
 		<div class="zoom" role="group" aria-label="Zoom">
-			<button onclick={() => zoomBtn(1 / 1.3)} aria-label="Zoom in"><Icon name="plus" size={20} /></button>
-			<button onclick={() => zoomBtn(1.3)} aria-label="Zoom out"><Icon name="minus" size={20} /></button>
+			<button onclick={() => zoomBtn(1 / 1.3)} title="Zoom in" aria-label="Zoom in"><Icon name="plus" size={20} /></button>
+			<button onclick={() => zoomBtn(1.3)} title="Zoom out" aria-label="Zoom out"><Icon name="minus" size={20} /></button>
 		</div>
 		{#if toast}<div class="toast" role="status">{toast}</div>{:else}<div class="hint">{HINT[mode]}</div>{/if}
 
@@ -883,12 +883,12 @@
 				<strong>{KIND_LABEL[selItem.kind]}</strong>
 				<span class="muted">{Math.round(selItem.w)} × {Math.round(selItem.d)} cm</span>
 				<div class="rot" role="group" aria-label="Rotate">
-					<button onclick={() => rotateBy(-15)} aria-label="Rotate 15° anticlockwise"><span class="ccw"><Icon name="rotate" size={18} /></span></button>
-					<button class="deg" onclick={openSize} aria-label="Set exact angle">{Math.round(selItem.rot ?? 0)}°</button>
-					<button onclick={() => rotateBy(15)} aria-label="Rotate 15° clockwise"><Icon name="rotate" size={18} /></button>
+					<button onclick={() => rotateBy(-15)} title="Rotate 15° anticlockwise" aria-label="Rotate 15° anticlockwise"><span class="ccw"><Icon name="rotate" size={18} /></span></button>
+					<button class="deg" onclick={openSize} title="Set exact angle" aria-label="Set exact angle">{Math.round(selItem.rot ?? 0)}°</button>
+					<button onclick={() => rotateBy(15)} title="Rotate 15° clockwise" aria-label="Rotate 15° clockwise"><Icon name="rotate" size={18} /></button>
 				</div>
 				<button class="btn" onclick={openSize}>Size</button>
-				<button class="btn icon" onclick={del} aria-label="Delete"><Icon name="trash" size={18} /></button>
+				<button class="btn icon" onclick={del} title="Delete" aria-label="Delete"><Icon name="trash" size={18} /></button>
 			</div>
 		{:else if selWin}
 			<div class="ctx">
@@ -899,7 +899,7 @@
 						<button role="radio" aria-checked={Math.abs(selWin.glass - g.v) < 0.01} class:on={Math.abs(selWin.glass - g.v) < 0.01} onclick={() => setGlass(g.v)}>{g.label}</button>
 					{/each}
 				</div>
-				<button class="btn icon" onclick={del} aria-label="Delete window"><Icon name="trash" size={18} /></button>
+				<button class="btn icon" onclick={del} title="Delete window" aria-label="Delete window"><Icon name="trash" size={18} /></button>
 			</div>
 		{:else if selDoor}
 			<div class="ctx">
@@ -911,12 +911,12 @@
 				{#if !selDoor.glass}
 					<button class="btn" onclick={() => setDoor({ flip: (selDoor.flip + 1) % 4 })}>Flip</button>
 				{/if}
-				<button class="btn icon" onclick={del} aria-label="Delete door"><Icon name="trash" size={18} /></button>
+				<button class="btn icon" onclick={del} title="Delete door" aria-label="Delete door"><Icon name="trash" size={18} /></button>
 			</div>
 		{:else if sel?.t === 'wall'}
 			<div class="ctx">
 				<strong>Wall</strong>
-				<button class="btn icon" onclick={del} aria-label="Delete wall"><Icon name="trash" size={18} /></button>
+				<button class="btn icon" onclick={del} title="Delete wall" aria-label="Delete wall"><Icon name="trash" size={18} /></button>
 			</div>
 		{:else if mode === 'outline' && draft.length}
 			<div class="ctx">
@@ -939,7 +939,7 @@
 
 	{#if limitSheet}<UpgradeSheet reason={limitSheet} onclose={() => (limitSheet = null)} />{/if}
 	{#if askTrace}
-		<button class="scrim" aria-label="Cancel" onclick={() => (askTrace = false)}></button>
+		<button class="scrim" title="Cancel" aria-label="Cancel" onclick={() => (askTrace = false)}></button>
 		<div class="sheet ask" role="dialog" aria-modal="true" aria-labelledby="trace-title">
 			<h2 id="trace-title">Auto-trace this plan?</h2>
 			<p class="muted">The AI traces the outline, walls and room names from the floor plan photo (about 10–30 seconds); you then add the windows.{plan.outline.length >= 3 || plan.walls.length ? ' This replaces what is traced now (Undo brings it back).' : ''} Furniture you've placed stays. Uses one of this project's AI re-runs ({profile.aiRunsLabel} per project).</p>
@@ -951,7 +951,7 @@
 	{/if}
 
 	{#if askFurniture}
-		<button class="scrim" aria-label="Close" onclick={() => (askFurniture = false)}></button>
+		<button class="scrim" title="Close" aria-label="Close" onclick={() => (askFurniture = false)}></button>
 		<div class="sheet ask" role="dialog" aria-modal="true" aria-labelledby="ask-title">
 			<h2 id="ask-title">Add furniture?</h2>
 			<p class="muted">There's no furniture yet. Adding beds, sofas and tables shows exactly where the sun lands on them.</p>
@@ -963,7 +963,7 @@
 	{/if}
 
 	{#if sheet}
-		<button class="scrim" aria-label="Close" onclick={() => (sheet = null)}></button>
+		<button class="scrim" title="Close" aria-label="Close" onclick={() => (sheet = null)}></button>
 		<div class="sheet" role="dialog" aria-modal="true">
 			{#if sheet === 'furniture'}
 				<h2>Add furniture</h2>

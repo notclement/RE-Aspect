@@ -22,7 +22,7 @@
 </script>
 
 <svelte:window onkeydown={(e) => e.key === 'Escape' && !busy && onclose()} />
-<button class="scrim" aria-label="Cancel" onclick={() => !busy && onclose()}></button>
+<button class="scrim" title="Cancel" aria-label="Cancel" onclick={() => !busy && onclose()}></button>
 <div class="dlg" role="alertdialog" aria-modal="true" aria-labelledby="del-title">
 	<span class="ic"><Icon name="trash" size={22} /></span>
 	<h2 id="del-title">Delete “{name}”?</h2>

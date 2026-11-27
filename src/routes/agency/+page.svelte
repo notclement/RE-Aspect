@@ -156,14 +156,14 @@
 		{#if editing}
 			<form class="nameedit" onsubmit={rename} novalidate>
 				<input maxlength="60" bind:value={newName} placeholder="Type here…" aria-label="Agency name" onkeydown={(e) => e.key === 'Escape' && (editing = false)} />
-				<button class="ib ok" type="submit" aria-label="Save name"><Icon name="check" size={18} /></button>
-				<button class="ib" type="button" onclick={() => (editing = false)} aria-label="Cancel"><Icon name="close" size={18} /></button>
+				<button class="ib ok" type="submit" title="Save name" aria-label="Save name"><Icon name="check" size={18} /></button>
+				<button class="ib" type="button" onclick={() => (editing = false)} title="Cancel" aria-label="Cancel"><Icon name="close" size={18} /></button>
 			</form>
 			{#if nameErr}<span class="error small">{nameErr}</span>{/if}
 		{:else}
 			<div class="namerow">
 				<h1>{info.name}</h1>
-				{#if isLead}<button class="ib" onclick={() => ((newName = info.name), (nameErr = null), (editing = true))} aria-label="Rename agency"><Icon name="pencil" size={18} /></button>{/if}
+				{#if isLead}<button class="ib" onclick={() => ((newName = info.name), (nameErr = null), (editing = true))} title="Rename agency" aria-label="Rename agency"><Icon name="pencil" size={18} /></button>{/if}
 			</div>
 		{/if}
 		<div class="badges">

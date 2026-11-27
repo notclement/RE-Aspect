@@ -21,6 +21,9 @@
 	export function reset() {
 		engine?.reset();
 	}
+	export function fitScale() {
+		return engine?.fitScale() ?? null;
+	}
 	$effect(() => {
 		void [
 			settings.unit,

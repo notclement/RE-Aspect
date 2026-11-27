@@ -79,19 +79,42 @@
 		return () => clearTimeout(hashTimer);
 	});
 
-	// ---- canvas height (drag the grip)
-	const H_KEY = 'rea.canvasH2'; // v2: bigger default on desktop
+	// ---- canvas height: on load, as big as possible while the time slider still fits on screen
+	// (phones and desktop). Drag the grip to change it for this visit.
 	let canvasH = $state(320);
-	$effect(() => {
-		const saved = Number(localStorage.getItem(H_KEY));
-		// Default: a big plan on desktop/tablet, compact on phones so the timeline stays on screen.
-		canvasH = saved > 0 ? clampH(saved) : clampH(Math.round(innerHeight * (innerWidth >= 900 ? 0.6 : 0.38)));
-	});
+	let studyEl = $state<HTMLDivElement>();
+	let canvasEl = $state<HTMLDivElement>();
+	let userSized = false;
 	function clampH(h: number) {
-		return Math.round(Math.min(innerHeight * 0.85, Math.max(220, h)));
+		return Math.round(Math.min(innerHeight * 0.85, Math.max(200, h)));
 	}
+	function fitHeight() {
+		if (userSized || !canvasEl || !studyEl) return;
+		const slider = studyEl.querySelector('.timeline input[type="range"]');
+		if (!slider) return;
+		const c = canvasEl.getBoundingClientRect();
+		const below = slider.getBoundingClientRect().bottom + 30 - c.bottom; // + the hour labels under it
+		const top = c.top + scrollY;
+		canvasH = clampH(innerHeight - top - below - 8);
+	}
+	onMount(() => {
+		// Twice: once now, once after fonts/the timeline have settled.
+		requestAnimationFrame(() => requestAnimationFrame(fitHeight));
+		const t = setTimeout(fitHeight, 400);
+		let ro = 0;
+		const onResize = () => {
+			cancelAnimationFrame(ro);
+			ro = requestAnimationFrame(fitHeight);
+		};
+		addEventListener('resize', onResize);
+		return () => {
+			clearTimeout(t);
+			removeEventListener('resize', onResize);
+		};
+	});
 	let dragY: number | null = null;
 	function hDown(e: PointerEvent) {
+		userSized = true;
 		(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
 		dragY = e.clientY;
 	}
@@ -102,17 +125,16 @@
 	}
 	function hUp() {
 		dragY = null;
-		try {
-			localStorage.setItem(H_KEY, String(canvasH));
-		} catch {
-			/* ignore */
-		}
 	}
 
 	// ---- the sun and the light
 	let grid = $state(true);
 	let zoomPct = $state(100);
-	let plan = $state<{ zoomBy(f: number): void; getScale(): number; reset(): void }>();
+	let plan = $state<{ zoomBy(f: number): void; getScale(): number; reset(): void; fit(): void }>();
+	function fit() {
+		plan?.fit();
+		zoomPct = Math.round((plan?.getScale() ?? 1) * 100);
+	}
 	function zoom(f: number) {
 		plan?.zoomBy(f);
 		zoomPct = Math.round((plan?.getScale() ?? 1) * 100);
@@ -198,7 +220,7 @@
 	);
 </script>
 
-<div class="study">
+<div class="study" bind:this={studyEl}>
 	<section class="viewer">
 		<div class="seg" role="tablist" aria-label="View">
 			{#each views as v (v)}
@@ -206,7 +228,11 @@
 			{/each}
 		</div>
 
-		<div class="canvas" style:height="{canvasH}px">
+		<div class="canvas" bind:this={canvasEl} style:height="{canvasH}px">
+			<div class="legend" title={hint}>
+				<span class="key"><i class="am"></i>Morning</span>
+				<span class="key"><i class="pm"></i>Afternoon</span>
+			</div>
 			<div class="scene">
 			{#if vs.view === 'walk'}
 				<WalkView {unit} {sun} {patches} {dark} {furniture} sunColor={tint} eyeLevelCm={profile.eyeLevelCm} walkSpeed={profile.data.walkSpeed} lookSensitivity={profile.data.lookSensitivity} onexit={() => (vs.view = views[0])} />
@@ -218,10 +244,11 @@
 			</div>
 			{#if vs.view !== 'walk'}
 				<div class="zoom">
-					<button onclick={() => zoom(1.2)} aria-label="Zoom in"><Icon name="plus" size={16} /></button>
+					<button onclick={() => zoom(1.2)} title="Zoom in" aria-label="Zoom in"><Icon name="plus" size={16} /></button>
 					<span>{zoomPct}%</span>
-					<button onclick={() => zoom(1 / 1.2)} aria-label="Zoom out"><Icon name="minus" size={16} /></button>
-					<button class="g" onclick={() => (grid = !grid)} aria-label="Toggle grid" aria-pressed={grid}><Icon name="grid" size={15} /></button>
+					<button onclick={() => zoom(1 / 1.2)} title="Zoom out" aria-label="Zoom out"><Icon name="minus" size={16} /></button>
+					<button class="g" onclick={fit} aria-label="Centre and fit the unit" title="Centre and fit"><Icon name="fit" size={16} /></button>
+					<button class="g" onclick={() => (grid = !grid)} title="Toggle grid" aria-label="Toggle grid" aria-pressed={grid}><Icon name="grid" size={15} /></button>
 				</div>
 			{/if}
 		</div>
@@ -236,6 +263,7 @@
 			onpointerup={hUp}
 			onpointercancel={hUp}
 			onkeydown={(e) => {
+				userSized = true;
 				if (e.key === 'ArrowDown') canvasH = clampH(canvasH + 30);
 				else if (e.key === 'ArrowUp') canvasH = clampH(canvasH - 30);
 				else return;
@@ -245,11 +273,11 @@
 		>
 			<span></span>
 		</div>
-		<div class="legend" title={hint}>
-			<span class="key"><i class="am"></i>Morning sun</span>
-			<span class="key"><i class="pm"></i>Afternoon sun</span>
-		</div>
 	</section>
+
+	<div class="timeline">
+		<SunTimeline sliderFirst bind:minutes={vs.minutes} bind:date={vs.date} sunrise={times.sunrise} sunset={times.sunset} lat={unit.lat} lon={unit.lon} {sun} {exposure} oninfo={() => (infoOpen = true)} />
+	</div>
 
 	<div class="below">
 		<p class="summary">{summary}</p>
@@ -258,10 +286,6 @@
 				<Icon name="sun" size={14} /><strong>{score.score.toFixed(1)}</strong>/10 · faces {compass16(score.facingDeg)}
 			</button>
 		{/if}
-	</div>
-
-	<div class="timeline">
-		<SunTimeline bind:minutes={vs.minutes} bind:date={vs.date} sunrise={times.sunrise} sunset={times.sunset} lat={unit.lat} lon={unit.lon} {sun} {exposure} oninfo={() => (infoOpen = true)} />
 	</div>
 
 	<div class="how" bind:this={howEl}>
@@ -292,7 +316,7 @@
 	.study {
 		display: grid;
 		grid-template-columns: minmax(0, 1fr);
-		grid-template-areas: 'viewer' 'below' 'timeline' 'how';
+		grid-template-areas: 'viewer' 'timeline' 'below' 'how';
 	}
 	.viewer {
 		grid-area: viewer;
@@ -306,6 +330,7 @@
 	}
 	.timeline {
 		grid-area: timeline;
+		margin-top: 10px;
 	}
 	.how {
 		grid-area: how;
@@ -373,14 +398,19 @@
 		background: color-mix(in srgb, var(--muted) 55%, transparent);
 	}
 	.legend {
+		position: absolute;
+		left: 10px;
+		top: 10px;
+		z-index: 3;
 		display: flex;
-		flex-wrap: wrap;
-		align-items: center;
-		gap: 6px 14px;
-		padding: 8px 12px 10px;
-		font-size: 12px;
+		gap: 10px;
+		padding: 5px 9px;
+		font-size: 11px;
 		color: var(--muted);
-		border-top: 1px solid var(--line);
+		background: color-mix(in srgb, var(--surface) 85%, transparent);
+		border: 1px solid var(--line);
+		border-radius: 999px;
+		pointer-events: auto;
 	}
 	.key {
 		display: inline-flex;

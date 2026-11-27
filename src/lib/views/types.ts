@@ -28,6 +28,7 @@ export interface PlanControls {
 	zoomBy(f: number): void;
 	getScale(): number;
 	reset(): void;
+	fit(): void;
 }
 export type Point = [number, number];
 export const rad = Math.PI / 180;

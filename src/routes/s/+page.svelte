@@ -82,7 +82,7 @@
 </svelte:head>
 
 <div class="wrap">
-	<a class="logo" href="/" aria-label="{BRAND.name} home"><span class="dot"></span>{BRAND.name}</a>
+	<a class="logo" href="/" title="{BRAND.name} home" aria-label="{BRAND.name} home"><span class="dot"></span>{BRAND.name}</a>
 
 	{#if state_ === 'loading'}
 		<div class="center"><Spinner size={22} /></div>

@@ -40,14 +40,14 @@
 <svelte:window onkeydown={onKey} />
 
 {#if open}
-	<button class="scrim" aria-label="Close sun info" onclick={() => (open = false)}></button>
+	<button class="scrim" title="Close sun info" aria-label="Close sun info" onclick={() => (open = false)}></button>
 	<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="suninfo-title">
 		<div class="grab" aria-hidden="true"></div>
 		<header>
 			<Icon name="sun" size={20} />
 			<h2 id="suninfo-title">Sun info</h2>
 			<span class="muted">{dateLabel}</span>
-			<button class="x" onclick={() => (open = false)} aria-label="Close"><Icon name="close" size={20} /></button>
+			<button class="x" onclick={() => (open = false)} title="Close" aria-label="Close"><Icon name="close" size={20} /></button>
 		</header>
 
 		<SunArc {date} {minutes} lat={unit.lat} lon={unit.lon} {sunrise} {sunset} altitude={sun.altitude} azimuth={sun.azimuth} {fmt} full />

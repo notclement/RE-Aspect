@@ -345,7 +345,7 @@
 					{#each photos as p (p.id)}
 						<figure>
 							<img src={p.img.dataUrl} alt="" decoding="async" />
-							<button class="x" onclick={() => removePhoto(p.id)} aria-label="Remove photo"><Icon name="close" size={16} /></button>
+							<button class="x" onclick={() => removePhoto(p.id)} title="Remove photo" aria-label="Remove photo"><Icon name="close" size={16} /></button>
 						</figure>
 					{/each}
 					{#each Array(adding) as _, i (i)}<figure class="loading"><Spinner size={18} /></figure>{/each}
@@ -424,7 +424,7 @@
 			<p class="muted lead">Tap the <strong>floor plan</strong>, then turn it so the unit's <strong>north points up</strong>.</p>
 			<div class="pick">
 				{#each photos as p (p.id)}
-					<button class:on={p.id === planId} onclick={() => pickPlan(p.id)} aria-label="Use as floor plan">
+					<button class:on={p.id === planId} onclick={() => pickPlan(p.id)} title="Use as floor plan" aria-label="Use as floor plan">
 						<img src={p.img.dataUrl} alt="" decoding="async" />
 						{#if p.id === planId}<span class="badge">Floor plan</span>{/if}
 					</button>
@@ -455,9 +455,9 @@
 					<img src={planPhoto.img.dataUrl} alt="Floor plan" style:transform="translate(var(--px, 0), var(--py, 0)) scale(var(--z, 1)) rotate({angle}deg)" />
 				</div>
 				<div class="rot">
-					<button class="btn" onclick={() => ((turns = (turns + 3) % 4), (userTurned = true))} aria-label="Turn left 90°"><span class="flip"><Icon name="back" size={18} /></span>90°</button>
+					<button class="btn" onclick={() => ((turns = (turns + 3) % 4), (userTurned = true))} title="Turn left 90°" aria-label="Turn left 90°"><span class="flip"><Icon name="back" size={18} /></span>90°</button>
 					<input type="range" min="-45" max="45" step="0.5" bind:value={fine} oninput={() => (userTurned = true)} aria-label="Fine turn" />
-					<button class="btn" onclick={() => ((turns = (turns + 1) % 4), (userTurned = true))} aria-label="Turn right 90°">90°<span class="flip r"><Icon name="back" size={18} /></span></button>
+					<button class="btn" onclick={() => ((turns = (turns + 1) % 4), (userTurned = true))} title="Turn right 90°" aria-label="Turn right 90°">90°<span class="flip r"><Icon name="back" size={18} /></span></button>
 				</div>
 				<p class="muted small center">{angle === 0 ? 'Not turned' : `Turned ${((angle % 360) + 360) % 360}° clockwise`} · <button class="link" onclick={() => ((turns = 0), (fine = 0), (userTurned = true))}>Reset</button></p>
 			{/if}

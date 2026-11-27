@@ -100,7 +100,8 @@ function batch(scene: T.Scene, transparent = false, itemCount = 0) {
 					let upload = false;
 					for (let i = 0; i < itemCount; i++) {
 						const offset = (i + 1) * 4,
-							lit = l.sun.altitude > 0 && l.furniture.lit.has(i),
+							// RE:Aspect: no whole-object tint (it made sunlit furniture glow orange all over).
+							lit = false && l.sun.altitude > 0 && l.furniture.lit.has(i),
 							blue = lit ? 203 : 255;
 						if (bytes[offset + 2] === blue) continue;
 						bytes[offset + 1] = lit ? 243 : 255;

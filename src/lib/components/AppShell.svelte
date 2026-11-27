@@ -82,9 +82,9 @@
 
 <header class="top">
 	{#if isSub}
-		<button class="iconbtn" onclick={back} aria-label="Back"><Icon name="back" size={22} /></button>
+		<button class="iconbtn" onclick={back} title="Back" aria-label="Back"><Icon name="back" size={22} /></button>
 	{:else}
-		<button class="iconbtn" onclick={() => (open = true)} aria-label="Open menu"><Icon name="menu" size={20} /></button>
+		<button class="iconbtn" onclick={() => (open = true)} title="Open menu" aria-label="Open menu"><Icon name="menu" size={20} /></button>
 	{/if}
 	<nav class="crumbs" aria-label="Breadcrumb">
 		{#each nav.crumbs as c, i (i)}
@@ -93,10 +93,10 @@
 		{/each}
 	</nav>
 	{#if promo.active && !promo.open}
-		<button class="iconbtn gift" onclick={() => (promo.open = true)} aria-label="Show the Pro promo"><Icon name="gift" size={20} /></button>
+		<button class="iconbtn gift" onclick={() => (promo.open = true)} title="Show the Pro promo" aria-label="Show the Pro promo"><Icon name="gift" size={20} /></button>
 	{/if}
 	<div class="acct" bind:this={acctEl}>
-		<button class="me" class:on={acct} onclick={() => (acct = !acct)} aria-label="Account menu" aria-expanded={acct}>
+		<button class="me" class:on={acct} onclick={() => (acct = !acct)} title="Account menu" aria-label="Account menu" aria-expanded={acct}>
 			<Avatar size={44} />
 		</button>
 		{#if acct}
@@ -131,7 +131,7 @@
 			<strong>Pro for everyone until {new Date(promo.current.endsAt).toLocaleDateString('en-SG', { day: 'numeric', month: 'short' })}</strong>
 			<span>{promo.current.message}</span>
 		</div>
-		<button class="pclose" onclick={() => promo.dismiss()} aria-label="Hide (reopen from the gift button, top right)"><Icon name="close" size={18} /></button>
+		<button class="pclose" onclick={() => promo.dismiss()} title="Hide (reopen from the gift button, top right)" aria-label="Hide (reopen from the gift button, top right)"><Icon name="close" size={18} /></button>
 	</div>
 {/if}
 {#if profile.viewAs}
@@ -144,7 +144,7 @@
 <main class="main">{@render children()}</main>
 
 {#if open}
-	<button class="scrim" aria-label="Close menu" onclick={() => (open = false)}></button>
+	<button class="scrim" title="Close menu" aria-label="Close menu" onclick={() => (open = false)}></button>
 	<aside class="drawer" aria-label="Menu">
 		<div class="brand"><span class="dot"></span><strong>{BRAND.name}</strong></div>
 		{#each links as l (l.href)}

@@ -114,7 +114,7 @@
 	</div>
 	{#if exposure}
 		{#if exposure.peak !== null}
-			<button class="peak" onclick={() => onpick?.(exposure!.peak!)} aria-label="Jump to the most sun inside, {fmt(exposure.peak)}">
+			<button class="peak" onclick={() => onpick?.(exposure!.peak!)} title="Jump to the most sun inside, {fmt(exposure.peak)}" aria-label="Jump to the most sun inside, {fmt(exposure.peak)}">
 				<span class="swatch"></span><span class="long">Most sun inside</span><span class="short">Peak inside</span> <strong>{fmt(exposure.peak)}</strong>
 			</button>
 		{:else}

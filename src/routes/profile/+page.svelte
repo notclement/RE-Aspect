@@ -88,7 +88,7 @@
 <svelte:head><title>Profile · RE:Aspect</title></svelte:head>
 
 <section class="card head">
-	<button class="av" onclick={() => fileInput?.click()} disabled={photoBusy} aria-label={profile.data.avatar ? 'Change photo' : 'Add photo'}>
+	<button class="av" onclick={() => fileInput?.click()} disabled={photoBusy} title={profile.data.avatar ? 'Change photo' : 'Add photo'} aria-label={profile.data.avatar ? 'Change photo' : 'Add photo'}>
 		<Avatar size={84} />
 		<span class="cam"><Icon name="camera" size={16} /></span>
 	</button>
@@ -107,14 +107,14 @@
 					aria-label="Display name"
 					onkeydown={(e) => e.key === 'Escape' && (editingName = false)}
 				/>
-				<button class="ib ok" type="submit" aria-label="Save name"><Icon name="check" size={18} /></button>
-				<button class="ib" type="button" onclick={() => (editingName = false)} aria-label="Cancel"><Icon name="close" size={18} /></button>
+				<button class="ib ok" type="submit" title="Save name" aria-label="Save name"><Icon name="check" size={18} /></button>
+				<button class="ib" type="button" onclick={() => (editingName = false)} title="Cancel" aria-label="Cancel"><Icon name="close" size={18} /></button>
 			</form>
 			{#if error}<span class="error small">{error}</span>{/if}
 		{:else}
 			<div class="namerow">
 				<h1>{profile.data.name || 'Add your name'}</h1>
-				<button class="ib" onclick={startEditName} aria-label="Edit display name"><Icon name="pencil" size={18} /></button>
+				<button class="ib" onclick={startEditName} title="Edit display name" aria-label="Edit display name"><Icon name="pencil" size={18} /></button>
 			</div>
 		{/if}
 		<span class="muted email">{auth.email ?? 'Preview mode'}</span>

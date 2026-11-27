@@ -33,6 +33,13 @@
 			invalidate();
 		}
 	}
+	/** RE:Aspect: centre the unit and make it as big as fits (95 % of the view instead of the default 86 %). */
+	export function fit() {
+		scale = 0.95 / 0.86;
+		px = py = 0;
+		onzoom?.(scale);
+		invalidate();
+	}
 	export function reset() {
 		scale = 1;
 		px = py = 0;
@@ -195,14 +202,15 @@
 					sx = Math.sin(az),
 					sy = -Math.cos(az);
 				if (sun.altitude > 0 && dark < 1) {
-					c.strokeStyle = sunColor || p.ochre;
-					c.globalAlpha = 0.26 * (1 - dark);
-					c.lineWidth = 2;
-					c.beginPath();
+					const col = sunColor || p.ochre;
+					c.globalAlpha = 0.45 * (1 - dark);
+					c.lineWidth = 2.5;
+					c.lineCap = 'round';
 					for (const q of beams)
 						if (q.nx * sx + q.ny * sy > 0.12) {
 							// Stop the exterior streak at the first boundary, including re-entrant corners.
-							let reach = 36;
+							// RE:Aspect: long rays (2.2 m) that fade out away from the wall.
+							let reach = 220;
 							const a = unit.outline;
 							for (let j = 0; j < a.length; j++) {
 								const v = a[j],
@@ -217,27 +225,27 @@
 									u = (x * sy - y * sx) / den;
 								if (t > 0.01 && u >= 0 && u <= 1) reach = Math.min(t, reach);
 							}
-							c.moveTo(q.x + sx * reach, q.y + sy * reach);
+							const ex = q.x + sx * reach,
+								ey = q.y + sy * reach,
+								g = c.createLinearGradient(ex, ey, q.x, q.y);
+							g.addColorStop(0, /^#[0-9a-f]{6}$/i.test(col) ? col + '00' : 'transparent');
+							g.addColorStop(1, col);
+							c.strokeStyle = g;
+							c.beginPath();
+							c.moveTo(ex, ey);
 							c.lineTo(q.x, q.y);
+							c.stroke();
 						}
-					c.stroke();
 					c.globalAlpha = 1;
 				}
 				c.drawImage(floor.base, b.x, b.y, b.w, b.h);
 				c.drawImage(floor.light, b.x, b.y, b.w, b.h);
 				c.drawImage(ink.canvas, b.x, b.y, b.w, b.h);
-				if (sun.altitude > 0) {
-					c.fillStyle = sunColor || p.ochre;
-					c.globalAlpha = 0.14 * (1 - dark);
-					for (const idx of furniture.lit) {
-						const it = unit.items[idx];
-						if (!it) continue;
-						c.save();
-						c.translate(it.x + it.w / 2, it.y + it.d / 2);
-						c.rotate((it.rot ?? 0) * rad);
-						c.fillRect(-it.w / 2, -it.d / 2, it.w, it.d);
-						c.restore();
-					}
+				// RE:Aspect: only the part of a piece of furniture that's actually in the sun patch lights up
+				// (a faint copy of the light on top), instead of tinting the whole object orange.
+				if (sun.altitude > 0 && dark < 1) {
+					c.globalAlpha = 0.35;
+					c.drawImage(floor.light, b.x, b.y, b.w, b.h);
 					c.globalAlpha = 1;
 				}
 				c.font = '500 ' + clamp(11 / k, 12, 38) + 'px system-ui';

@@ -90,13 +90,13 @@
 <svelte:window onkeydown={onKey} />
 
 {#if open}
-	<button class="scrim" aria-label="Close share" onclick={() => (open = false)}></button>
+	<button class="scrim" title="Close share" aria-label="Close share" onclick={() => (open = false)}></button>
 	<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="share-title">
 		<div class="grab" aria-hidden="true"></div>
 		<header>
 			<Icon name="share" size={20} />
 			<h2 id="share-title">Share this unit</h2>
-			<button class="x" onclick={() => (open = false)} aria-label="Close"><Icon name="close" size={20} /></button>
+			<button class="x" onclick={() => (open = false)} title="Close" aria-label="Close"><Icon name="close" size={20} /></button>
 		</header>
 		<p class="muted">Anyone with the link can view the sun study — no account needed. It opens on the view, date and time you're looking at now. Notes stay private.</p>
 
