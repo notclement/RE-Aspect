@@ -205,7 +205,7 @@
 			</div>
 		{:else}
 			{#key vs.view}
-				<PlanView bind:this={planView} {unit} mode={vs.view} {patches} {dark} {sun} {furniture} showSun={profile.data.showSunMarker} {grid} />
+				<PlanView bind:this={planView} {unit} mode={vs.view} {patches} {dark} {sun} {furniture} showSun={profile.data.showSunMarker} {grid} onzoom={(k) => (zoomPct = Math.round(k * 100))} />
 			{/key}
 			<div class="zoom">
 				<button onclick={() => zoom(1.2)} aria-label="Zoom in"><Icon name="plus" size={16} /></button>

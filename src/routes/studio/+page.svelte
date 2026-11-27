@@ -1,7 +1,7 @@
 <script lang="ts">
 	/**
 	 * Studio — fix and finish a project's plan. Mobile-first, one SVG canvas in cm, tools at the bottom.
-	 *   Move     · tap to select; drag furniture / window ends; drag empty space to pan; zoom with + / − (no pinch)
+	 *   Move     · tap to select; drag furniture / window ends; drag empty space to pan; zoom with + / − or a gentle two-finger pinch
 	 *   Outline  · tap the unit's corners on the floor plan, tap the first corner to close (scale comes from sq ft)
 	 *   Wall     · tap start, tap end (snaps to straight lines)
 	 *   Window   · tap an outside wall to add a window; glass ⅓ · ½ · ⅔
@@ -131,7 +131,7 @@
 	if (aiState) setTimeout(() => (toast = null), 6000);
 
 	const HINT: Record<Mode, string> = {
-		move: 'Tap to select · drag to move · + / − to zoom',
+		move: 'Tap to select · drag to move · pinch or + / − to zoom',
 		outline: 'Tap each corner of the unit · tap the first corner to finish',
 		wall: 'Tap where the wall starts, then where it ends',
 		window: 'Tap an outside wall to add a window',
@@ -291,7 +291,7 @@
 		pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 		if (pointers.size === 2) {
 			const [a, b] = [...pointers.values()];
-			// Two fingers: no pinch-zoom (zoom is on the + / − buttons). Just ignore the gesture.
+			// Two fingers: gentle pinch zoom (see onMove).
 			erasing = null;
 			gesture = { kind: 'pinch', d0: Math.hypot(a.x - b.x, a.y - b.y), vb0: { ...vb }, mid: toCm((a.x + b.x) / 2, (a.y + b.y) / 2) };
 			downAt.moved = true;
@@ -447,6 +447,16 @@
 		}
 		if (!gesture) return;
 		if (gesture.kind === 'pinch') {
+			// Gentle two-finger zoom around the fingers' midpoint (half as fast as the fingers move).
+			const [a, b] = [...pointers.values()];
+			if (!a || !b) return;
+			const d = Math.hypot(a.x - b.x, a.y - b.y);
+			if (d < 10 || gesture.d0 < 10) return;
+			const f = Math.sqrt(gesture.d0 / d);
+			const v0 = gesture.vb0;
+			const nw = Math.min(6000, Math.max(150, v0.w * f));
+			const k = nw / v0.w;
+			vb = { x: gesture.mid[0] - (gesture.mid[0] - v0.x) * k, y: gesture.mid[1] - (gesture.mid[1] - v0.y) * k, w: nw, h: v0.h * k };
 			return;
 		} else if (gesture.kind === 'pan' && downAt.moved) {
 			const k = gesture.vb0.w / Math.max(1, svg!.clientWidth);
@@ -527,10 +537,10 @@
 		}
 	}
 
-	// Wheel / two-finger trackpad scroll pans the plan (never zooms — zoom is on the + / − buttons).
+	// Wheel / two-finger trackpad scroll pans the plan; trackpad pinch (ctrl+wheel) zooms gently.
 	function onWheel(e: WheelEvent) {
 		e.preventDefault();
-		if (e.ctrlKey) return; // trackpad pinch: ignored
+		if (e.ctrlKey) return void zoomAt(Math.exp(e.deltaY * 0.004), toCm(e.clientX, e.clientY)); // trackpad pinch: gentle zoom
 		const k = vb.w / Math.max(1, svg?.clientWidth ?? 1);
 		vb = { ...vb, x: vb.x + e.deltaX * k, y: vb.y + e.deltaY * k };
 	}

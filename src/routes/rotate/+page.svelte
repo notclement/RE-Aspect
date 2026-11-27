@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { pinchZoom } from '#lib/pinch.ts';
 	/**
 	 * Re-rotate a project's floor plan (back from Studio). Uses the original photo kept on this device,
 	 * so turning it again never loses quality. If an outline was traced on the old rotation, the
@@ -65,9 +66,9 @@
 {:else}
 	<h1>Rotate the floor plan</h1>
 	<p class="muted lead">Turn it so the unit's <strong>north points up</strong>.</p>
-	<div class="stage">
+	<div class="stage" use:pinchZoom>
 		<div class="north" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22"><path d="M12 2l7 19-7-5-7 5z" fill="currentColor" /></svg>N</div>
-		<img src={img.original ?? img.dataUrl} alt="Floor plan" style:transform="rotate({img.original ? angle : angle - (img.angle ?? 0)}deg)" />
+		<img src={img.original ?? img.dataUrl} alt="Floor plan" style:transform="translate(var(--px, 0), var(--py, 0)) scale(var(--z, 1)) rotate({img.original ? angle : angle - (img.angle ?? 0)}deg)" />
 	</div>
 	<div class="rot">
 		<button class="btn" onclick={() => (turns = (turns + 3) % 4)} aria-label="Turn left 90°">⟲ 90°</button>

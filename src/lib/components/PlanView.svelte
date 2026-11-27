@@ -5,7 +5,7 @@
 	 * (built with Astra) will replace the 3D layer later — it receives the same Unit data.
 	 *
 	 * Gestures (natural, never inverted): drag = pan (top down) / orbit (3D: drag left → model turns left),
-	 * zoom only with the + / − buttons (no pinch or wheel zoom).
+	 * zoom with the + / − buttons or a gentle two-finger pinch (damped); page zoom stays blocked.
 	 */
 	import { itemTransform, doorGeom, type Unit, type Item } from '#lib/sample-unit.ts';
 	import { hull, smooth, roomFor, type Patch, type FurnitureLight, type WindowRay } from '#lib/light.ts';
@@ -19,7 +19,8 @@
 		furniture,
 		windowRays = [],
 		showSun = false,
-		grid = $bindable(true)
+		grid = $bindable(true),
+		onzoom
 	}: {
 		unit: Unit;
 		mode: 'top' | '3d';
@@ -30,6 +31,7 @@
 		windowRays?: WindowRay[];
 		showSun?: boolean;
 		grid?: boolean;
+		onzoom?: (scale: number) => void; // pinch zoom changed the scale (for the % readout)
 	} = $props();
 
 	// ---- geometry
@@ -102,6 +104,7 @@
 	const MAX_ZOOM = 2.5;
 	export function zoomBy(f: number) {
 		scale = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, scale * f));
+		onzoom?.(scale);
 	}
 	export function reset() {
 		scale = 1;
@@ -124,10 +127,17 @@
 		if (!prev) return;
 		const dx = e.clientX - prev.x;
 		const dy = e.clientY - prev.y;
-		pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 		if (pointers.size >= 2) {
-			return; // two fingers: no zoom (zoom only with the + / − buttons)
+			// Two fingers: gentle pinch zoom (half as fast as the fingers move), no pan/orbit.
+			const other = [...pointers.entries()].find(([id]) => id !== e.pointerId)?.[1];
+			pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+			if (!other) return;
+			const before = Math.hypot(prev.x - other.x, prev.y - other.y);
+			const after = Math.hypot(e.clientX - other.x, e.clientY - other.y);
+			if (before > 10 && after > 10) zoomBy(Math.sqrt(after / before));
+			return;
 		}
+		pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 		if (mode === '3d') {
 			rot -= dx * 0.35; // natural: drag left → the model turns left
 			tilt = Math.min(70, Math.max(15, tilt - dy * 0.25));
@@ -140,8 +150,10 @@
 		pointers.delete(e.pointerId);
 	}
 	function wheel(e: WheelEvent) {
-		// No wheel / trackpad-pinch zoom: zoom only with the + / − buttons. Block the browser's own pinch-zoom here.
-		if (e.ctrlKey) e.preventDefault();
+		// Trackpad pinch (ctrl+wheel) zooms the plan gently; plain wheel / two-finger scroll does nothing here.
+		if (!e.ctrlKey) return;
+		e.preventDefault();
+		zoomBy(Math.exp(-e.deltaY * 0.004));
 	}
 
 	// ---- 3D layer stack

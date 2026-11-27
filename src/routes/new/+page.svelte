@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { pinchZoom } from '#lib/pinch.ts';
 	/**
 	 * New project wizard: Photos (≤15) → Details → Floor plan (pick + rotate north up) → Create.
 	 * Photos are shrunk in the browser; they're only sent for processing, never stored on our servers.
@@ -448,9 +449,9 @@
 				{:else}
 					<p class="muted small tip">Tip: use the north arrow on the site plan or location map.</p>
 				{/if}
-				<div class="stage">
+				<div class="stage" use:pinchZoom>
 					<div class="north" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22"><path d="M12 2l7 19-7-5-7 5z" fill="currentColor" /></svg>N</div>
-					<img src={planPhoto.img.dataUrl} alt="Floor plan" style:transform="rotate({angle}deg)" />
+					<img src={planPhoto.img.dataUrl} alt="Floor plan" style:transform="translate(var(--px, 0), var(--py, 0)) scale(var(--z, 1)) rotate({angle}deg)" />
 				</div>
 				<div class="rot">
 					<button class="btn" onclick={() => ((turns = (turns + 3) % 4), (userTurned = true))} aria-label="Turn left 90°"><span class="flip"><Icon name="back" size={18} /></span>90°</button>
