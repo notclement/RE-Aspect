@@ -170,6 +170,17 @@
 			<dt>Location</dt><dd>{unit.lat.toFixed(4)}, {unit.lon.toFixed(4)}</dd>
 			<dt>Plan rotation</dt><dd>{unit.bearing}° from true north</dd>
 		</dl>
+		<dl class="src">
+			<dt>Data source</dt><dd>Calculated on this device — no internet or outside data needed</dd>
+			<dt>Method</dt><dd>Simplified NOAA solar-position equations (from Jean Meeus, <em>Astronomical Algorithms</em>), accurate to well under 1°</dd>
+			<dt>Sunrise / sunset</dt><dd>Sun centre 0.833° below the horizon (standard refraction allowance)</dd>
+			<dt>Time zone</dt><dd>Singapore, UTC+8 (no daylight saving)</dd>
+		</dl>
+		<p class="muted note">
+			Check against:
+			<a href="https://gml.noaa.gov/grad/solcalc/" target="_blank" rel="noopener noreferrer">NOAA Solar Calculator</a> ·
+			<a href="https://www.timeanddate.com/sun/singapore/singapore" target="_blank" rel="noopener noreferrer">timeanddate.com — Singapore</a>
+		</p>
 		<p class="muted note">Calculated estimates for guidance only.</p>
 	</Collapse>
 </div>
@@ -296,6 +307,14 @@
 	}
 	dd {
 		margin: 0;
+	}
+	.src {
+		margin-top: 14px;
+		padding-top: 12px;
+		border-top: 1px dashed var(--line);
+	}
+	.note a {
+		color: var(--forest);
 	}
 	.note {
 		font-size: 12px;
