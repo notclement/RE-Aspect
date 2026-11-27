@@ -8,7 +8,7 @@
 	 * pinch or wheel = zoom.
 	 */
 	import type { Unit, Item } from '#lib/sample-unit.ts';
-	import type { Patch } from '#lib/light.ts';
+	import type { Patch, FurnitureLight } from '#lib/light.ts';
 
 	let {
 		unit,
@@ -16,6 +16,7 @@
 		patches,
 		dark,
 		sun,
+		furniture,
 		grid = $bindable(true)
 	}: {
 		unit: Unit;
@@ -23,6 +24,7 @@
 		patches: Patch[];
 		dark: number;
 		sun: { azimuth: number; altitude: number };
+		furniture: FurnitureLight;
 		grid?: boolean;
 	} = $props();
 
@@ -160,6 +162,9 @@
 		{#each patches as p, i (i)}
 			<clipPath id="room{i}"><polygon points={pts(p.clip)} /></clipPath>
 		{/each}
+		<clipPath id="litarea">
+			{#each patches as p, i (i)}<polygon points={pts(p.points)} />{/each}
+		</clipPath>
 	</defs>
 	<rect
 		x={unit.balcony.x}
@@ -175,6 +180,12 @@
 	{#each patches as p, i (i)}
 		<polygon points={pts(p.points)} fill="url(#sunfill)" opacity={0.25 + p.intensity * 0.65} clip-path="url(#room{i})" />
 	{/each}
+	<!-- furniture blocks the sun: shadows only show where sunlight would have landed -->
+	<g clip-path="url(#litarea)">
+		{#each furniture.shadows as sh, i (i)}
+			<polygon points={pts(sh)} fill="url(#planks)" opacity=".88" />
+		{/each}
+	</g>
 	<polygon points={outline} fill="#1A2740" opacity={dark * 0.28} />
 	{#if sunUp}
 		<g class="ray" opacity={Math.min(1, sun.altitude / 8)}>
@@ -200,8 +211,9 @@
 	{#each unit.items as i, k (k)}
 		{#if z === null || itemTop(i) >= z}
 			{@const top = z === null || itemTop(i) - z < STEP}
+			{@const sunny = top && furniture.lit.has(k)}
 			{#if i.kind === 'plant'}
-				<circle cx={i.x + i.w / 2} cy={i.y + i.d / 2} r={i.w / 2} fill={top ? i.color : shade(i.color, 0.78)} />
+				<circle cx={i.x + i.w / 2} cy={i.y + i.d / 2} r={i.w / 2} fill={top ? i.color : shade(i.color, 0.78)} stroke={sunny ? '#E9A93A' : 'none'} stroke-width="6" />
 			{:else}
 				<rect
 					x={i.x}
@@ -210,9 +222,12 @@
 					height={i.d}
 					rx={i.r}
 					fill={top ? i.color : shade(i.color, 0.78)}
-					stroke={top ? shade(i.color, 0.8) : 'none'}
-					stroke-width="3"
+					stroke={sunny ? '#E9A93A' : top ? shade(i.color, 0.8) : 'none'}
+					stroke-width={sunny ? 7 : 3}
 				/>
+				{#if sunny}
+					<rect x={i.x} y={i.y} width={i.w} height={i.d} rx={i.r} fill="#F6C453" opacity=".38" />
+				{/if}
 				{#if i.kind === 'bed' && top}
 					<rect x={i.x + 10} y={i.y + 8} width={i.w - 20} height={i.d * 0.22} rx="10" fill="#F6F3EA" />
 				{/if}

@@ -57,3 +57,65 @@ export function darkness(altitude: number): number {
 	if (altitude <= -6) return 1;
 	return (10 - altitude) / 16;
 }
+
+// ---------------------------------------------------------------- furniture × sunlight
+
+type Pt = [number, number];
+
+function hull(points: Pt[]): Pt[] {
+	const p = [...points].sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+	const cross = (o: Pt, a: Pt, b: Pt) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+	const lower: Pt[] = [];
+	for (const q of p) {
+		while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], q) <= 0) lower.pop();
+		lower.push(q);
+	}
+	const upper: Pt[] = [];
+	for (const q of p.reverse()) {
+		while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], q) <= 0) upper.pop();
+		upper.push(q);
+	}
+	return lower.slice(0, -1).concat(upper.slice(0, -1));
+}
+
+function inside(pt: Pt, poly: Pt[]): boolean {
+	let c = false;
+	for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+		const [xi, yi] = poly[i];
+		const [xj, yj] = poly[j];
+		if (yi > pt[1] !== yj > pt[1] && pt[0] < ((xj - xi) * (pt[1] - yi)) / (yj - yi) + xi) c = !c;
+	}
+	return c;
+}
+
+export interface FurnitureLight {
+	shadows: Pt[][]; // floor shadows cast by furniture (only visible inside sun patches)
+	lit: Set<number>; // indexes of items sitting in direct sun
+}
+
+/** Shadows cast by furniture onto the floor, and which pieces are in direct sun. */
+export function furnitureLight(unit: Unit, azimuth: number, altitude: number, patches: Patch[]): FurnitureLight {
+	const shadows: Pt[][] = [];
+	const lit = new Set<number>();
+	if (altitude <= 0.3 || patches.length === 0) return { shadows, lit };
+	const az = ((azimuth - unit.bearing) * Math.PI) / 180;
+	const s: Pt = [Math.sin(az), -Math.cos(az)];
+	const cot = Math.min(1 / Math.tan((altitude * Math.PI) / 180), 8);
+	unit.items.forEach((it, i) => {
+		const foot: Pt[] = [
+			[it.x, it.y], [it.x + it.w, it.y], [it.x + it.w, it.y + it.d], [it.x, it.y + it.d]
+		];
+		if (it.h > 5) {
+			const d = it.h * cot;
+			shadows.push(hull([...foot, ...foot.map((p) => [p[0] - s[0] * d, p[1] - s[1] * d] as Pt)]));
+		}
+		const samples: Pt[] = [...foot, [it.x + it.w / 2, it.y + it.d / 2]];
+		if (patches.some((p) => samples.some((q) => inside(q, p.points) && inside(q, p.clip)))) lit.add(i);
+	});
+	return { shadows, lit };
+}
+
+export const ITEM_LABELS: Record<string, string> = {
+	sofa: 'Sofa', bed: 'Bed', table: 'Table', chair: 'Chair', counter: 'Counter', console: 'TV console',
+	wardrobe: 'Wardrobe', rug: 'Rug', plant: 'Plant', desk: 'Desk', bath: 'Bath'
+};

@@ -11,7 +11,7 @@
 	import Collapse from '#lib/components/Collapse.svelte';
 	import { SAMPLE_UNIT } from '#lib/sample-unit.ts';
 	import { sunPosition, localDate, sunTimes, compass } from '#lib/sun.ts';
-	import { sunPatches, darkness } from '#lib/light.ts';
+	import { sunPatches, darkness, furnitureLight, ITEM_LABELS } from '#lib/light.ts';
 	import { nav } from '#lib/stores/nav.svelte.ts';
 	import { profile } from '#lib/stores/profile.svelte.ts';
 
@@ -68,6 +68,10 @@
 	const sun = $derived(sunPosition(localDate(vs.date, vs.minutes), unit.lat, unit.lon));
 	const patches = $derived(sunPatches(unit, sun.azimuth, sun.altitude));
 	const dark = $derived(darkness(sun.altitude));
+	const furniture = $derived(furnitureLight(unit, sun.azimuth, sun.altitude, patches));
+	const sunnyItems = $derived(
+		[...new Set([...furniture.lit].map((i) => ITEM_LABELS[unit.items[i].kind]).filter((n) => n !== 'Rug'))]
+	);
 	const times = $derived(sunTimes(vs.date, unit.lat, unit.lon));
 
 	const litWalls = $derived(
@@ -91,7 +95,8 @@
 		sun.altitude <= 0
 			? 'The sun is down — the unit is in shade.'
 			: litWalls.length
-				? `Direct sun through the ${litWalls.join(' & ')}-facing windows.`
+				? `Direct sun through the ${litWalls.join(' & ')}-facing windows.` +
+					(sunnyItems.length ? ` In the sun: ${sunnyItems.join(', ').toLowerCase()}.` : '')
 				: 'Sun is up, but no windows face it right now — soft daylight only.'
 	);
 </script>
@@ -117,7 +122,7 @@
 			</div>
 		{:else}
 			{#key vs.view}
-				<PlanView bind:this={planView} {unit} mode={vs.view} {patches} {dark} {sun} {grid} />
+				<PlanView bind:this={planView} {unit} mode={vs.view} {patches} {dark} {sun} {furniture} {grid} />
 			{/key}
 			<div class="zoom">
 				<button onclick={() => zoom(1 / 1.2)} aria-label="Zoom out"><Icon name="minus" size={18} /></button>
