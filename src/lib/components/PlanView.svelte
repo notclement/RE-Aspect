@@ -8,7 +8,7 @@
 	 * pinch or wheel = zoom.
 	 */
 	import type { Unit, Item } from '#lib/sample-unit.ts';
-	import type { Patch, FurnitureLight, Ray } from '#lib/light.ts';
+	import { hull, smooth, type Patch, type FurnitureLight } from '#lib/light.ts';
 
 	let {
 		unit,
@@ -17,7 +17,6 @@
 		dark,
 		sun,
 		furniture,
-		rays,
 		showSun = false,
 		grid = $bindable(true)
 	}: {
@@ -27,7 +26,6 @@
 		dark: number;
 		sun: { azimuth: number; altitude: number };
 		furniture: FurnitureLight;
-		rays: Ray[];
 		showSun?: boolean;
 		grid?: boolean;
 	} = $props();
@@ -62,6 +60,15 @@
 	});
 	// Where sunlight comes from at ground level (horizon point in the sun's direction).
 	const horizon = $derived([cx + sdir[0] * R, cy + sdir[1] * R] as const);
+	// Sunbeams: one continuous stripe pattern turned to the light direction (no per-ray jumps).
+	// Outside: masked by a soft radial fade and by the unit's own shadow. Inside: only where light lands.
+	const beamAngle = $derived((Math.atan2(-sdir[1], -sdir[0]) * 180) / Math.PI);
+	const beamFade = $derived(smooth(sun.altitude / 15));
+	const buildingShadow = $derived(
+		hull([...unit.outline, ...unit.outline.map((p) => [p[0] - sdir[0] * 6000, p[1] - sdir[1] * 6000] as [number, number])])
+			.map((p) => p.join(','))
+			.join(' ')
+	);
 	let stageW = $state(600);
 	// 3D plan: sun placed on a dome around the unit (horizon distance shrinks, height grows with altitude).
 	const sky3d = $derived.by(() => {
@@ -174,7 +181,11 @@
 		</radialGradient>
 		<mask id="raymask" maskUnits="userSpaceOnUse" x={vb.x - 3000} y={vb.y - 3000} width={vb.w + 6000} height={vb.h + 6000}>
 			<rect x={vb.x - 3000} y={vb.y - 3000} width={vb.w + 6000} height={vb.h + 6000} fill="url(#rayfade)" />
+			<polygon points={buildingShadow} fill="#000" />
 		</mask>
+		<pattern id="beams" width="70" height="70" patternUnits="userSpaceOnUse" patternTransform="rotate({beamAngle})">
+			<line x1="0" y1="35" x2="70" y2="35" stroke="#E39A1E" stroke-width="5" stroke-opacity=".75" />
+		</pattern>
 		<clipPath id="unitclip"><polygon points={outline} /></clipPath>
 		<clipPath id="litarea">
 			{#each patches as p, i (i)}<polygon points={pts(p.points)} />{/each}
@@ -196,7 +207,7 @@
 	{/each}
 	<!-- furniture blocks the sun: shadows only show where sunlight would have landed -->
 	<g clip-path="url(#unitclip)">
-		<g clip-path="url(#litarea)" opacity={Math.min(1, sun.altitude / 6)}>
+		<g clip-path="url(#litarea)" opacity={beamFade}>
 			{#each furniture.shadows as sh, i (i)}
 				<polygon points={pts(sh)} fill="url(#planks)" opacity=".88" />
 			{/each}
@@ -204,14 +215,10 @@
 	</g>
 	<polygon points={outline} fill="#1A2740" opacity={dark * 0.28} />
 	{#if sunUp}
-		<g class="rays" opacity={Math.min(1, sun.altitude / 8)} mask="url(#raymask)">
-			{#each rays as r, k (k)}
-				<line class="out" class:blocked={r.blocked} x1={r.outside[0][0]} y1={r.outside[0][1]} x2={r.outside[1][0]} y2={r.outside[1][1]} />
-				{#if r.blocked}
-					<circle cx={r.outside[1][0]} cy={r.outside[1][1]} r="9" class="stop" />
-				{:else if r.inside}
-					<line class="in" x1={r.inside[0][0]} y1={r.inside[0][1]} x2={r.inside[1][0]} y2={r.inside[1][1]} />
-				{/if}
+		<g opacity={beamFade}>
+			<rect class="beams" x={vb.x - 3000} y={vb.y - 3000} width={vb.w + 6000} height={vb.h + 6000} fill="url(#beams)" mask="url(#raymask)" />
+			{#each patches as p, i (i)}
+				<polygon points={pts(p.points)} fill="url(#beams)" opacity={p.intensity * 0.7} clip-path="url(#room{i})" />
 			{/each}
 		</g>
 	{/if}
@@ -230,9 +237,8 @@
 	{#each unit.items as i, k (k)}
 		{#if z === null || itemTop(i) >= z}
 			{@const top = z === null || itemTop(i) - z < STEP}
-			{@const sunny = top && furniture.lit.has(k)}
 			{#if i.kind === 'plant'}
-				<circle cx={i.x + i.w / 2} cy={i.y + i.d / 2} r={i.w / 2} fill={top ? i.color : shade(i.color, 0.78)} stroke={sunny ? '#E9A93A' : 'none'} stroke-width="6" />
+				<circle cx={i.x + i.w / 2} cy={i.y + i.d / 2} r={i.w / 2} fill={top ? i.color : shade(i.color, 0.78)} />
 			{:else}
 				<rect
 					x={i.x}
@@ -241,12 +247,9 @@
 					height={i.d}
 					rx={i.r}
 					fill={top ? i.color : shade(i.color, 0.78)}
-					stroke={sunny ? '#E9A93A' : top ? shade(i.color, 0.8) : 'none'}
-					stroke-width={sunny ? 7 : 3}
+					stroke={top ? shade(i.color, 0.8) : 'none'}
+					stroke-width="3"
 				/>
-				{#if sunny}
-					<rect x={i.x} y={i.y} width={i.w} height={i.d} rx={i.r} fill="#F6C453" opacity=".38" />
-				{/if}
 				{#if i.kind === 'bed' && top}
 					<rect x={i.x + 10} y={i.y + 8} width={i.w - 20} height={i.d * 0.22} rx="10" fill="#F6F3EA" />
 				{/if}
@@ -376,27 +379,7 @@
 		letter-spacing: 2px;
 		fill: #7b8077;
 	}
-.rays line {
-		stroke-linecap: round;
-	}
-	.rays .out {
-		stroke: #e39a1e;
-		stroke-width: 6;
-		opacity: 0.8;
-	}
-	.rays .out.blocked {
-		opacity: 0.35;
-	}
-	.rays .in {
-		stroke: #d98c12;
-		stroke-width: 6;
-		stroke-dasharray: 16 12;
-	}
-	.rays .stop {
-		fill: #a6762a;
-		opacity: 0.6;
-	}
-	.sundisc text {
+.sundisc text {
 		font: 700 40px var(--font);
 		paint-order: stroke;
 		stroke: var(--paper);

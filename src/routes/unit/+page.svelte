@@ -11,7 +11,7 @@
 	import Collapse from '#lib/components/Collapse.svelte';
 	import { SAMPLE_UNIT } from '#lib/sample-unit.ts';
 	import { sunPosition, localDate, sunTimes, compass } from '#lib/sun.ts';
-	import { sunPatches, darkness, furnitureLight, lightRays, ITEM_LABELS } from '#lib/light.ts';
+	import { sunPatches, darkness, furnitureLight, ITEM_LABELS } from '#lib/light.ts';
 	import { nav } from '#lib/stores/nav.svelte.ts';
 	import { profile } from '#lib/stores/profile.svelte.ts';
 
@@ -69,7 +69,6 @@
 	const patches = $derived(sunPatches(unit, sun.azimuth, sun.altitude));
 	const dark = $derived(darkness(sun.altitude));
 	const furniture = $derived(furnitureLight(unit, sun.azimuth, sun.altitude, patches));
-	const rays = $derived(lightRays(unit, sun.azimuth, sun.altitude));
 	const sunnyItems = $derived(
 		[...new Set([...furniture.lit].map((i) => ITEM_LABELS[unit.items[i].kind]).filter((n) => n !== 'Rug'))]
 	);
@@ -123,13 +122,13 @@
 			</div>
 		{:else}
 			{#key vs.view}
-				<PlanView bind:this={planView} {unit} mode={vs.view} {patches} {dark} {sun} {furniture} {rays} showSun={profile.data.showSunMarker} {grid} />
+				<PlanView bind:this={planView} {unit} mode={vs.view} {patches} {dark} {sun} {furniture} showSun={profile.data.showSunMarker} {grid} />
 			{/key}
 			<div class="zoom">
-				<button onclick={() => zoom(1 / 1.2)} aria-label="Zoom out"><Icon name="minus" size={18} /></button>
+				<button onclick={() => zoom(1.2)} aria-label="Zoom in"><Icon name="plus" size={16} /></button>
 				<span>{zoomPct}%</span>
-				<button onclick={() => zoom(1.2)} aria-label="Zoom in"><Icon name="plus" size={18} /></button>
-				<button onclick={() => (grid = !grid)} aria-label="Toggle grid" aria-pressed={grid}><Icon name="grid" size={18} /></button>
+				<button onclick={() => zoom(1 / 1.2)} aria-label="Zoom out"><Icon name="minus" size={16} /></button>
+				<button class="g" onclick={() => (grid = !grid)} aria-label="Toggle grid" aria-pressed={grid}><Icon name="grid" size={15} /></button>
 			</div>
 		{/if}
 	</div>
@@ -157,7 +156,7 @@
 
 <p class="summary">{summary}</p>
 
-<SunTimeline bind:minutes={vs.minutes} bind:date={vs.date} />
+<SunTimeline bind:minutes={vs.minutes} bind:date={vs.date} sunrise={times.sunrise} sunset={times.sunset} />
 
 <div class="details">
 	<Collapse title="Study details">
@@ -250,19 +249,19 @@
 	.zoom {
 		position: absolute;
 		right: 12px;
-		bottom: 12px;
+		top: 64px;
 		display: flex;
+		flex-direction: column;
 		align-items: center;
-		gap: 2px;
-		background: var(--surface);
+		background: color-mix(in srgb, var(--surface) 92%, transparent);
 		border: 1px solid var(--line);
 		border-radius: 12px;
-		padding: 3px;
+		padding: 2px;
 		z-index: 3;
 	}
 	.zoom button {
-		width: 40px;
-		height: 40px;
+		width: 34px;
+		height: 34px;
 		border: 0;
 		background: none;
 		border-radius: 9px;
@@ -270,14 +269,17 @@
 		place-items: center;
 		cursor: pointer;
 	}
+	.zoom .g {
+		border-top: 1px solid var(--line);
+		border-radius: 0 0 9px 9px;
+	}
 	.zoom button[aria-pressed='true'] {
 		color: var(--forest);
 	}
 	.zoom span {
-		min-width: 48px;
-		text-align: center;
+		font-size: 10px;
 		font-variant-numeric: tabular-nums;
-		font-size: 14px;
+		color: var(--muted);
 	}
 	.walk {
 		height: 100%;

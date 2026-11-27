@@ -50,7 +50,7 @@ export function sunPatches(unit: Unit, azimuth: number, altitude: number): Patch
 		const at = (p: [number, number], d: number): [number, number] => [p[0] - s[0] * d, p[1] - s[1] * d];
 		out.push({
 			points: [at(w.a, dS), at(w.b, dS), at(w.b, dH), at(w.a, dH)],
-			intensity: Math.min(1, facing * 1.5) * smooth(altitude / 10),
+			intensity: Math.min(1, facing * 1.5) * smooth(altitude / 12),
 			clip: roomFor(unit, w)
 		});
 	}
@@ -68,7 +68,7 @@ export function darkness(altitude: number): number {
 
 type Pt = [number, number];
 
-function hull(points: Pt[]): Pt[] {
+export function hull(points: Pt[]): Pt[] {
 	const p = [...points].sort((a, b) => a[0] - b[0] || a[1] - b[1]);
 	const cross = (o: Pt, a: Pt, b: Pt) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
 	const lower: Pt[] = [];
@@ -194,7 +194,7 @@ export function lightRays(unit: Unit, azimuth: number, altitude: number, spacing
 }
 
 /** Smoothstep 0..1 — soft fade for low sun. */
-function smooth(x: number): number {
+export function smooth(x: number): number {
 	const t = Math.max(0, Math.min(1, x));
 	return t * t * (3 - 2 * t);
 }

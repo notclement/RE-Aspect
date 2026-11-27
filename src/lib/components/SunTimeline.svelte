@@ -9,8 +9,19 @@
 	let {
 		minutes = $bindable(16 * 60),
 		date = $bindable(''),
-		cycleSeconds = 25
-	}: { minutes?: number; date?: string; cycleSeconds?: number } = $props();
+		cycleSeconds = 25,
+		sunrise = null,
+		sunset = null
+	}: { minutes?: number; date?: string; cycleSeconds?: number; sunrise?: number | null; sunset?: number | null } = $props();
+
+	/** Night passes 1.5× faster than daytime; the speed eases across sunrise/sunset so there's no jolt. */
+	const NIGHT_SPEED = 1.5;
+	function speedAt(m: number) {
+		if (sunrise === null || sunset === null) return 1;
+		const ease = 30; // minutes over which speed blends
+		const day = Math.min(1, Math.max(0, Math.min(m - sunrise, sunset - m) / ease + 0.5));
+		return NIGHT_SPEED - (NIGHT_SPEED - 1) * day;
+	}
 
 	let playing = $state(false);
 	let raf = 0;
@@ -28,7 +39,7 @@
 		if (!playing) return;
 		const dt = last ? (t - last) / 1000 : 0;
 		last = t;
-		minutes = (minutes + (1440 / cycleSeconds) * dt) % 1440;
+		minutes = (minutes + (1440 / cycleSeconds) * speedAt(minutes) * Math.min(dt, 0.1)) % 1440;
 		raf = requestAnimationFrame(tick);
 	}
 	function toggle() {
