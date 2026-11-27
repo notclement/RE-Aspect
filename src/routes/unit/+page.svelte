@@ -17,8 +17,8 @@
 
 	import { unitView, type View } from '#lib/stores/unit-view.svelte.ts';
 	const views: { id: View; label: string }[] = [
-		{ id: '3d', label: '3D plan' },
 		{ id: 'top', label: 'Top down' },
+		{ id: '3d', label: '3D plan' },
 		{ id: 'walk', label: 'Walk' }
 	];
 

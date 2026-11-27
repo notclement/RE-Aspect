@@ -25,7 +25,7 @@
 - Settings, Profile, Upgrade/Plans, Referral, Agency (Lead), Admin.
 
 ## 3. UI / UX
-- **Organised by unit** (approved mockup, 27 Nov): top bar with ☰ menu + breadcrumb (Units / Sun study). A unit page shows the serif unit name, a segmented control **3D plan · Top down · Walk**, the canvas (dotted grid, north arrow, − 100% + # zoom/grid control), the **Sun timeline** card (Auto sun · date · 12 AM–12 AM slider · time pill) and collapsible *Study details* / *Sun info*.
+- **Organised by unit** (approved mockup, 27 Nov): top bar with ☰ menu + breadcrumb (Units / Sun study). A unit page shows the serif unit name, a segmented control **Top down (default) · 3D plan · Walk**, the canvas (dotted grid, north arrow, − 100% + # zoom/grid control), the **Sun timeline** card (Auto sun · date · 12 AM–12 AM slider · time pill) and collapsible *Study details* / *Sun info*.
 - Palette: warm paper `#F7F6F1`, forest green `#2F4A3B` (primary), ochre `#B07A2A` (sun/time), serif titles.
 - Very clean; everything secondary is tucked behind tabs.
 - The **time slider is always visible** in Sun View, 3D and Walkthrough.

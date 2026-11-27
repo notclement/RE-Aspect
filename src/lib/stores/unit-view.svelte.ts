@@ -15,7 +15,7 @@ const states = $state<Record<string, UnitViewState>>({});
 
 export function unitView(id: string): UnitViewState {
 	states[id] ??= {
-		view: '3d',
+		view: 'top',
 		date: todaySG(),
 		minutes: Math.max(7 * 60, Math.min(18 * 60, nowMinutesSG()))
 	};
