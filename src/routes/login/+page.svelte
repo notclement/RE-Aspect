@@ -23,7 +23,7 @@
 <svelte:head><title>Sign in · RE:Aspect</title></svelte:head>
 
 <div class="wrap">
-	<div class="sky"><RoomArt height={190} eager /></div>
+	<div class="sky"><RoomArt height={190} align="gentle" eager /></div>
 	<h1 class="brandmark"><Logo height={52} label={BRAND.name} /></h1>
 	<p class="muted">{BRAND.tagline}</p>
 
