@@ -98,6 +98,7 @@
 				<input
 					bind:this={nameInput}
 					maxlength="40"
+					placeholder="Type here…"
 					autocomplete="name"
 					bind:value={name}
 					aria-label="Display name"

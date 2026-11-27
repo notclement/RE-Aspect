@@ -66,8 +66,8 @@
 	<p class="muted small">{row.status === 'pending' ? 'Asked to join' : 'Member of'} <strong>{row.agency_name}</strong>. Their lead manages membership.</p>
 {:else if editing}
 	<form class="agf" onsubmit={save} novalidate>
-		<div class="field"><label for="agn-{userId}">Agency name</label><input id="agn-{userId}" maxlength="60" bind:value={name} placeholder="e.g. Harbourfront Realty" /></div>
-		<div class="field"><label for="ags-{userId}">Paid seats</label><input id="ags-{userId}" inputmode="numeric" maxlength="3" bind:value={seats} /></div>
+		<div class="field"><label for="agn-{userId}">Agency name</label><input id="agn-{userId}" maxlength="60" bind:value={name} placeholder="Type here…" /></div>
+		<div class="field"><label for="ags-{userId}">Paid seats</label><input id="ags-{userId}" inputmode="numeric" maxlength="3" placeholder="Type here…" bind:value={seats} /></div>
 		{#if preview}<p class="muted small">{preview}</p>{/if}
 		{#if err}<p class="err small">{err}</p>{/if}
 		<div class="row">

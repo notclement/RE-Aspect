@@ -27,7 +27,7 @@
 	<p class="muted">What should we call you? We'll use your name around the app.</p>
 	<div class="field">
 		<label for="name">Your name</label>
-		<input id="name" autocomplete="name" maxlength="40" bind:value={name} placeholder="e.g. Clement Tan" />
+		<input id="name" autocomplete="name" maxlength="40" bind:value={name} placeholder="Type here…" />
 		{#if error}<span class="error">{error}</span>{/if}
 	</div>
 	<button class="btn primary wide" type="submit">Continue</button>

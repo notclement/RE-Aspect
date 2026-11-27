@@ -102,24 +102,24 @@
 			<form onsubmit={submit} novalidate>
 				<div class="field">
 					<label for="co">Company / agency</label>
-					<input id="co" maxlength="60" autocomplete="organization" bind:value={company} />
+					<input id="co" maxlength="60" autocomplete="organization" bind:value={company} placeholder="Type here…" />
 					{#if errors.company}<span class="error">{errors.company}</span>{/if}
 				</div>
 				<div class="two">
 					<div class="field">
 						<label for="ts">Team size</label>
-						<input id="ts" inputmode="numeric" maxlength="4" bind:value={teamSize} placeholder="10" />
+						<input id="ts" inputmode="numeric" maxlength="4" bind:value={teamSize} placeholder="Type here…" />
 						{#if errors.teamSize}<span class="error">{errors.teamSize}</span>{/if}
 					</div>
 					<div class="field">
 						<label for="ph">Phone (optional)</label>
-						<input id="ph" type="tel" inputmode="tel" maxlength="20" autocomplete="tel" bind:value={phone} />
+						<input id="ph" type="tel" inputmode="tel" maxlength="20" autocomplete="tel" bind:value={phone} placeholder="Type here…" />
 						{#if errors.phone}<span class="error">{errors.phone}</span>{/if}
 					</div>
 				</div>
 				<div class="field">
 					<label for="msg">Anything else? (optional)</label>
-					<textarea id="msg" rows="3" maxlength="1000" bind:value={message}></textarea>
+					<textarea id="msg" rows="3" maxlength="1000" bind:value={message} placeholder="Type here…"></textarea>
 					{#if errors.message}<span class="error">{errors.message}</span>{/if}
 				</div>
 				{#if sendError}<p class="error">{sendError}</p>{/if}

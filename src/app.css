@@ -194,3 +194,9 @@ textarea {
 		transition-duration: 0.01ms !important;
 	}
 }
+
+/* Placeholders: simple "Type here…" everywhere, faded so they never look like real values. */
+::placeholder {
+	color: var(--muted);
+	opacity: 0.45;
+}

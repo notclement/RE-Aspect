@@ -249,12 +249,12 @@
 			<form class="edit" onsubmit={saveEdit} novalidate>
 				<div class="field">
 					<label for="pd-name">Project name</label>
-					<input id="pd-name" maxlength="60" bind:value={form.name} />
+					<input id="pd-name" maxlength="60" placeholder="Type here…" bind:value={form.name} />
 					{#if errors.name}<span class="error">{errors.name}</span>{/if}
 				</div>
 				<div class="field">
 					<label for="pd-unit">Unit number</label>
-					<input id="pd-unit" maxlength="10" placeholder="125" bind:value={form.unitNo} />
+					<input id="pd-unit" maxlength="10" placeholder="Type here…" bind:value={form.unitNo} />
 					{#if errors.unitNo}<span class="error">{errors.unitNo}</span>{/if}
 				</div>
 				<div class="field">
@@ -266,17 +266,17 @@
 				</div>
 				<div class="field">
 					<label for="pd-addr">Address</label>
-					<input id="pd-addr" maxlength="120" bind:value={form.address} />
+					<input id="pd-addr" maxlength="120" placeholder="Type here…" bind:value={form.address} />
 					{#if errors.address}<span class="error">{errors.address}</span>{/if}
 				</div>
 				<div class="field">
 					<label for="pd-desc">Description</label>
-					<textarea id="pd-desc" rows="3" maxlength="280" bind:value={form.description}></textarea>
+					<textarea id="pd-desc" rows="3" maxlength="280" placeholder="Type here…" bind:value={form.description}></textarea>
 					{#if errors.description}<span class="error">{errors.description}</span>{/if}
 				</div>
 				<div class="field">
 					<label for="pd-notes">Notes</label>
-					<textarea id="pd-notes" rows="5" maxlength="2000" placeholder="Viewing notes, client preferences…" bind:value={form.notes}></textarea>
+					<textarea id="pd-notes" rows="5" maxlength="2000" placeholder="Type here…" bind:value={form.notes}></textarea>
 					{#if errors.notes}<span class="error">{errors.notes}</span>{/if}
 				</div>
 				<div class="actions">

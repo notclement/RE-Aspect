@@ -234,7 +234,7 @@
 		<div class="card"><span class="muted">All projects</span><strong>{stats.projects}</strong></div>
 	</div>
 
-	<input class="search" type="search" placeholder="Search name or email" bind:value={q} aria-label="Search users" maxlength="80" />
+	<input class="search" type="search" placeholder="Search…" bind:value={q} aria-label="Search users" maxlength="80" />
 	<div class="filters" role="radiogroup" aria-label="Filter users">
 		{#each FILTERS as f (f.id)}
 			<button role="radio" aria-checked={filter === f.id} class:on={filter === f.id} onclick={() => (filter = f.id)}>{f.label} <span>{counts[f.id]}</span></button>

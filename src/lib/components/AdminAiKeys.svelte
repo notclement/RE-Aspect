@@ -129,11 +129,11 @@
 			</div>
 			<div class="field">
 				<label for="k-name">Name</label>
-				<input id="k-name" maxlength="40" placeholder="e.g. Main OpenAI" bind:value={label} />
+				<input id="k-name" maxlength="40" placeholder="Type here…" bind:value={label} />
 			</div>
 			<div class="field">
 				<label for="k-key">API key</label>
-				<input id="k-key" type="password" autocomplete="new-password" spellcheck="false" maxlength="400" bind:value={secret} />
+				<input id="k-key" type="password" placeholder="Paste key here…" autocomplete="new-password" spellcheck="false" maxlength="400" bind:value={secret} />
 			</div>
 			{#if formError}<p class="error small">{formError}</p>{/if}
 			<div class="actions">

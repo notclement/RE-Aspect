@@ -2,7 +2,7 @@
  * DayTrace light model v1: project each window along the sun direction onto the floor.
  * Standalone unit — no neighbouring buildings (see docs/REQUIREMENTS.md §6).
  */
-import { itemCorners, type Unit, type Opening } from './sample-unit.ts';
+import { itemCorners, type Unit, type Opening, type Wall } from './sample-unit.ts';
 
 export interface Patch {
 	points: [number, number][];
@@ -23,10 +23,38 @@ export function roomFor(unit: Unit, win: Opening): [number, number][] {
 	return win.room ?? unit.outline;
 }
 
+/** Shortest distance from p to segment a–b. */
+function segDist(p: [number, number], a: [number, number], b: [number, number]): number {
+	const dx = b[0] - a[0];
+	const dy = b[1] - a[1];
+	const L2 = dx * dx + dy * dy || 1;
+	const t = Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / L2));
+	return Math.hypot(p[0] - (a[0] + dx * t), p[1] - (a[1] + dy * t));
+}
+
+/** Walls that can block light coming in through window w (every wall except the one the window sits in). */
+function blockers(unit: Unit, w: Opening): Wall[] {
+	return unit.walls.filter((wl) => !(segDist(w.a, wl.a, wl.b) < 4 && segDist(w.b, wl.a, wl.b) < 4));
+}
+
+/** How far light entering at p (travelling along d) gets before a wall stops it. */
+function reachFrom(p: [number, number], d: [number, number], walls: Wall[], max: number): number {
+	let reach = max;
+	const q: [number, number] = [p[0] + d[0] * 2, p[1] + d[1] * 2];
+	for (const wl of walls) {
+		const u = hit(q, d, wl.a, wl.b);
+		if (u !== null && u + 2 < reach) reach = u + 2;
+	}
+	return reach;
+}
+
+const SLICES = 24; // light is traced in slices across each window, so walls cut it off where they stand
+
 export function sunPatches(unit: Unit, azimuth: number, altitude: number): Patch[] {
 	if (altitude <= 0.3) return [];
 	const az = (azimuth - unit.bearing) * RAD;
 	const s: [number, number] = [Math.sin(az), -Math.cos(az)]; // towards the sun, plan coords (+y = south)
+	const d: [number, number] = [-s[0], -s[1]]; // direction the light travels
 	const cot = Math.min(1 / Math.tan(altitude * RAD), LOW_SUN_COT);
 	const out: Patch[] = [];
 	for (const w of unit.windows) {
@@ -34,12 +62,32 @@ export function sunPatches(unit: Unit, azimuth: number, altitude: number): Patch
 		if (facing <= 0.03) continue;
 		const dS = w.sill * cot;
 		const dH = w.head * cot;
-		const at = (p: [number, number], d: number): [number, number] => [p[0] - s[0] * d, p[1] - s[1] * d];
-		out.push({
-			points: [at(w.a, dS), at(w.b, dS), at(w.b, dH), at(w.a, dH)],
-			intensity: Math.min(1, facing * 1.5) * smooth(altitude / 12),
-			clip: roomFor(unit, w)
-		});
+		const intensity = Math.min(1, facing * 1.5) * smooth(altitude / 12);
+		const clip = roomFor(unit, w);
+		const walls = blockers(unit, w);
+		const at = (p: [number, number], k: number): [number, number] => [p[0] + d[0] * k, p[1] + d[1] * k];
+		const lerp = (t: number): [number, number] => [w.a[0] + (w.b[0] - w.a[0]) * t, w.a[1] + (w.b[1] - w.a[1]) * t];
+		// Far edge of the light for each slice boundary (null = that part is blocked before the light reaches the floor).
+		const far: (number | null)[] = [];
+		for (let i = 0; i <= SLICES; i++) {
+			const r = reachFrom(lerp(i / SLICES), d, walls, dH);
+			far.push(r > dS + 1 ? r : null);
+		}
+		// One polygon per run of lit slices.
+		let run: number[] = [];
+		const flush = () => {
+			if (run.length >= 2) {
+				const near = run.map((i) => at(lerp(i / SLICES), dS));
+				const back = run.map((i) => at(lerp(i / SLICES), far[i]!)).reverse();
+				out.push({ points: [...near, ...back], intensity, clip });
+			}
+			run = [];
+		};
+		for (let i = 0; i <= SLICES; i++) {
+			if (far[i] === null) flush();
+			else run.push(i);
+		}
+		flush();
 	}
 	return out;
 }
@@ -209,13 +257,18 @@ export function windowRays(unit: Unit, azimuth: number, altitude: number, spacin
 		if (s[0] * w.normal[0] + s[1] * w.normal[1] <= 0.03) continue;
 		const len = Math.hypot(w.b[0] - w.a[0], w.b[1] - w.a[1]);
 		const n = Math.max(2, Math.round(len / spacing));
+		const walls = blockers(unit, w);
 		for (let k = 0; k < n; k++) {
 			const t = (k + 0.5) / n;
 			const at: Pt = [w.a[0] + (w.b[0] - w.a[0]) * t, w.a[1] + (w.b[1] - w.a[1]) * t];
+			// Walls stop the light: the ray ends where it meets one (and is dropped if that's before it reaches the floor).
+			const reach = reachFrom(at, d, walls, w.head * cot);
+			const sill = w.sill * cot;
+			if (reach <= sill + 1) continue;
 			out.push({
 				at,
-				land: [at[0] + d[0] * w.sill * cot, at[1] + d[1] * w.sill * cot],
-				end: [at[0] + d[0] * w.head * cot, at[1] + d[1] * w.head * cot],
+				land: [at[0] + d[0] * sill, at[1] + d[1] * sill],
+				end: [at[0] + d[0] * reach, at[1] + d[1] * reach],
 				win: wi
 			});
 		}

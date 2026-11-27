@@ -155,7 +155,7 @@
 		<span class="lbl muted">{isLead ? 'Your agency' : 'Your agency'}</span>
 		{#if editing}
 			<form class="nameedit" onsubmit={rename} novalidate>
-				<input maxlength="60" bind:value={newName} aria-label="Agency name" onkeydown={(e) => e.key === 'Escape' && (editing = false)} />
+				<input maxlength="60" bind:value={newName} placeholder="Type here…" aria-label="Agency name" onkeydown={(e) => e.key === 'Escape' && (editing = false)} />
 				<button class="ib ok" type="submit" aria-label="Save name"><Icon name="check" size={18} /></button>
 				<button class="ib" type="button" onclick={() => (editing = false)} aria-label="Cancel"><Icon name="close" size={18} /></button>
 			</form>

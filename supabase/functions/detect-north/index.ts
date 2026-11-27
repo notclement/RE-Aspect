@@ -14,7 +14,7 @@ const ALLOWED_ORIGINS = [
 const MODELS = {
 	openai: Deno.env.get('OPENAI_MODEL') ?? 'gpt-4.1',
 	anthropic: Deno.env.get('ANTHROPIC_MODEL') ?? 'claude-sonnet-5-5',
-	google: Deno.env.get('GOOGLE_MODEL') ?? 'gemini-2.5-flash',
+	google: Deno.env.get('GOOGLE_MODEL') ?? 'gemini-3.5-flash', // 2.5 Flash was retired in June 2026
 	deepseek: Deno.env.get('DEEPSEEK_MODEL') ?? 'deepseek-flash'
 };
 const DAILY_LIMIT = 30;

@@ -23,6 +23,7 @@
 	import { getSupabase, supabaseConfigured } from '#lib/supabase.ts';
 	import { auth } from '#lib/stores/auth.svelte.ts';
 	import { fnError } from '#lib/fn-error.ts';
+	import { shrinkPhoto } from '#lib/image.ts';
 	import { profile } from '#lib/stores/profile.svelte.ts';
 	import Spinner from '#lib/components/Spinner.svelte';
 
@@ -111,7 +112,7 @@
 
 	// ── tools ────────────────────────────────────────────────────────────────
 	type Mode = 'move' | 'outline' | 'wall' | 'window' | 'door';
-	let mode = $state<Mode>((project?.plan?.outline.length ?? 0) >= 3 ? 'move' : 'outline');
+	let mode = $state<Mode>(aiState === 'ok' ? 'window' : (project?.plan?.outline.length ?? 0) >= 3 ? 'move' : 'outline');
 	let draft = $state<Pt[]>([]); // outline in progress
 	let wallStart = $state<Pt | null>(null);
 	let hover = $state<Pt | null>(null);
@@ -120,7 +121,7 @@
 	let sheet = $state<'furniture' | 'size' | null>(null);
 	let toast = $state<string | null>(
 		aiState === 'ok'
-			? 'AI traced your plan — check the windows and furniture.'
+			? 'Walls traced. Now tap the outside walls to add windows.'
 			: aiState === 'manual'
 				? "Couldn't auto-trace this plan. Tap each corner of the unit to outline it."
 				: null
@@ -530,21 +531,23 @@
 		tracing = true;
 		try {
 			const sb = await getSupabase();
+			const small = await shrinkPhoto(backdrop.dataUrl, 1400, 0.85);
 			const { data, error } = await sb.functions.invoke('process-project', {
-				body: { projectId: project.id, floorPlan: { dataUrl: backdrop.dataUrl, w: backdrop.w, h: backdrop.h }, interiors: [], sizeSqft: project.sizeSqft, propertyType: project.propertyType, ceilingCm: project.ceilingCm }
+				body: { projectId: project.id, floorPlan: small, sizeSqft: project.sizeSqft, propertyType: project.propertyType, ceilingCm: project.ceilingCm }
 			});
 			if (error) throw new Error(await fnError(error));
 			const p = sanitizePlan((data as { plan?: unknown })?.plan);
+			if (p?.imageScale) p.imageScale = Math.round(p.imageScale * (small.w / backdrop.w) * 10000) / 10000;
 			if (!p || p.outline.length < 3) throw new Error("The AI couldn't find the unit's outline in this photo.");
 			const before = snap();
-			plan = { ...p, items: plan.items.length ? plan.items : p.items };
+			plan = { ...p, items: plan.items };
 			sel = null;
 			draft = [];
 			wallStart = null;
-			mode = 'move';
+			mode = 'window';
 			commit(before);
 			fit();
-			toast = 'Traced — check the walls, windows and doors. Undo brings back what you had.';
+			toast = 'Walls traced. Now tap the outside walls to add windows (Undo brings back what you had).';
 			setTimeout(() => (toast = null), 5000);
 		} catch (e) {
 			const msg = e instanceof Error ? e.message : 'Auto-trace failed.';
@@ -775,7 +778,7 @@
 		<button class="scrim" aria-label="Cancel" onclick={() => (askTrace = false)}></button>
 		<div class="sheet ask" role="dialog" aria-modal="true" aria-labelledby="trace-title">
 			<h2 id="trace-title">Auto-trace this plan?</h2>
-			<p class="muted">The AI traces the floor plan photo again: outline, walls, windows and rooms.{plan.outline.length >= 3 || plan.walls.length ? ' This replaces what is traced now (Undo brings it back).' : ''} Furniture you've placed stays. Uses one of this project's AI re-runs ({profile.aiRunsLabel} per project).</p>
+			<p class="muted">The AI traces the outline, walls and room names from the floor plan photo (about 10–30 seconds); you then add the windows.{plan.outline.length >= 3 || plan.walls.length ? ' This replaces what is traced now (Undo brings it back).' : ''} Furniture you've placed stays. Uses one of this project's AI re-runs ({profile.aiRunsLabel} per project).</p>
 			<div class="actions">
 				<button class="btn" onclick={() => (askTrace = false)}>Cancel</button>
 				<button class="btn primary" onclick={autoTrace}><Icon name="sparkle" size={18} />Auto-trace</button>

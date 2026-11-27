@@ -130,10 +130,12 @@
 	}
 
 	function validateDetails() {
+		// Every field is required.
 		const n = validateProjectName(name);
-		const l = level.trim() ? validateFloorLevel(level) : ({ ok: true, value: null } as const);
-		const u = unitNo.trim() ? validateUnitNumber(unitNo, l.ok ? l.value : null) : ({ ok: true, value: '' } as const);
-		const a = validateFreeText(address, { max: 120, label: 'Address' });
+		const l = level.trim() ? validateFloorLevel(level) : ({ ok: false, error: 'Please enter the floor level.' } as const);
+		const u = validateUnitNumber(unitNo, l.ok ? l.value : null);
+		const a0 = validateFreeText(address, { max: 120, label: 'Address' });
+		const a = a0.ok && !a0.value ? ({ ok: false, error: 'Please enter the address or postal code.' } as const) : a0;
 		const s = validateSizeSqft(size);
 		const c = validateCeilingHeightM(ceiling);
 		errors = {
@@ -158,7 +160,7 @@
 	// ── Create & process ─────────────────────────────────────────────────────
 	let phase = $state<'edit' | 'creating' | 'processing'>('edit');
 	let createError = $state<string | null>(null);
-	const STAGES = ['Reading the floor plan…', 'Tracing walls and windows…', 'Placing furniture…', 'Almost done…'];
+	const STAGES = ['Reading the floor plan…', 'Tracing the walls…', 'Naming the rooms…', 'Almost done…'];
 	let stage = $state(0);
 	const plan = $derived(PLANS[profile.planId]);
 	const atLimit = $derived(!!plan.includedUnits && myProjects.length >= plan.includedUnits);
@@ -256,15 +258,16 @@
 				updateProject(project.id, { status: 'processing' });
 				const tick = setInterval(() => (stage = Math.min(STAGES.length - 1, stage + 1)), 6000);
 				try {
-					const interiors = await Promise.all(
-						photos.filter((p) => p.id !== planId).map(async (p) => (await shrinkPhoto(p.img.dataUrl, 1024, 0.75)).dataUrl)
-					);
+					// Fast trace: walls only, from a smaller copy of the plan (windows are added in Studio).
+					const small = await shrinkPhoto(rotated.dataUrl, 1400, 0.85);
 					const sb = await getSupabase();
 					const { data, error } = await sb.functions.invoke('process-project', {
-						body: { projectId: project.id, floorPlan: rotated, interiors, sizeSqft: d.sizeSqft, propertyType, ceilingCm: d.ceilingCm }
+						body: { projectId: project.id, floorPlan: small, sizeSqft: d.sizeSqft, propertyType, ceilingCm: d.ceilingCm }
 					});
 					if (error) throw new Error(await fnError(error));
 					const p = sanitizePlan((data as { plan?: unknown })?.plan);
+					// The AI saw the smaller copy: convert its scale to the full-size photo kept on this device.
+					if (p?.imageScale) p.imageScale = Math.round(p.imageScale * (small.w / rotated.w) * 10000) / 10000;
 					if (p && p.outline.length >= 3) {
 						updateProject(project.id, { plan: p, status: 'ready' });
 						clearInterval(tick);
@@ -352,7 +355,7 @@
 						id="addr"
 						autocomplete="off"
 						maxlength="120"
-						placeholder="e.g. 560123 or 12 Example Street"
+						placeholder="Type here…"
 						bind:value={addrQuery}
 						oninput={onAddrInput}
 						onkeydown={(e) => e.key === 'Enter' && (e.preventDefault(), runSearch())}
@@ -373,18 +376,18 @@
 			</div>
 			<div class="field">
 				<label for="pname">Project name</label>
-				<input id="pname" maxlength="60" placeholder="e.g. Riverside Residences" bind:value={name} />
+				<input id="pname" maxlength="60" placeholder="Type here…" bind:value={name} />
 				{#if errors.name}<span class="error">{errors.name}</span>{/if}
 			</div>
 			<div class="row2">
 				<div class="field">
 					<label for="unit">Unit number</label>
-					<input id="unit" maxlength="10" placeholder="125" bind:value={unitNo} />
+					<input id="unit" maxlength="10" placeholder="Type here…" bind:value={unitNo} />
 					{#if errors.unitNo}<span class="error">{errors.unitNo}</span>{/if}
 				</div>
 				<div class="field">
 					<label for="lvl">Floor level</label>
-					<input id="lvl" inputmode="numeric" maxlength="3" placeholder="5" bind:value={level} />
+					<input id="lvl" inputmode="numeric" maxlength="3" placeholder="Type here…" bind:value={level} />
 					{#if errors.level}<span class="error">{errors.level}</span>{/if}
 				</div>
 			</div>
@@ -397,12 +400,12 @@
 			<div class="row2">
 				<div class="field">
 					<label for="size">Size (sq ft)</label>
-					<input id="size" inputmode="numeric" maxlength="6" placeholder="950" bind:value={size} />
+					<input id="size" inputmode="numeric" maxlength="6" placeholder="Type here…" bind:value={size} />
 					{#if errors.size}<span class="error">{errors.size}</span>{:else}<span class="muted small">Sets the plan's scale</span>{/if}
 				</div>
 				<div class="field">
 					<label for="ceil">Ceiling (m)</label>
-					<input id="ceil" inputmode="decimal" maxlength="4" bind:value={ceiling} oninput={() => (ceilingTouched = true)} />
+					<input id="ceil" inputmode="decimal" maxlength="4" placeholder="Type here…" bind:value={ceiling} oninput={() => (ceilingTouched = true)} />
 					{#if errors.ceiling}<span class="error">{errors.ceiling}</span>{/if}
 				</div>
 			</div>

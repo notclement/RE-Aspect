@@ -1,5 +1,6 @@
 // RE:Aspect · process-project
-// Traces a floor plan (and places furniture from interior photos) with the admin's active AI key.
+// Traces a floor plan — outline, walls and room names only (fast) — with the admin's active AI key.
+// Windows and doors are added by the user in Studio (the app prompts them).
 // Photos arrive in the request body only — they are never written to storage, so nothing is left to delete.
 // Deploy: Supabase → Edge Functions → process-project (Verify JWT on).
 import { createClient } from 'jsr:@supabase/supabase-js@2';
@@ -10,11 +11,12 @@ const ALLOWED_ORIGINS = [
 	'http://localhost:5173',
 	'http://localhost:4173'
 ];
+// Fastest model of each provider (tracing must finish well before a phone gives up on the request).
 const MODELS = {
-	openai: Deno.env.get('OPENAI_MODEL') ?? 'gpt-4.1',
-	anthropic: Deno.env.get('ANTHROPIC_MODEL') ?? 'claude-sonnet-5-5',
-	google: Deno.env.get('GOOGLE_MODEL') ?? 'gemini-2.5-flash',
-	deepseek: Deno.env.get('DEEPSEEK_MODEL') ?? 'deepseek-flash' // V4.1 Flash: text + images
+	openai: Deno.env.get('OPENAI_TRACE_MODEL') ?? 'gpt-5.6-luna',
+	anthropic: Deno.env.get('ANTHROPIC_TRACE_MODEL') ?? 'claude-haiku-5-5',
+	google: Deno.env.get('GOOGLE_TRACE_MODEL') ?? 'gemini-3.5-flash-lite',
+	deepseek: Deno.env.get('DEEPSEEK_TRACE_MODEL') ?? 'deepseek-flash'
 };
 const KINDS = ['sofa', 'bed', 'table', 'chair', 'counter', 'console', 'wardrobe', 'rug', 'plant', 'desk', 'bath'];
 const COLORS: Record<string, string> = {
@@ -37,19 +39,14 @@ function cors(req: Request) {
 const json = (req: Request, body: unknown, status = 200) =>
 	new Response(JSON.stringify(body), { status, headers: { ...cors(req), 'Content-Type': 'application/json' } });
 
-const PROMPT = (sizeSqft: number, nInteriors: number) => `You are tracing an apartment floor plan for a sunlight simulator.
-Image 1 is the floor plan, already rotated so NORTH IS UP. ${nInteriors ? `Images 2–${nInteriors + 1} are interior photos of the same unit; use them only to decide which furniture is in which room.` : 'There are no interior photos; furnish each room with typical furniture for its type.'}
+const PROMPT = (sizeSqft: number) => `Trace this apartment floor plan (north is up) for a sunlight simulator.
 The unit's total floor area is about ${sizeSqft} sq ft.
-
 Return ONLY a JSON object, no prose:
-{
- "outline": [[x,y], ...],          // the unit's external boundary, corners in order (clockwise), excluding outside ledges/balconies
- "walls":   [{"a":[x,y],"b":[x,y]}], // interior walls between rooms
- "windows": [{"a":[x,y],"b":[x,y]}], // window openings; both ends must lie ON an outline edge
- "rooms":   [{"name":"Living / Dining","x":x,"y":y}], // label position = room centre
- "items":   [{"kind":"bed","cx":x,"cy":y,"w_cm":152,"d_cm":190,"h_cm":50}] // furniture: kind is one of ${KINDS.join(', ')}; cx,cy = centre; w along x, d along y
-}
-Coordinates: x and y are 0–1000, relative to the floor-plan image (0,0 = top-left, 1000,1000 = bottom-right). Use the drawn walls, not the dimension lines. Ignore legends, text and dimension lines outside the unit.`;
+{"outline": [[x,y], ...], "walls": [{"a":[x,y],"b":[x,y]}], "rooms": [{"name":"Living / Dining","x":x,"y":y}]}
+- outline: the unit's external boundary, corners in order, excluding outside ledges / balconies.
+- walls: straight interior walls between rooms (one segment each).
+- rooms: room name at the room's centre.
+Coordinates are 0–1000 relative to the image (0,0 top-left, 1000,1000 bottom-right). Follow the thick drawn walls, not dimension lines; ignore legends and text outside the unit. Do not include windows, doors or furniture.`;
 
 function parseJson(text: string): Record<string, unknown> {
 	const s = text.indexOf('{');
@@ -59,7 +56,7 @@ function parseJson(text: string): Record<string, unknown> {
 }
 
 async function callAI(provider: string, key: string, prompt: string, images: string[]): Promise<Record<string, unknown>> {
-	const signal = AbortSignal.timeout(110_000);
+	const signal = AbortSignal.timeout(55_000);
 	if (provider === 'openai' || provider === 'deepseek') {
 		// DeepSeek uses the same OpenAI-compatible Chat Completions format (deepseek-flash reads images).
 		const ds = provider === 'deepseek';
@@ -96,7 +93,7 @@ async function callAI(provider: string, key: string, prompt: string, images: str
 			headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
 			body: JSON.stringify({
 				model: MODELS.anthropic,
-				max_tokens: 8000,
+				max_tokens: 3000,
 				messages: [{
 					role: 'user',
 					content: [
@@ -223,7 +220,7 @@ function buildPlan(ai: Record<string, unknown>, W: number, H: number, sizeSqft: 
 			return { kind, x: Math.round(x - w / 2), y: Math.round(y - d / 2), w: Math.round(w), d: Math.round(d), h: Math.round(h), color: COLORS[kind], r: kind === 'plant' ? Math.round(w / 2) : 6 };
 		})
 		.filter((i) => !!i);
-	return { v: 1, outline, walls, windows, items, rooms, imageScale: Math.round(s * 10000) / 10000 };
+	return { v: 1, outline, walls, windows: [], doors: [], items: [], rooms, imageScale: Math.round(s * 10000) / 10000 };
 }
 
 // Projects on the new API keys expose them as JSON maps, e.g. {"default":"sb_secret_…"}.
@@ -264,9 +261,6 @@ Deno.serve(async (req) => {
 	const W = Number(fp.w);
 	const H = Number(fp.h);
 	const sizeSqft = Number(body.sizeSqft);
-	const interiors = (Array.isArray(body.interiors) ? body.interiors : [])
-		.slice(0, 14)
-		.filter((x): x is string => typeof x === 'string' && x.length < 2_000_000 && IMG.test(x));
 	if (!projectId || !fpUrl || !(W > 50 && W <= 4096) || !(H > 50 && H <= 4096) || !(sizeSqft >= 150 && sizeSqft <= 20000)) {
 		return json(req, { error: 'Bad request' }, 400);
 	}
@@ -275,21 +269,20 @@ Deno.serve(async (req) => {
 	// Limits (also checks ownership and disabled accounts).
 	const { error: le } = await admin.rpc('ai_run_take', { p_project: projectId, p_fn: 'trace', p_user: u.user.id });
 	if (le) return json(req, { error: le.message }, le.message.includes('limit') ? 429 : 403);
-	if (interiors.length) await admin.rpc('ai_run_take', { p_project: projectId, p_fn: 'furnish', p_user: u.user.id });
 
 	const { data: keyRows, error: ke } = await admin.rpc('active_ai_key');
 	const k = Array.isArray(keyRows) ? keyRows[0] : null;
 	if (ke || !k?.api_key) return json(req, { error: 'No AI key is set up yet.' }, 412);
 
 	try {
-		const ai = await callAI(k.provider, k.api_key, PROMPT(sizeSqft, interiors.length), [fpUrl, ...interiors]);
+		const ai = await callAI(k.provider, k.api_key, PROMPT(sizeSqft), [fpUrl]);
 		const plan = buildPlan(ai, W, H, sizeSqft);
 		const { error: se } = await admin.from('projects').update({ plan, status: 'ready' }).eq('id', projectId).eq('owner', u.user.id);
 		if (se) throw se;
 		return json(req, { plan });
 	} catch (e) {
 		await admin.from('projects').update({ status: 'failed' }).eq('id', projectId).eq('owner', u.user.id);
-		const detail = (e instanceof Error ? e.message : String(e)).replace(/[<>{}\\\u0000-\u001f]/g, '').replace(/\b(sk|key|AIza)[-_A-Za-z0-9*]{8,}/g, '[key]').slice(0, 240);
+		const detail = (e instanceof Error ? (e.name === 'TimeoutError' ? `${k.provider} took too long (over 55 s)` : e.message) : String(e)).replace(/[<>{}\\\u0000-\u001f]/g, '').replace(/\b(sk|key|AIza)[-_A-Za-z0-9*]{8,}/g, '[key]').slice(0, 240);
 		console.error('[process-project]', k.provider, detail);
 		return json(req, { error: 'Could not trace this floor plan automatically.', provider: k.provider, detail }, 422);
 	}
