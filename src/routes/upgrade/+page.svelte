@@ -7,7 +7,7 @@
 	import { profile } from '#lib/stores/profile.svelte.ts';
 	import { auth } from '#lib/stores/auth.svelte.ts';
 	import { agency } from '#lib/stores/agency.svelte.ts';
-	import { PLANS, FREE_LAUNCH } from '#lib/config/plans.ts';
+	import { PLANS } from '#lib/config/plans.ts';
 	import { validateCompanyName, validateNumber, validatePhone, validateFreeText } from '#lib/validate.ts';
 	import Icon from '#lib/components/Icon.svelte';
 
@@ -54,7 +54,7 @@
 <svelte:head><title>Plans · RE:Aspect</title></svelte:head>
 
 <h1 class="title">Plans</h1>
-{#if FREE_LAUNCH}<p class="muted lead">Launch period: everyone gets Pro features free while we test.</p>{/if}
+<p class="muted lead">New accounts get 3 months of Pro free until 1 Feb 2027.</p>
 
 <div class="plans">
 	<section class="card plan" class:on={current === 'free'}>
@@ -77,7 +77,7 @@
 			<li><Icon name="check" size={16} />Import, export and modules</li>
 		</ul>
 		{#if current === 'pro'}
-			<span class="tag pro">{FREE_LAUNCH && profile.data.plan === 'free' ? 'Free during launch' : 'Your plan'}</span>
+			<span class="tag pro">{profile.onPromo ? 'Free for now (promo)' : 'Your plan'}</span>
 		{:else if current === 'free'}
 			<button class="btn primary" disabled>Coming soon</button>
 		{/if}

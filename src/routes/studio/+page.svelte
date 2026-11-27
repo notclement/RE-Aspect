@@ -27,6 +27,7 @@
 	import { shrinkPhoto } from '#lib/image.ts';
 	import { profile } from '#lib/stores/profile.svelte.ts';
 	import Spinner from '#lib/components/Spinner.svelte';
+	import UpgradeSheet from '#lib/components/UpgradeSheet.svelte';
 
 	const id = page.url.searchParams.get('id');
 	const aiState = page.url.searchParams.get('ai');
@@ -637,6 +638,7 @@
 	// Auto-trace: ask the AI to trace the floor plan photo again (e.g. after the tracing was removed).
 	// Uses one of the project's AI re-runs (limits are checked on the server). Furniture already placed is kept.
 	let askTrace = $state(false);
+	let limitSheet = $state<'ai' | 'daily' | null>(null);
 	let tracing = $state(false);
 	const canAutoTrace = $derived(!!backdrop && supabaseConfigured && auth.status === 'signed-in');
 	async function autoTrace() {
@@ -671,8 +673,12 @@
 		} catch (e) {
 			const msg = e instanceof Error ? e.message : 'Auto-trace failed.';
 			console.warn('[auto-trace]', msg);
-			toast = msg.includes('Daily') ? "You've reached today's AI limit — try again tomorrow, or trace with Outline." : msg.includes('limit') ? 'No AI re-runs left for this project — trace it by hand with Outline.' : `Auto-trace didn't work${profile.data.isAdmin ? `: ${msg}` : ' — please trace with Outline, or try again later.'}`;
-			setTimeout(() => (toast = null), 6000);
+			if (msg.includes('Daily')) limitSheet = 'daily';
+			else if (msg.includes('limit')) limitSheet = 'ai';
+			else {
+				toast = `Auto-trace didn't work${profile.data.isAdmin ? `: ${msg}` : ' — please trace with Outline, or try again later.'}`;
+				setTimeout(() => (toast = null), 6000);
+			}
 		}
 		tracing = false;
 	}
@@ -915,6 +921,7 @@
 		</div>
 	</div>
 
+	{#if limitSheet}<UpgradeSheet reason={limitSheet} onclose={() => (limitSheet = null)} />{/if}
 	{#if askTrace}
 		<button class="scrim" aria-label="Cancel" onclick={() => (askTrace = false)}></button>
 		<div class="sheet ask" role="dialog" aria-modal="true" aria-labelledby="trace-title">

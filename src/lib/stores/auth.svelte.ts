@@ -4,6 +4,7 @@ import { theme } from './theme.svelte.ts';
 import { syncProjects, signOutProjects } from './projects.svelte.ts';
 import { isAvatarDataUrl } from '#lib/image.ts';
 import { agency } from './agency.svelte.ts';
+import { promo } from './promo.svelte.ts';
 
 export type AuthStatus = 'loading' | 'signed-in' | 'signed-out' | 'preview';
 
@@ -43,6 +44,7 @@ class Auth {
 			this.status = 'signed-out';
 			this.email = null;
 			agency.clear();
+			promo.clear();
 			return;
 		}
 		this.email = user.email ?? null;
@@ -51,7 +53,7 @@ class Auth {
 		if (!profile.data.name && typeof googleName === 'string') {
 			profile.update({ name: googleName.slice(0, 40) });
 		}
-		await Promise.all([this.loadProfile(), agency.refresh()]);
+		await Promise.all([this.loadProfile(), agency.refresh(), promo.refresh()]);
 		this.status = 'signed-in';
 		void syncProjects();
 	}

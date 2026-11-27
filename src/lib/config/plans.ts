@@ -71,12 +71,3 @@ export function agencyUnitPool(paidSeats: number): number {
 export function agencyMemberLimit(paidSeats: number): number {
 	return Math.max(0, Math.floor(paidSeats)) + 1;
 }
-
-/**
- * Launch period: everything is free while we test with real users.
- * Limits stay built in; everyone is simply treated as Pro until payments go live.
- */
-export const FREE_LAUNCH = true;
-export function effectivePlan(plan: PlanId): PlanId {
-	return FREE_LAUNCH && plan === 'free' ? 'pro' : plan;
-}

@@ -3,13 +3,15 @@
 	$effect(() => nav.set({ label: 'Profile' }));
 	import { profile, ROLE_LABELS } from '#lib/stores/profile.svelte.ts';
 	import { auth } from '#lib/stores/auth.svelte.ts';
-	import { PLANS, FREE_LAUNCH } from '#lib/config/plans.ts';
+	import { PLANS } from '#lib/config/plans.ts';
+	import { promo } from '#lib/stores/promo.svelte.ts';
 	import { validateName } from '#lib/validate.ts';
 	import { myProjects } from '#lib/stores/projects.svelte.ts';
 	import Avatar from '#lib/components/Avatar.svelte';
 	import Icon from '#lib/components/Icon.svelte';
 	import CropSquare from '#lib/components/CropSquare.svelte';
 	import { agency } from '#lib/stores/agency.svelte.ts';
+	import { projectUsage } from '#lib/usage.svelte.ts';
 
 	let fileInput = $state<HTMLInputElement>();
 	let photoBusy = $state(false);
@@ -55,8 +57,9 @@
 	const plan = $derived(PLANS[profile.planId]);
 
 	// Usage: own projects (demos are free); AI re-runs are counted per project on the server.
-	const used = $derived(agency.active && agency.info ? agency.info.used : myProjects.length);
-	const included = $derived(agency.active && agency.info ? agency.info.pool : (plan.includedUnits ?? 0));
+	const usage = $derived(projectUsage());
+	const used = $derived(usage.used);
+	const included = $derived(usage.limit ?? 0);
 	const pct = $derived(included ? Math.min(100, Math.round((used / included) * 100)) : 0);
 	const until = $derived(profile.data.proUntil);
 	const planNote = $derived(
@@ -66,8 +69,8 @@
 				? 'Lifetime Pro'
 				: until
 					? `Pro until ${new Date(until).toLocaleDateString('en-SG', { day: 'numeric', month: 'short', year: 'numeric' })}`
-					: FREE_LAUNCH && profile.data.plan === 'free'
-						? 'Free during launch'
+					: profile.onPromo && promo.current
+						? `Pro for everyone until ${new Date(promo.current.endsAt).toLocaleDateString('en-SG', { day: 'numeric', month: 'short' })}`
 						: ''
 	);
 
@@ -129,18 +132,18 @@
 <section class="card usage" aria-label="Usage">
 	<div class="u-head">
 		<strong>{agency.active ? `${agency.info?.name} · shared projects` : 'Projects'}</strong>
-		<span><b>{used}</b> / {included || '—'}</span>
+		<span><b>{used}</b> / {usage.limit ?? '∞'}</span>
 	</div>
 	<div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax={included} aria-valuenow={used} aria-label="Projects used">
-		<span style:width="{pct}%" class:full={pct >= 100}></span>
+		<span style:width="{pct}%" class:full={usage.full || usage.near}></span>
 	</div>
 	<div class="facts">
-		<span><b>{Math.max(0, included - used)}</b> projects left</span>
+		<span><b>{usage.limit === null ? '∞' : Math.max(0, included - used)}</b> projects left</span>
 		<span><b>{profile.aiRunsLabel}×</b> AI re-runs per project</span>
 		{#if plan.extraUnitOneOffSgd}<span><b>S${plan.extraUnitOneOffSgd}</b> per extra project</span>{/if}
 	</div>
-	{#if FREE_LAUNCH}<p class="muted small">Launch period: everyone gets Pro features free while we test. Demo projects don't count.</p>{/if}
-	<a class="plans-link" href="/upgrade">See plans<Icon name="chevron" size={16} /></a>
+	<p class="muted small">Demo projects don't count.</p>
+	<a class="plans-link" class:hot={(usage.full || usage.near) && profile.planId === 'free'} href="/upgrade">{(usage.full || usage.near) && profile.planId === 'free' ? 'Get more with Pro' : 'See plans'}<Icon name="chevron" size={16} /></a>
 </section>
 
 <style>
@@ -316,6 +319,9 @@
 		color: var(--forest);
 		font-weight: 600;
 		text-decoration: none;
+	}
+	.plans-link.hot {
+		color: var(--ochre);
 	}
 	.plans-link :global(svg) {
 		transform: rotate(-90deg);

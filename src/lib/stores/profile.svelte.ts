@@ -2,7 +2,8 @@
  * The user's profile + personal settings.
  * Phase 0: stored in this browser. Phase 1: synced to the Supabase `profiles` table on sign-in.
  */
-import { effectivePlan, PLANS, type PlanId } from '#lib/config/plans.ts';
+import { PLANS, type PlanId } from '#lib/config/plans.ts';
+import { promo } from './promo.svelte.ts';
 import { theme, isThemeChoice, type ThemeChoice } from './theme.svelte.ts';
 import { agency } from './agency.svelte.ts';
 
@@ -126,23 +127,23 @@ class ProfileStore {
 		return this.data.plan === 'agency' ? 'agency' : this.data.plan;
 	}
 
-	/** Plan whose limits the UI shows (a "view as" preview ignores the free-launch upgrade). */
+	/** Plan whose limits the UI shows (same rules as the server's effective_plan; a "view as" preview shows that role). */
 	get planId(): PlanId {
 		const r = this.viewAs;
 		if (r) return r === 'free' ? 'free' : r === 'agency' || r === 'lead' ? 'agency' : 'pro';
 		if (agency.active) return 'agency';
-		return this.data.isAdmin ? 'pro' : effectivePlan(this.data.plan);
+		if (this.data.isAdmin || this.data.plan === 'pro') return 'pro';
+		return promo.active ? 'pro' : 'free';
+	}
+	/** Is the user on Pro only because of a running promo? */
+	get onPromo(): boolean {
+		return !this.viewAs && !this.data.isAdmin && !agency.active && this.data.plan !== 'pro' && promo.active;
 	}
 
 	/** AI re-runs per project to show: admins (not previewing another role) are unlimited on the server. */
 	get aiRunsLabel(): string {
 		if (this.data.isAdmin && !this.viewAs) return '∞';
-		const r = this.viewAs;
-		// AI limits follow the real plan (the free launch doesn't raise them): Free 5 · Pro 25 · Agency 25.
-		const plan: PlanId = r
-			? r === 'free' ? 'free' : r === 'agency' || r === 'lead' ? 'agency' : 'pro'
-			: agency.active ? 'agency' : this.data.plan;
-		return String(PLANS[plan].aiRunsPerFunctionPerUnit);
+		return String(PLANS[this.planId].aiRunsPerFunctionPerUnit); // Free 5 · Pro 25 · Agency 25
 	}
 
 	update(patch: Partial<Profile>, fromCloud = false) {

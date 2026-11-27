@@ -20,6 +20,11 @@
 	import { validateProjectName, validateUnitNumber, validateFreeText, validateFloorLevel, validateSizeSqft, validateCeilingHeightM } from '#lib/validate.ts';
 	import { getSupabase, supabaseConfigured } from '#lib/supabase.ts';
 	import { sanitizePlan } from '#lib/plan.ts';
+	import UpgradeSheet from '#lib/components/UpgradeSheet.svelte';
+	import { projectUsage } from '#lib/usage.svelte.ts';
+	// At the project limit: explain what Pro adds instead of letting them fill in the whole wizard first.
+	const usage = projectUsage();
+	let limitSheet = $state(usage.full);
 
 	$effect(() => nav.set({ label: 'New project' }));
 
@@ -163,7 +168,7 @@
 	const STAGES = ['Reading the floor plan…', 'Tracing the walls…', 'Naming the rooms…', 'Almost done…'];
 	let stage = $state(0);
 	const plan = $derived(PLANS[profile.planId]);
-	const atLimit = $derived(!!plan.includedUnits && myProjects.length >= plan.includedUnits);
+	const atLimit = $derived(projectUsage().full); // admins unlimited; agency members use the pool
 
 	function next() {
 		if (step === 0 && !photos.length) return void (photoError = 'Add at least the floor plan photo.');
@@ -287,12 +292,14 @@
 			goto(`/studio?id=${project.id}`, { replaceState: true });
 		} catch (e) {
 			createError = e instanceof Error ? e.message : 'Could not create the project.';
+			if (/limit reached/i.test(createError)) limitSheet = true;
 			phase = 'edit';
 		}
 	}
 </script>
 
 <svelte:head><title>New project · RE:Aspect</title></svelte:head>
+{#if limitSheet}<UpgradeSheet reason="projects" used={usage.used} limit={usage.limit ?? undefined} onclose={() => ((limitSheet = false), goto('/'))} />{/if}
 
 {#if phase !== 'edit'}
 	<div class="busy">
@@ -311,7 +318,7 @@
 	</ol>
 
 	{#if atLimit}
-		<p class="card warn">You've used all {plan.includedUnits} projects on your plan. Delete a project to make room{plan.extraUnitOneOffSgd ? `, or add extra projects (S$${plan.extraUnitOneOffSgd} each) once payments open` : ''}.</p>
+		<p class="card warn">You've used all {plan.includedUnits} project{plan.includedUnits === 1 ? '' : 's'} on your plan. Delete a project to make room{profile.planId === 'free' ? ', or ' : ''}{#if profile.planId === 'free'}<a href="/upgrade">upgrade to Pro</a>{/if}.</p>
 	{/if}
 
 	{#if step === 0}

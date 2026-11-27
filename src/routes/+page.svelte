@@ -9,6 +9,16 @@
 	import { planReady, planToUnit } from '#lib/plan.ts';
 	import { propertyTypeLabel } from '#lib/config/property-types.ts';
 	import ConfirmDelete from '#lib/components/ConfirmDelete.svelte';
+	import UpgradeSheet from '#lib/components/UpgradeSheet.svelte';
+	import { projectUsage } from '#lib/usage.svelte.ts';
+	const usage = $derived(projectUsage());
+	let showUpgrade = $state(false);
+	function newProject(e: MouseEvent) {
+		if (usage.full) {
+			e.preventDefault();
+			showUpgrade = true;
+		}
+	}
 	let toDelete = $state<{ id: string; name: string } | null>(null);
 
 	$effect(() => nav.set({ label: 'Projects' }));
@@ -24,9 +34,20 @@
 <p class="muted hello">{greeting()}, {profile.firstName}</p>
 <div class="head">
 	<h1>Your projects</h1>
-	<a class="btn primary" href="/new"><Icon name="plus" size={18} /> New project</a>
+	<a class="btn primary" href="/new" onclick={newProject}><Icon name="plus" size={18} /> New project</a>
 </div>
-<p class="muted meta">{myProjects.length} of {plan.includedUnits ?? '—'} projects used · <span class="tag pro">{plan.label}</span></p>
+<div class="meter" class:warn={usage.near} class:full={usage.full}>
+	<p class="muted meta">
+		{usage.used} of {usage.limit ?? '∞'} project{usage.limit === 1 ? '' : 's'} used · <span class="tag pro">{plan.label}</span>
+		{#if (usage.full || usage.near) && profile.planId === 'free'}· <a href="/upgrade" class="more">Get more with Pro</a>{/if}
+	</p>
+	{#if usage.limit}
+		<div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax={usage.limit} aria-valuenow={usage.used} aria-label="Projects used">
+			<span style:width="{Math.min(100, Math.round((usage.used / usage.limit) * 100))}%"></span>
+		</div>
+	{/if}
+</div>
+{#if showUpgrade}<UpgradeSheet reason="projects" used={usage.used} limit={usage.limit ?? undefined} onclose={() => (showUpgrade = false)} />{/if}
 
 {#each myProjects as p (p.id)}
 	<div class="own">
@@ -90,7 +111,31 @@
 	}
 	.meta {
 		font-size: 14px;
-		margin: 6px 0 18px;
+		margin: 6px 0 6px;
+	}
+	.meter {
+		margin-bottom: 18px;
+	}
+	.bar {
+		height: 6px;
+		border-radius: 3px;
+		background: var(--surface-2);
+		overflow: hidden;
+		max-width: 360px;
+	}
+	.bar span {
+		display: block;
+		height: 100%;
+		background: var(--forest);
+		border-radius: inherit;
+	}
+	.meter.warn .bar span,
+	.meter.full .bar span {
+		background: var(--ochre);
+	}
+	.more {
+		color: var(--ochre);
+		font-weight: 600;
 	}
 	.unit {
 		display: flex;

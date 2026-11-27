@@ -17,10 +17,11 @@
 	import AdminAiKeys from '#lib/components/AdminAiKeys.svelte';
 	import AdminAgency, { type AgencyRow } from '#lib/components/AdminAgency.svelte';
 	import AdminEnquiries from '#lib/components/AdminEnquiries.svelte';
+	import AdminPromo from '#lib/components/AdminPromo.svelte';
 	import { ROLE_LABELS, type RoleView } from '#lib/stores/profile.svelte.ts';
 
 	const roleList = Object.entries(ROLE_LABELS) as [RoleView, string][];
-	let tab = $state<'users' | 'ai' | 'enquiries'>('users');
+	let tab = $state<'users' | 'ai' | 'enquiries' | 'promo'>('users');
 	type Filter = 'all' | 'pro' | 'agency' | 'free' | 'full' | 'disabled';
 	const FILTERS: { id: Filter; label: string }[] = [
 		{ id: 'all', label: 'All' },
@@ -220,6 +221,7 @@
 	<div class="seg" role="tablist">
 		<button role="tab" aria-selected={tab === 'users'} class:on={tab === 'users'} onclick={() => (tab = 'users')}><Icon name="user" size={18} />Users</button>
 		<button role="tab" aria-selected={tab === 'enquiries'} class:on={tab === 'enquiries'} onclick={() => (tab = 'enquiries')}><Icon name="users" size={18} />Enquiries</button>
+		<button role="tab" aria-selected={tab === 'promo'} class:on={tab === 'promo'} onclick={() => (tab = 'promo')}><Icon name="gift" size={18} />Promo</button>
 		<button role="tab" aria-selected={tab === 'ai'} class:on={tab === 'ai'} onclick={() => (tab = 'ai')}><Icon name="key" size={18} />AI keys</button>
 	</div>
 
@@ -227,6 +229,8 @@
 		<AdminAiKeys />
 	{:else if tab === 'enquiries'}
 		<AdminEnquiries />
+	{:else if tab === 'promo'}
+		<AdminPromo />
 	{:else}
 	<div class="stats">
 		<div class="card"><span class="muted">Users</span><strong>{stats.users}</strong></div>
@@ -322,7 +326,7 @@
 										{/if}
 									{/each}
 								</div>
-								<p class="muted small">1 month adds to any time they already have. During the launch everyone gets Pro features anyway — grants decide who keeps Pro after launch.</p>
+								<p class="muted small">1 month adds to any time they already have. New sign-ups until 1 Feb 2027 get 3 months automatically.</p>
 							{/if}
 
 							<h4>Agency</h4>
@@ -440,6 +444,7 @@
 	}
 	.seg {
 		display: flex;
+		overflow-x: auto;
 		gap: 4px;
 		padding: 4px;
 		background: var(--surface-2);

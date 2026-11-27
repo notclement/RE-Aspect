@@ -13,6 +13,7 @@
 	import { profile, ROLE_LABELS, type RoleView } from '#lib/stores/profile.svelte.ts';
 	import { BRAND } from '#lib/config/brand.ts';
 	import { agency } from '#lib/stores/agency.svelte.ts';
+	import { promo } from '#lib/stores/promo.svelte.ts';
 
 	let { children }: { children: Snippet } = $props();
 	let open = $state(false);
@@ -42,7 +43,12 @@
 	const roleList = Object.entries(ROLE_LABELS) as [RoleView, string][];
 	// "My agency" sits between Profile and Settings for agency leads / members (and admins previewing those roles).
 	const showAgency = $derived(!!agency.info || profile.viewAs === 'lead' || profile.viewAs === 'agency');
+	// "Upgrade to Pro" for people on Free (also during a promo, which is temporary). Not for Pro, agency or admins.
+	const showUpgrade = $derived(
+		profile.viewAs ? profile.viewAs === 'free' : !profile.data.isAdmin && !agency.active && profile.data.plan !== 'pro'
+	);
 	const acctLinks = $derived<{ href: string; label: string; icon: IconName }[]>([
+		...(showUpgrade ? [{ href: '/upgrade', label: 'Upgrade to Pro ✦', icon: 'sparkle' as IconName }] : []),
 		{ href: '/profile', label: 'Profile', icon: 'user' },
 		...(showAgency ? [{ href: '/agency', label: 'My agency', icon: 'users' as IconName }] : []),
 		{ href: '/settings', label: 'Settings', icon: 'gear' }
@@ -69,6 +75,9 @@
 			{#if c.href && i < nav.crumbs.length - 1}<a href={c.href}>{c.label}</a>{:else}<strong>{c.label}</strong>{/if}
 		{/each}
 	</nav>
+	{#if promo.active && !promo.open}
+		<button class="iconbtn gift" onclick={() => (promo.open = true)} aria-label="Show the Pro promo"><Icon name="gift" size={20} /></button>
+	{/if}
 	<div class="acct" bind:this={acctEl}>
 		<button class="me" class:on={acct} onclick={() => (acct = !acct)} aria-label="Account menu" aria-expanded={acct}>
 			<Avatar size={44} />
@@ -110,6 +119,16 @@
 
 {#if auth.status === 'preview'}
 	<div class="preview">Preview mode — data stays in this browser.</div>
+{/if}
+{#if promo.open && promo.current}
+	<div class="promo" role="status">
+		<span class="pic"><Icon name="gift" size={20} /></span>
+		<div class="ptext">
+			<strong>Pro for everyone until {new Date(promo.current.endsAt).toLocaleDateString('en-SG', { day: 'numeric', month: 'short' })}</strong>
+			<span>{promo.current.message}</span>
+		</div>
+		<button class="pclose" onclick={() => promo.dismiss()} aria-label="Hide (reopen from the gift button, top right)"><Icon name="close" size={18} /></button>
+	</div>
 {/if}
 {#if profile.viewAs}
 	<div class="preview viewas">
@@ -390,5 +409,47 @@
 		font-size: 13px;
 		padding: 0 4px;
 		text-align: center;
+	}
+	.gift {
+		color: var(--ochre);
+		width: 44px;
+		height: 44px;
+	}
+	.promo {
+		display: flex;
+		align-items: flex-start;
+		gap: 12px;
+		margin: 10px 16px 0;
+		padding: 12px 8px 12px 14px;
+		border-radius: var(--radius-sm);
+		background: var(--ochre-soft);
+		color: var(--text);
+		border: 1px solid color-mix(in srgb, var(--ochre) 35%, transparent);
+	}
+	.pic {
+		color: var(--ochre);
+		display: grid;
+		padding-top: 2px;
+	}
+	.ptext {
+		flex: 1;
+		min-width: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		font-size: 14px;
+		white-space: pre-wrap;
+	}
+	.pclose {
+		width: 44px;
+		height: 44px;
+		margin: -10px 0 -10px 0;
+		display: grid;
+		place-items: center;
+		border: 0;
+		background: none;
+		color: var(--muted);
+		cursor: pointer;
+		flex-shrink: 0;
 	}
 </style>
