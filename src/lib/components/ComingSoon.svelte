@@ -12,7 +12,7 @@
 <section class="card soon">
 	<div class="badge"><Icon name={icon} size={26} /></div>
 	<h2>{title}</h2>
-	<p class="muted">Arrives in <strong>{phase}</strong>. Anchor a unit first to unlock this view.</p>
+	<p class="muted">Arrives in <strong>{phase}</strong>. Set up a project first to unlock this view.</p>
 	<ul>
 		{#each points as p (p)}<li>{p}</li>{/each}
 	</ul>

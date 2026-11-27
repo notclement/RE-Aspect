@@ -3,42 +3,47 @@
 	import { profile, greeting } from '#lib/stores/profile.svelte.ts';
 	import { nav } from '#lib/stores/nav.svelte.ts';
 	import { PLANS } from '#lib/config/plans.ts';
-	import { SAMPLE_UNIT } from '#lib/sample-unit.ts';
+	import { SAMPLE_UNITS } from '#lib/sample-unit.ts';
+	import { projectDetails } from '#lib/stores/projects.svelte.ts';
 
-	$effect(() => nav.set({ label: 'Units' }));
+	$effect(() => nav.set({ label: 'Projects' }));
 	const plan = $derived(PLANS[profile.planId]);
 	const myUnits: unknown[] = []; // Phase 1: loaded from Supabase / local cache
 </script>
 
-<svelte:head><title>Units · RE:Aspect</title></svelte:head>
+<svelte:head><title>Projects · RE:Aspect</title></svelte:head>
 
 <p class="muted hello">{greeting()}, {profile.firstName}</p>
 <div class="head">
-	<h1>Your units</h1>
-	<a class="btn primary" href="/anchor"><Icon name="plus" size={18} /> New unit</a>
+	<h1>Your projects</h1>
+	<a class="btn primary" href="/anchor"><Icon name="plus" size={18} /> New project</a>
 </div>
-<p class="muted meta">{myUnits.length} of {plan.includedUnits ?? '—'} units · <span class="tag pro">{plan.label}</span></p>
+<p class="muted meta">{myUnits.length} of {plan.includedUnits ?? '—'} projects · <span class="tag pro">{plan.label}</span></p>
 
-<a class="unit card" href="/unit?id={SAMPLE_UNIT.id}">
-	<div class="thumb" aria-hidden="true">
-		<svg viewBox="0 0 200 130">
-			<rect x="10" y="10" width="180" height="110" rx="4" fill="#E9DFCB" />
-			<polygon points="30,120 120,120 150,70 60,70" fill="#F2B84B" opacity=".7" />
-			<rect x="10" y="10" width="180" height="110" rx="4" fill="none" stroke="#3A4139" stroke-width="6" />
-			<path d="M120 10v50M120 75v45M120 65h70M10 55h45" stroke="#3A4139" stroke-width="5" />
-		</svg>
-	</div>
-	<div class="info">
-		<span class="tag">DEMO</span>
-		<strong>{SAMPLE_UNIT.name}</strong>
-		<span class="muted">{SAMPLE_UNIT.unitNo} · Level {SAMPLE_UNIT.level} · {SAMPLE_UNIT.sizeSqft.toLocaleString()} sq ft</span>
-	</div>
-	<Icon name="chevron" />
-</a>
+{#each SAMPLE_UNITS as u (u.id)}
+	{@const d = projectDetails(u.id)}
+	<a class="unit card" href="/unit?id={u.id}">
+		<div class="thumb" aria-hidden="true">
+			<svg viewBox="0 0 200 130">
+				<rect x="10" y="10" width="180" height="110" rx="4" fill="#E9DFCB" />
+				<polygon points="30,120 120,120 150,70 60,70" fill="#F2B84B" opacity=".7" />
+				<rect x="10" y="10" width="180" height="110" rx="4" fill="none" stroke="#3A4139" stroke-width="6" />
+				<path d="M120 10v50M120 75v45M120 65h70M10 55h45" stroke="#3A4139" stroke-width="5" />
+			</svg>
+		</div>
+		<div class="info">
+			<span class="tag">DEMO</span>
+			<strong>{d.name}</strong>
+			<span class="muted">{[d.unitNo, `Level ${u.level}`, `${u.sizeSqft.toLocaleString()} sq ft`].filter(Boolean).join(' · ')}</span>
+			{#if d.description}<span class="muted desc">{d.description}</span>{/if}
+		</div>
+		<Icon name="chevron" />
+	</a>
+{/each}
 
 {#if myUnits.length === 0}
 	<section class="empty">
-		<h2>Anchor your first unit</h2>
+		<h2>Set up your first project</h2>
 		<p class="muted">
 			Upload the developer's floor plan, add the address and unit number, and see exactly where the sun lands — any day, any time.
 		</p>
@@ -89,6 +94,12 @@
 	.info strong {
 		font-family: var(--serif);
 		font-size: 20px;
+	}
+	.unit + .unit {
+		margin-top: 10px;
+	}
+	.desc {
+		font-size: 13px;
 	}
 	.empty {
 		text-align: center;

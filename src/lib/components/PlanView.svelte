@@ -67,7 +67,7 @@
 	const beamAngle = $derived((Math.atan2(-sdir[1], -sdir[0]) * 180) / Math.PI);
 	const beamFade = $derived(smooth(sun.altitude / 15));
 	const buildingShadow = $derived(
-		hull([...unit.outline, ...unit.outline.map((p) => [p[0] - sdir[0] * 6000, p[1] - sdir[1] * 6000] as [number, number])])
+		hull([...unit.outline, ...unit.outline.map((p) => [p[0] - sdir[0] * 4000, p[1] - sdir[1] * 4000] as [number, number])])
 			.map((p) => p.join(','))
 			.join(' ')
 	);
@@ -148,11 +148,12 @@
 
 	// ---- 3D layer stack
 	const PX_PER_CM = 0.16; // vertical exaggeration for the cut-away look
-	const STEP = 3;
+	// Performance: few, static layers. Only the floor layer changes as the sun moves.
+	const STEP = 4;
 	const WALL_H = 230;
 	const wallLayers = $derived(Array.from({ length: Math.round((WALL_H * PX_PER_CM) / STEP) }, (_, i) => (i + 1) * STEP));
-	const itemTop = (i: Item) => Math.min(42, Math.max(2, i.h * PX_PER_CM));
-	const itemLayers = $derived(Array.from({ length: 14 }, (_, i) => (i + 1) * STEP));
+	const itemTop = (i: Item) => Math.min(20, Math.max(2, i.h * PX_PER_CM));
+	const itemLayers = $derived(Array.from({ length: 5 }, (_, i) => (i + 1) * STEP));
 
 	function shade(hex: string, f: number) {
 		const n = parseInt(hex.slice(1), 16);
@@ -160,7 +161,6 @@
 		return `#${c((n >> 16) & 255)}${c((n >> 8) & 255)}${c(n & 255)}`;
 	}
 
-	const dim = $derived(`brightness(${1 - dark * 0.22}) saturate(${1 - dark * 0.25})`);
 	const north = $derived(mode === '3d' ? rot + unit.bearing : unit.bearing);
 </script>
 
@@ -181,8 +181,8 @@
 			<stop offset="0.45" stop-color="#fff" />
 			<stop offset="1" stop-color="#fff" stop-opacity="0" />
 		</radialGradient>
-		<mask id="raymask" maskUnits="userSpaceOnUse" x={vb.x - 3000} y={vb.y - 3000} width={vb.w + 6000} height={vb.h + 6000}>
-			<rect x={vb.x - 3000} y={vb.y - 3000} width={vb.w + 6000} height={vb.h + 6000} fill="url(#rayfade)" />
+		<mask id="raymask" maskUnits="userSpaceOnUse" x={vb.x - 1600} y={vb.y - 1600} width={vb.w + 3200} height={vb.h + 3200}>
+			<rect x={vb.x - 1600} y={vb.y - 1600} width={vb.w + 3200} height={vb.h + 3200} fill="url(#rayfade)" />
 			<polygon points={buildingShadow} fill="#000" />
 		</mask>
 		<pattern id="beams" width="160" height="70" patternUnits="userSpaceOnUse" patternTransform="rotate({beamAngle})">
@@ -222,10 +222,10 @@
 			{/each}
 		</g>
 	</g>
-	<polygon points={outline} fill="#1A2740" opacity={dark * 0.28} />
+	<polygon points={outline} fill="#1A2740" opacity={dark * 0.12} />
 	{#if sunUp}
 		<g opacity={beamFade}>
-			<rect class="beams" x={vb.x - 3000} y={vb.y - 3000} width={vb.w + 6000} height={vb.h + 6000} fill="url(#beams)" mask="url(#raymask)" />
+			<rect class="beams" x={vb.x - 1600} y={vb.y - 1600} width={vb.w + 3200} height={vb.h + 3200} fill="url(#beams)" mask="url(#raymask)" />
 			{#each windowRays as r, k (k)}
 				<g clip-path="url(#wroom{r.win})">
 					<!-- through the glass, over the shaded strip behind the sill wall -->
@@ -309,25 +309,30 @@
 
 	{#if mode === 'top'}
 		<div class="flat" style:transform="translate({panX}px,{panY}px) scale({scale})">
-			<svg {viewBox} style:filter={dim}>
+			<svg {viewBox}>
 				{@render floor()}
 				{@render items(null)}
 				{@render walls(false)}
 				{#each unit.rooms as r (r.name)}
 					<text x={r.x} y={r.y} class="label" text-anchor="middle">{r.name.toUpperCase()}</text>
 				{/each}
+				<polygon points={outline} fill="#16213A" opacity={dark * 0.2} pointer-events="none" />
 				{#if showSun}{@render sunDisc(sunUp ? topSun[0] : horizon[0], sunUp ? topSun[1] : horizon[1], 46)}{/if}
 			</svg>
 		</div>
 	{:else}
 		<div class="model" style:transform="translate({panX}px,{panY}px) scale({scale * 0.92}) rotateX({tilt}deg) rotateZ({rot}deg)">
-			<svg {viewBox} style:filter={dim}>{@render floor()}</svg>
+			<svg {viewBox}>{@render floor()}</svg>
 			{#each itemLayers as z (z)}
-				<svg {viewBox} style:transform="translateZ({z}px)" style:filter={dim}>{@render items(z)}</svg>
+				<svg {viewBox} style:transform="translateZ({z}px)">{@render items(z)}</svg>
 			{/each}
 			{#each wallLayers as z, k (z)}
-				<svg {viewBox} style:transform="translateZ({z}px)" style:filter={dim}>{@render walls(k === wallLayers.length - 1)}</svg>
+				<svg {viewBox} style:transform="translateZ({z}px)">{@render walls(k === wallLayers.length - 1)}</svg>
 			{/each}
+			<!-- one cheap night-time tint over everything, instead of a filter on every layer -->
+			<svg {viewBox} style:transform="translateZ({WALL_H * PX_PER_CM + 1}px)" style:opacity={dark * 0.32} class="night">
+				<polygon points={outline} fill="#16213A" />
+			</svg>
 			{#if sunUp && showSun}
 			<div
 				class="sky"
@@ -358,6 +363,7 @@
 		cursor: grab;
 		perspective: 1600px;
 		user-select: none;
+		contain: strict;
 	}
 	:global([data-theme='dark']) .stage {
 		--floor: #cbbfa6;
@@ -379,6 +385,11 @@
 	}
 	.model {
 		transform-style: preserve-3d;
+		will-change: transform;
+	}
+	.night {
+		pointer-events: none;
+		transition: opacity 0.2s linear;
 	}
 	.flat svg,
 	.model svg {

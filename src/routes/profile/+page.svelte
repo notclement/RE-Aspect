@@ -43,7 +43,7 @@
 		<span>{ROLE_LABELS[profile.role]}{#if profile.viewAs} <span class="muted">(preview)</span>{/if}</span>
 	</div>
 	<div class="li"><span class="muted">Plan</span><span class="tag pro">{plan.label}</span></div>
-	<div class="li"><span class="muted">Units included</span><span>{plan.includedUnits}</span></div>
+	<div class="li"><span class="muted">Projects included</span><span>{plan.includedUnits}</span></div>
 	<div class="li"><span class="muted">AI re-runs per function</span><span>{plan.aiRunsPerFunctionPerUnit}</span></div>
 </div>
 {#if FREE_LAUNCH}<p class="muted fine">Launch period: everyone gets Pro features free while we test.</p>{/if}

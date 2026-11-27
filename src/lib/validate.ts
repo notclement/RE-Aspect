@@ -72,3 +72,18 @@ export const validateSizeSqft = (v: string | number) =>
 	validateNumber(v, { min: 150, max: 20000, label: 'Size (sq ft)', decimals: 0 });
 export const validateBodyHeightCm = (v: string | number) =>
 	validateNumber(v, { min: 100, max: 230, label: 'Height (cm)', decimals: 0 });
+
+/**
+ * Free text (descriptions, notes). Keeps line breaks when `multiline`, strips other control
+ * characters and angle brackets, collapses runs of spaces, enforces a max length. Empty is allowed.
+ */
+export function validateFreeText(input: string, { max, label, multiline = false }: { max: number; label: string; multiline?: boolean }): Result<string> {
+	let v = input
+		// eslint-disable-next-line no-control-regex
+		.replace(multiline ? /[\u0000-\u0009\u000B-\u001F\u007F]/g : /[\u0000-\u001F\u007F]/g, '')
+		.replace(/[<>]/g, '')
+		.replace(/[ \t]+/g, ' ');
+	v = multiline ? v.replace(/\n{3,}/g, '\n\n').trim() : v.trim();
+	if (v.length > max) return fail(`${label} must be under ${max} characters.`);
+	return ok(v);
+}

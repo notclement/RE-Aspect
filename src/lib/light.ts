@@ -20,20 +20,7 @@ const LOW_SUN_COT = 6;
 
 /** Room polygon a window lights (falls back to the unit outline). */
 export function roomFor(unit: Unit, win: Opening): [number, number][] {
-	const S = 3.4;
-	const r = (x1: number, y1: number, x2: number, y2: number): [number, number][] => [
-		[x1 * S, y1 * S], [x2 * S, y1 * S], [x2 * S, y2 * S], [x1 * S, y2 * S]
-	];
-	if (unit.id !== 'sample') return unit.outline;
-	const mx = (win.a[0] + win.b[0]) / 2 / S;
-	const my = (win.a[1] + win.b[1]) / 2 / S;
-	if (my <= 21) return r(20, 20, 130, 110); // kitchen
-	if (mx >= 379 && my < 140) return r(250, 20, 380, 140); // bedroom 1
-	if (mx >= 250) return r(250, 140, 380, 260); // bedroom 2
-	return [
-		[20 * S, 110 * S], [130 * S, 110 * S], [130 * S, 80 * S], [180 * S, 80 * S], [180 * S, 90 * S],
-		[250 * S, 90 * S], [250 * S, 260 * S], [20 * S, 260 * S]
-	]; // living / dining
+	return win.room ?? unit.outline;
 }
 
 export function sunPatches(unit: Unit, azimuth: number, altitude: number): Patch[] {

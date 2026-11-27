@@ -65,5 +65,6 @@ export function nowMinutesSG(): number {
 /** Compass name for an azimuth, e.g. 225 → "SW". */
 export function compass(az: number): string {
 	const names = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
-	return names[Math.round(az / 45) % 8];
+	const a = ((az % 360) + 360) % 360;
+	return names[Math.round(a / 45) % 8];
 }

@@ -9,7 +9,9 @@
 	import PlanView from '#lib/components/PlanView.svelte';
 	import SunTimeline from '#lib/components/SunTimeline.svelte';
 	import Collapse from '#lib/components/Collapse.svelte';
-	import { SAMPLE_UNIT } from '#lib/sample-unit.ts';
+	import { sampleById } from '#lib/sample-unit.ts';
+	import { projectDetails, saveProjectDetails, type ProjectDetails } from '#lib/stores/projects.svelte.ts';
+	import { validateProjectName, validateUnitNumber, validateFreeText } from '#lib/validate.ts';
 	import { sunPosition, localDate, sunTimes, compass } from '#lib/sun.ts';
 	import { sunPatches, darkness, furnitureLight, windowRays, ITEM_LABELS } from '#lib/light.ts';
 	import { nav } from '#lib/stores/nav.svelte.ts';
@@ -24,12 +26,48 @@
 
 	// Phase 1: load by id (page.url.searchParams.get('id')) from Supabase / local cache.
 	// For now only the built-in sample unit exists.
-	const unitId = $derived(page.url.searchParams.get('id') ?? 'sample');
-	const unit = SAMPLE_UNIT;
+	const unit = $derived(sampleById(page.url.searchParams.get('id')));
+	const details = $derived(projectDetails(unit.id));
+
+	// ---- edit project details
+	let editing = $state(false);
+	let form = $state<ProjectDetails>({ name: '', unitNo: '', address: '', description: '', notes: '' });
+	let errors = $state<Partial<Record<keyof ProjectDetails, string>>>({});
+	let detailsOpen = $state(false);
+	function startEdit() {
+		form = { ...details };
+		errors = {};
+		editing = true;
+		detailsOpen = true;
+	}
+	function saveEdit(e: SubmitEvent) {
+		e.preventDefault();
+		const name = validateProjectName(form.name);
+		const unitNo = form.unitNo.trim() ? validateUnitNumber(form.unitNo) : ({ ok: true, value: '' } as const);
+		const address = validateFreeText(form.address, { max: 120, label: 'Address' });
+		const description = validateFreeText(form.description, { max: 280, label: 'Description', multiline: true });
+		const notes = validateFreeText(form.notes, { max: 2000, label: 'Notes', multiline: true });
+		errors = {
+			name: name.ok ? undefined : name.error,
+			unitNo: unitNo.ok ? undefined : unitNo.error,
+			address: address.ok ? undefined : address.error,
+			description: description.ok ? undefined : description.error,
+			notes: notes.ok ? undefined : notes.error
+		};
+		if (!(name.ok && unitNo.ok && address.ok && description.ok && notes.ok)) return;
+		saveProjectDetails(unit.id, {
+			name: name.value,
+			unitNo: unitNo.value,
+			address: address.value,
+			description: description.value,
+			notes: notes.value
+		});
+		editing = false;
+	}
 
 	// View, date and time live in a session store so leaving the page and coming back restores them.
 	// (Created outside any $derived so it doesn't mutate state during a read.)
-	const vs = unitView(page.url.searchParams.get('id') ?? 'sample');
+	const vs = $derived(unitView(unit.id));
 	let grid = $state(true);
 	let planView = $state<PlanView>();
 
@@ -63,7 +101,7 @@
 	}
 	let zoomPct = $state(100);
 
-	$effect(() => nav.set({ label: 'Units', href: '/' }, { label: 'Sun study' }));
+	$effect(() => nav.set({ label: 'Projects', href: '/' }, { label: details.name }));
 
 	const sun = $derived(sunPosition(localDate(vs.date, vs.minutes), unit.lat, unit.lon));
 	const patches = $derived(sunPatches(unit, sun.azimuth, sun.altitude));
@@ -94,7 +132,7 @@
 	}
 	const summary = $derived(
 		sun.altitude <= 0
-			? 'The sun is down — the unit is in shade.'
+			? 'The sun is down — the home is in shade.'
 			: litWalls.length
 				? `Direct sun through the ${litWalls.join(' & ')}-facing windows.` +
 					(sunnyItems.length ? ` In the sun: ${sunnyItems.join(', ').toLowerCase()}.` : '')
@@ -102,10 +140,10 @@
 	);
 </script>
 
-<svelte:head><title>{unit.name} · RE:Aspect</title></svelte:head>
+<svelte:head><title>{details.name} · RE:Aspect</title></svelte:head>
 
-<h1>{unit.name}</h1>
-<p class="sub muted">{unit.unitNo} · Level {unit.level} · {unit.sizeSqft.toLocaleString()} sq ft · Demo unit</p>
+<h1>{details.name}</h1>
+<p class="sub muted">{[details.unitNo, `Level ${unit.level}`, `${unit.sizeSqft.toLocaleString()} sq ft`].filter(Boolean).join(' · ')} · Demo project</p>
 
 <section class="viewer">
 	<div class="seg" role="tablist" aria-label="View">
@@ -160,14 +198,53 @@
 <SunTimeline bind:minutes={vs.minutes} bind:date={vs.date} sunrise={times.sunrise} sunset={times.sunset} />
 
 <div class="details">
-	<Collapse title="Study details">
-		<dl>
-			<dt>Unit</dt><dd>{unit.unitNo}, Level {unit.level}</dd>
-			<dt>Size</dt><dd>{unit.sizeSqft.toLocaleString()} sq ft</dd>
-			<dt>Ceiling</dt><dd>{(unit.ceiling / 100).toFixed(2)} m</dd>
-			<dt>Sunrise · sunset</dt><dd>{fmtMin(times.sunrise)} · {fmtMin(times.sunset)}</dd>
-			<dt>Model</dt><dd>Standalone unit — neighbouring buildings not modelled</dd>
-		</dl>
+	<Collapse title="Project details" bind:open={detailsOpen}>
+		{#if editing}
+			<form class="edit" onsubmit={saveEdit} novalidate>
+				<div class="field">
+					<label for="pd-name">Project name</label>
+					<input id="pd-name" maxlength="60" bind:value={form.name} />
+					{#if errors.name}<span class="error">{errors.name}</span>{/if}
+				</div>
+				<div class="field">
+					<label for="pd-unit">Unit number</label>
+					<input id="pd-unit" maxlength="10" placeholder="#12-04" bind:value={form.unitNo} />
+					{#if errors.unitNo}<span class="error">{errors.unitNo}</span>{/if}
+				</div>
+				<div class="field">
+					<label for="pd-addr">Address</label>
+					<input id="pd-addr" maxlength="120" bind:value={form.address} />
+					{#if errors.address}<span class="error">{errors.address}</span>{/if}
+				</div>
+				<div class="field">
+					<label for="pd-desc">Description</label>
+					<textarea id="pd-desc" rows="3" maxlength="280" bind:value={form.description}></textarea>
+					{#if errors.description}<span class="error">{errors.description}</span>{/if}
+				</div>
+				<div class="field">
+					<label for="pd-notes">Notes</label>
+					<textarea id="pd-notes" rows="5" maxlength="2000" placeholder="Viewing notes, client preferences…" bind:value={form.notes}></textarea>
+					{#if errors.notes}<span class="error">{errors.notes}</span>{/if}
+				</div>
+				<div class="actions">
+					<button type="button" class="btn" onclick={() => (editing = false)}>Cancel</button>
+					<button type="submit" class="btn primary">Save</button>
+				</div>
+			</form>
+		{:else}
+			<dl>
+				<dt>Name</dt><dd>{details.name}</dd>
+				<dt>Unit</dt><dd>{details.unitNo || '—'}, Level {unit.level}</dd>
+				<dt>Address</dt><dd>{details.address || '—'}</dd>
+				<dt>Description</dt><dd class="pre">{details.description || '—'}</dd>
+				<dt>Notes</dt><dd class="pre">{details.notes || '—'}</dd>
+				<dt>Size</dt><dd>{unit.sizeSqft.toLocaleString()} sq ft</dd>
+				<dt>Ceiling</dt><dd>{(unit.ceiling / 100).toFixed(2)} m · windows: lower 1/3 wall, upper 2/3 glass</dd>
+				<dt>Sunrise · sunset</dt><dd>{fmtMin(times.sunrise)} · {fmtMin(times.sunset)}</dd>
+				<dt>Model</dt><dd>Standalone unit — neighbouring buildings not modelled</dd>
+			</dl>
+			<button class="btn editbtn" onclick={startEdit}>Edit details</button>
+		{/if}
 	</Collapse>
 	<Collapse title="Sun info">
 		<dl>
@@ -324,6 +401,25 @@
 	}
 	.note a {
 		color: var(--forest);
+	}
+	.pre {
+		white-space: pre-wrap;
+	}
+	.editbtn {
+		margin-top: 14px;
+	}
+	.edit textarea {
+		padding: 10px 12px;
+		border-radius: 10px;
+		border: 1px solid var(--line);
+		background: var(--surface);
+		font-size: 16px;
+		resize: vertical;
+	}
+	.actions {
+		display: flex;
+		justify-content: flex-end;
+		gap: 8px;
 	}
 	.note {
 		font-size: 12px;

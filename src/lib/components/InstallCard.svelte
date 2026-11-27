@@ -54,7 +54,7 @@
 	{#if installed}
 		<p class="muted">Installed — open it from your home screen for the full-screen app experience.</p>
 	{:else if deferred}
-		<p class="muted">Opens full-screen like a normal app, loads instantly and works offline for units you've viewed.</p>
+		<p class="muted">Opens full-screen like a normal app, loads instantly and works offline for projects you've viewed.</p>
 		<button class="btn primary" onclick={install}>Install app</button>
 	{:else if ios}
 		<p class="muted">On iPhone / iPad (Safari):</p>

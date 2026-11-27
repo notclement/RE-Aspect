@@ -28,8 +28,8 @@
 	}
 
 	const links: { href: string; label: string; icon: IconName }[] = [
-		{ href: '/', label: 'Units', icon: 'home' },
-		{ href: '/anchor', label: 'New unit', icon: 'plus' },
+		{ href: '/', label: 'Projects', icon: 'home' },
+		{ href: '/anchor', label: 'New project', icon: 'plus' },
 		{ href: '/profile', label: 'Profile', icon: 'user' },
 		{ href: '/settings', label: 'Settings', icon: 'gear' }
 	];

@@ -1,14 +1,14 @@
 <script lang="ts">
 	import { nav } from '#lib/stores/nav.svelte.ts';
-	$effect(() => nav.set({ label: 'Units', href: '/' }, { label: 'New unit' }));
+	$effect(() => nav.set({ label: 'Projects', href: '/' }, { label: 'New project' }));
 	import ComingSoon from '#lib/components/ComingSoon.svelte';
 </script>
 
-<svelte:head><title>New unit · RE:Aspect</title></svelte:head>
-<h1>New unit</h1>
+<svelte:head><title>New project · RE:Aspect</title></svelte:head>
+<h1>New project</h1>
 <ComingSoon
 	icon="anchor"
-	title="Anchor — set up a unit"
+	title="Anchor — set up a project"
 	phase="Phase 1"
 	points={[
 		'Upload everything you have: developer floor plan, Google Maps / satellite images, stack plan',
