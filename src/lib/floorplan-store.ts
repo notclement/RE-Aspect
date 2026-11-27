@@ -15,9 +15,11 @@ function open(): Promise<IDBDatabase> {
 }
 
 export interface FloorPlanImage {
-	dataUrl: string;
+	dataUrl: string; // rotated (north up)
 	w: number;
 	h: number;
+	original?: string; // as uploaded, so it can be re-rotated without losing quality
+	angle?: number; // degrees clockwise applied to `original`
 }
 
 export async function saveFloorPlan(projectId: string, img: FloorPlanImage): Promise<void> {

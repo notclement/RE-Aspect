@@ -31,10 +31,16 @@ export function validateName(input: string): Result<string> {
  * Singapore unit number, e.g. "#18-04", "18-04", "#05-1234", "#12-03A".
  * Normalised to "#FF-UUUU[A]". Floor 1–3 digits, unit 1–4 digits, optional single trailing letter.
  */
-export function validateUnitNumber(input: string): Result<string> {
+export function validateUnitNumber(input: string, floorLevel?: number | null): Result<string> {
 	const v = cleanText(input).toUpperCase().replace(/\s/g, '');
 	if (!v) return fail('Please enter the unit number.');
 	if (v.length > 10) return fail('That unit number is too long.');
+	// Just the unit ("125") — combined with the floor level when we have it ("#05-125").
+	const bare = /^#?(\d{1,4})([A-Z])?$/.exec(v);
+	if (bare) {
+		const unit = bare[1].padStart(2, '0') + (bare[2] ?? '');
+		return ok(floorLevel && floorLevel > 0 ? `#${String(floorLevel).padStart(2, '0')}-${unit}` : unit);
+	}
 	const m = /^#?(\d{1,3})-(\d{1,4})([A-Z])?$/.exec(v);
 	if (!m) return fail('Use the format #18-04 (an optional letter at the end is OK, e.g. #12-03A).');
 	const floor = m[1].padStart(2, '0');

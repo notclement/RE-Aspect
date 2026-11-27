@@ -107,11 +107,17 @@
 
 	const pointers = new Map<number, { x: number; y: number }>();
 	let pinchDist = 0;
+	let pinchScale = 1;
+	// Pinch follows the fingers but damped (exponent < 1) so small finger moves give small zooms.
+	const PINCH_DAMP = 0.6;
 
 	function down(e: PointerEvent) {
 		(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
 		pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-		if (pointers.size === 2) pinchDist = dist();
+		if (pointers.size === 2) {
+			pinchDist = dist();
+			pinchScale = scale;
+		}
 	}
 	function dist() {
 		const [a, b] = [...pointers.values()];
@@ -125,8 +131,7 @@
 		pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 		if (pointers.size >= 2) {
 			const d = dist();
-			if (pinchDist) zoomBy(d / pinchDist);
-			pinchDist = d;
+			if (pinchDist > 20) scale = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, pinchScale * (d / pinchDist) ** PINCH_DAMP));
 			return;
 		}
 		if (mode === '3d') {
@@ -143,7 +148,9 @@
 	}
 	function wheel(e: WheelEvent) {
 		e.preventDefault();
-		zoomBy(e.deltaY < 0 ? 1.1 : 1 / 1.1);
+		// Proportional to the wheel delta: trackpad pinches (ctrlKey) send many small events, mouse wheels a few big ones.
+		const dy = Math.max(-50, Math.min(50, e.deltaY));
+		zoomBy(Math.exp(-dy * (e.ctrlKey ? 0.006 : 0.0025)));
 	}
 
 	// ---- 3D layer stack

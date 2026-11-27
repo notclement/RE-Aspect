@@ -7,6 +7,7 @@
 	import { validateName } from '#lib/validate.ts';
 	import { myProjects } from '#lib/stores/projects.svelte.ts';
 	import Avatar from '#lib/components/Avatar.svelte';
+	import Icon from '#lib/components/Icon.svelte';
 	import CropSquare from '#lib/components/CropSquare.svelte';
 
 	let fileInput = $state<HTMLInputElement>();
@@ -40,16 +41,22 @@
 		}
 	}
 
-	let name = $state(profile.data.name);
+	let editingName = $state(false);
+	let name = $state('');
 	let error = $state<string | null>(null);
-	let saved = $state(false);
+	let nameInput = $state<HTMLInputElement>();
+	function startEditName() {
+		name = profile.data.name;
+		error = null;
+		editingName = true;
+		queueMicrotask(() => nameInput?.select());
+	}
 	const plan = $derived(PLANS[profile.planId]);
 
 	// Usage: own projects (demos are free); AI re-runs are counted per project on the server.
 	const used = $derived(myProjects.length);
 	const included = $derived(plan.includedUnits ?? 0);
 	const pct = $derived(included ? Math.min(100, Math.round((used / included) * 100)) : 0);
-	const aiFunctions = ['Floor-plan trace', 'Furniture from photos'];
 	const until = $derived(profile.data.proUntil);
 	const planNote = $derived(
 		profile.viewAs
@@ -63,158 +70,209 @@
 						: ''
 	);
 
-	function save(e: SubmitEvent) {
-		e.preventDefault();
+	function save(e?: SubmitEvent) {
+		e?.preventDefault();
 		const r = validateName(name);
 		error = r.ok ? null : r.error;
 		if (r.ok) {
-			auth.saveName(r.value);
-			saved = true;
-			setTimeout(() => (saved = false), 1500);
+			if (r.value !== profile.data.name) void auth.saveName(r.value);
+			editingName = false;
 		}
 	}
 </script>
 
 <svelte:head><title>Profile · RE:Aspect</title></svelte:head>
 
-<h1>{profile.firstName}'s profile</h1>
+<section class="card head">
+	<button class="av" onclick={() => fileInput?.click()} disabled={photoBusy} aria-label={profile.data.avatar ? 'Change photo' : 'Add photo'}>
+		<Avatar size={84} />
+		<span class="cam"><Icon name="camera" size={16} /></span>
+	</button>
+	<input bind:this={fileInput} type="file" accept="image/*" hidden onchange={pickPhoto} />
 
-<div class="card photo">
-	<Avatar size={72} />
-	<div class="pbtns">
-		<button class="btn" onclick={() => fileInput?.click()} disabled={photoBusy}>{photoBusy ? 'Saving…' : profile.data.avatar ? 'Change photo' : 'Add photo'}</button>
-		{#if profile.data.avatar}<button class="btn" onclick={removePhoto} disabled={photoBusy}>Remove</button>{/if}
-		<span class="muted small">Pick the square you want — it's shrunk to a tiny 128 px thumbnail before upload.</span>
+	<div class="who">
+		<span class="lbl muted">Display name</span>
+		{#if editingName}
+			<form class="nameedit" onsubmit={save} novalidate>
+				<input
+					bind:this={nameInput}
+					maxlength="40"
+					autocomplete="name"
+					bind:value={name}
+					aria-label="Display name"
+					onkeydown={(e) => e.key === 'Escape' && (editingName = false)}
+				/>
+				<button class="ib ok" type="submit" aria-label="Save name"><Icon name="check" size={18} /></button>
+				<button class="ib" type="button" onclick={() => (editingName = false)} aria-label="Cancel"><Icon name="close" size={18} /></button>
+			</form>
+			{#if error}<span class="error small">{error}</span>{/if}
+		{:else}
+			<div class="namerow">
+				<h1>{profile.data.name || 'Add your name'}</h1>
+				<button class="ib" onclick={startEditName} aria-label="Edit display name"><Icon name="pencil" size={18} /></button>
+			</div>
+		{/if}
+		<span class="muted email">{auth.email ?? 'Preview mode'}</span>
+		<div class="badges">
+			<span class="tag">{ROLE_LABELS[profile.role]}{profile.viewAs ? ' · preview' : ''}</span>
+			<span class="tag pro">{plan.label}</span>
+			{#if planNote}<span class="muted small">{planNote}</span>{/if}
+		</div>
+		{#if profile.data.avatar}<button class="link small" onclick={removePhoto} disabled={photoBusy}>Remove photo</button>{/if}
 		{#if photoError}<span class="error small">{photoError}</span>{/if}
 	</div>
-	<input bind:this={fileInput} type="file" accept="image/*" hidden onchange={pickPhoto} />
-</div>
+</section>
 {#if cropFile}<CropSquare file={cropFile} ondone={cropped} oncancel={() => (cropFile = null)} />{/if}
 
-<form class="card" onsubmit={save} novalidate>
-	<div class="field">
-		<label for="n">Name</label>
-		<input id="n" maxlength="40" autocomplete="name" bind:value={name} />
-		{#if error}<span class="error">{error}</span>{/if}
-	</div>
-	<button class="btn primary" type="submit">{saved ? 'Saved ✓' : 'Save'}</button>
-</form>
-
-<div class="card list">
-	<div class="li"><span class="muted">Email</span><span>{auth.email ?? '—'}</span></div>
-	<div class="li">
-		<span class="muted">Role</span>
-		<span>{ROLE_LABELS[profile.role]}{#if profile.viewAs} <span class="muted">(preview)</span>{/if}</span>
-	</div>
-	<div class="li">
-		<span class="muted">Plan</span>
-		<span class="planv"><span class="tag pro">{plan.label}</span>{#if planNote}<span class="muted small">{planNote}</span>{/if}</span>
-	</div>
-</div>
-
-<h3>Usage</h3>
-<div class="card usage">
+<section class="card usage" aria-label="Usage">
 	<div class="u-head">
 		<strong>Projects</strong>
-		<span><b>{used}</b> of {included || '—'}</span>
+		<span><b>{used}</b> / {included || '—'}</span>
 	</div>
 	<div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax={included} aria-valuenow={used} aria-label="Projects used">
 		<span style:width="{pct}%" class:full={pct >= 100}></span>
 	</div>
-	<p class="muted small">
-		{included - used > 0 ? `${included - used} left` : 'Quota reached'}
-		{#if plan.extraUnitOneOffSgd} · extra projects S${plan.extraUnitOneOffSgd} each, one-off{/if}
-		· demo projects don't count
-	</p>
-
-	<div class="u-head ai">
-		<strong>AI re-runs</strong>
-		<span>{plan.aiRunsPerFunctionPerUnit} per function, per project</span>
+	<div class="facts">
+		<span><b>{Math.max(0, included - used)}</b> projects left</span>
+		<span><b>{plan.aiRunsPerFunctionPerUnit}×</b> AI re-runs per project</span>
+		{#if plan.extraUnitOneOffSgd}<span><b>S${plan.extraUnitOneOffSgd}</b> per extra project</span>{/if}
 	</div>
-	<ul class="ai-list">
-		{#each aiFunctions as f (f)}
-			<li><span>{f}</span><span class="muted">{plan.aiRunsPerFunctionPerUnit} per project</span></li>
-		{/each}
-	</ul>
-	<p class="muted small">Used when you create a project or re-run the AI from Studio. The count is kept per project.</p>
-</div>
-{#if FREE_LAUNCH}<p class="muted fine">Launch period: everyone gets Pro features free while we test.</p>{/if}
+	{#if FREE_LAUNCH}<p class="muted small">Launch period: everyone gets Pro features free while we test. Demo projects don't count.</p>{/if}
+</section>
 
 <style>
-	.card {
-		margin-bottom: 14px;
-	}
-	.list {
-		padding: 4px 16px;
-	}
-	.li {
-		display: flex;
-		justify-content: space-between;
-		padding: 12px 0;
-		border-bottom: 1px solid var(--line);
-	}
-	.li:last-child {
-		border-bottom: 0;
-	}
-	.photo {
+	.head {
 		display: flex;
 		align-items: center;
-		gap: 16px;
+		gap: 18px;
 		margin-bottom: 14px;
 	}
-	.pbtns {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 8px;
-		align-items: center;
+	.av {
+		position: relative;
+		border: 0;
+		background: none;
+		padding: 0;
+		cursor: pointer;
+		border-radius: 50%;
+		flex-shrink: 0;
 	}
-	.pbtns .small {
-		flex-basis: 100%;
+	.cam {
+		position: absolute;
+		right: -2px;
+		bottom: -2px;
+		width: 32px;
+		height: 32px;
+		border-radius: 50%;
+		display: grid;
+		place-items: center;
+		background: var(--forest);
+		color: var(--on-primary);
+		border: 2px solid var(--surface);
 	}
-	.error {
-		color: #b5483a;
-	}
-	h3 {
-		margin: 22px 0 8px;
-		font-size: 13px;
-		text-transform: uppercase;
-		letter-spacing: 0.06em;
-		color: var(--muted);
-	}
-	.planv {
+	.who {
+		flex: 1;
+		min-width: 0;
 		display: flex;
 		flex-direction: column;
-		align-items: flex-end;
-		gap: 2px;
+		gap: 4px;
+		align-items: flex-start;
+	}
+	.lbl {
+		font-size: 11px;
+		font-weight: 600;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+	}
+	.namerow {
+		display: flex;
+		align-items: center;
+		gap: 4px;
+		max-width: 100%;
+	}
+	.namerow h1 {
+		margin: 0;
+		font-size: clamp(22px, 6vw, 30px);
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.nameedit {
+		display: flex;
+		gap: 6px;
+		width: 100%;
+	}
+	.nameedit input {
+		flex: 1;
+		min-width: 0;
+		min-height: 44px;
+		padding: 0 12px;
+		border-radius: var(--radius-sm);
+		border: 1px solid var(--forest);
+		background: var(--surface);
+		font-size: 18px;
+	}
+	.ib {
+		width: 44px;
+		height: 44px;
+		flex-shrink: 0;
+		display: grid;
+		place-items: center;
+		border: 0;
+		border-radius: var(--radius-sm);
+		background: none;
+		color: var(--muted);
+		cursor: pointer;
+	}
+	.ib:hover {
+		background: var(--surface-2);
+	}
+	.ib.ok {
+		background: var(--forest);
+		color: var(--on-primary);
+	}
+	.email {
+		font-size: 14px;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		max-width: 100%;
+	}
+	.badges {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 6px;
+		margin-top: 4px;
 	}
 	.small {
 		font-size: 12px;
+	}
+	.link {
+		border: 0;
+		background: none;
+		padding: 0;
+		color: var(--muted);
+		text-decoration: underline;
+		cursor: pointer;
+		min-height: 32px;
+	}
+	.error {
+		color: #b5483a;
 	}
 	.u-head {
 		display: flex;
 		justify-content: space-between;
 		align-items: baseline;
-		gap: 10px;
 	}
 	.u-head b {
 		font-size: 20px;
 		font-variant-numeric: tabular-nums;
-	}
-	.u-head.ai {
-		margin-top: 18px;
-		padding-top: 14px;
-		border-top: 1px solid var(--line);
-	}
-	.u-head.ai span {
-		font-size: 13px;
-		color: var(--muted);
 	}
 	.bar {
 		height: 10px;
 		border-radius: 5px;
 		background: var(--surface-2);
 		overflow: hidden;
-		margin: 8px 0 6px;
+		margin: 8px 0 12px;
 	}
 	.bar span {
 		display: block;
@@ -226,22 +284,29 @@
 	.bar span.full {
 		background: var(--ochre);
 	}
-	.ai-list {
-		list-style: none;
-		margin: 8px 0 0;
-		padding: 0;
+	.facts {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+		gap: 8px;
 	}
-	.ai-list li {
-		display: flex;
-		justify-content: space-between;
-		padding: 7px 0;
-		font-size: 14px;
-		border-bottom: 1px dashed var(--line);
-	}
-	.ai-list li:last-child {
-		border-bottom: 0;
-	}
-	.fine {
+	.facts span {
+		background: var(--surface-2);
+		border-radius: var(--radius-sm);
+		padding: 10px 12px;
 		font-size: 13px;
+		color: var(--muted);
+	}
+	.facts b {
+		display: block;
+		font-size: 18px;
+		color: var(--text);
+	}
+	.usage .small {
+		margin: 10px 0 0;
+	}
+	@media (max-width: 420px) {
+		.head {
+			align-items: flex-start;
+		}
 	}
 </style>

@@ -64,7 +64,7 @@
 	function saveEdit(e: SubmitEvent) {
 		e.preventDefault();
 		const name = validateProjectName(form.name);
-		const unitNo = form.unitNo.trim() ? validateUnitNumber(form.unitNo) : ({ ok: true, value: '' } as const);
+		const unitNo = form.unitNo.trim() ? validateUnitNumber(form.unitNo, mine?.level ?? unit.level) : ({ ok: true, value: '' } as const);
 		const address = validateFreeText(form.address, { max: 120, label: 'Address' });
 		const description = validateFreeText(form.description, { max: 280, label: 'Description', multiline: true });
 		const notes = validateFreeText(form.notes, { max: 2000, label: 'Notes', multiline: true });
@@ -258,7 +258,7 @@
 				</div>
 				<div class="field">
 					<label for="pd-unit">Unit number</label>
-					<input id="pd-unit" maxlength="10" placeholder="#12-04" bind:value={form.unitNo} />
+					<input id="pd-unit" maxlength="10" placeholder="125" bind:value={form.unitNo} />
 					{#if errors.unitNo}<span class="error">{errors.unitNo}</span>{/if}
 				</div>
 				<div class="field">

@@ -10,6 +10,7 @@
 	 */
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
+	import { goto } from '$app/navigation';
 	import Icon, { type IconName } from '#lib/components/Icon.svelte';
 	import { nav } from '#lib/stores/nav.svelte.ts';
 	import { getProject, updateProject, flush } from '#lib/stores/projects.svelte.ts';
@@ -279,7 +280,7 @@
 			const [a, b] = [...pointers.values()];
 			const d = Math.hypot(a.x - b.x, a.y - b.y);
 			vb = gesture.vb0;
-			zoomAt(gesture.d0 / Math.max(1, d), gesture.mid);
+			zoomAt((gesture.d0 / Math.max(1, d)) ** 0.6, gesture.mid);
 		} else if (gesture.kind === 'pan' && downAt.moved) {
 			const k = gesture.vb0.w / Math.max(1, svg!.clientWidth);
 			vb = { ...gesture.vb0, x: gesture.vb0.x - (e.clientX - gesture.sx) * k, y: gesture.vb0.y - (e.clientY - gesture.sy) * k };
@@ -343,7 +344,8 @@
 
 	function onWheel(e: WheelEvent) {
 		e.preventDefault();
-		zoomAt(Math.exp(e.deltaY * 0.0015), toCm(e.clientX, e.clientY));
+		const dy = Math.max(-50, Math.min(50, e.deltaY));
+		zoomAt(Math.exp(dy * (e.ctrlKey ? 0.006 : 0.0025)), toCm(e.clientX, e.clientY));
 	}
 
 	function setMode(m: Mode) {
@@ -427,6 +429,23 @@
 		commit(before);
 	}
 
+	// Done: if there's no furniture yet, offer to add some first (furniture shows where the sun lands).
+	let askFurniture = $state(false);
+	let highlightFurniture = $state(false);
+	function done() {
+		if (!project) return;
+		if (plan.outline.length >= 3 && plan.items.length === 0 && !askFurniture) return void (askFurniture = true);
+		void flush(project.id);
+		goto(`/unit?id=${project.id}`);
+	}
+	function addFurnitureNow() {
+		askFurniture = false;
+		mode = 'move';
+		highlightFurniture = true;
+		toast = 'Tap Furniture to add beds, sofas, tables…';
+		setTimeout(() => (toast = null), 4000);
+	}
+
 	const selItem = $derived(sel?.t === 'item' ? plan.items[sel.i] : null);
 	const selWin = $derived(sel?.t === 'window' ? plan.windows[sel.i] : null);
 	const tools: { id: Mode; label: string; icon: IconName }[] = [
@@ -465,12 +484,15 @@
 {:else}
 	<div class="studio">
 		<div class="top">
+			{#if backdrop}
+				<a class="btn back" href="/rotate?id={project.id}"><Icon name="back" size={18} />Rotate plan</a>
+			{/if}
 			<span class="state muted">{savedAt === 'saving' ? 'Saving…' : 'Saved'}</span>
 			{#if backdrop}
 				<button class="mini" class:on={showBackdrop} onclick={() => (showBackdrop = !showBackdrop)} aria-pressed={showBackdrop} aria-label="Show floor plan photo"><Icon name="image" size={18} /></button>
 			{/if}
 			<button class="mini" onclick={fit} aria-label="Fit to screen"><Icon name="grid" size={18} /></button>
-			<a class="btn primary done" href="/unit?id={project.id}"><Icon name="check" size={18} />Done</a>
+			<button class="btn primary done" onclick={done}><Icon name="check" size={18} />Done</button>
 		</div>
 
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -570,12 +592,24 @@
 			{#each tools as t (t.id)}
 				<button class:on={mode === t.id} onclick={() => setMode(t.id)} aria-pressed={mode === t.id}><Icon name={t.icon} size={22} /><span>{t.label}</span></button>
 			{/each}
-			<button onclick={() => (sheet = 'furniture')}><Icon name="sofa" size={22} /><span>Furniture</span></button>
+			<button class:pulse={highlightFurniture} onclick={() => ((sheet = 'furniture'), (highlightFurniture = false))}><Icon name="sofa" size={22} /><span>Furniture</span></button>
 			<button onclick={undo} disabled={!canUndo} aria-label="Undo"><Icon name="undo" size={22} /><span>Undo</span></button>
 			<button onclick={redo} disabled={!canRedo} aria-label="Redo"><Icon name="redo" size={22} /><span>Redo</span></button>
 		</nav>
 		</div>
 	</div>
+
+	{#if askFurniture}
+		<button class="scrim" aria-label="Close" onclick={() => (askFurniture = false)}></button>
+		<div class="sheet ask" role="dialog" aria-modal="true" aria-labelledby="ask-title">
+			<h2 id="ask-title">Add furniture?</h2>
+			<p class="muted">There's no furniture yet. Adding beds, sofas and tables shows exactly where the sun lands on them.</p>
+			<div class="actions">
+				<button class="btn" onclick={() => ((askFurniture = false), void flush(project.id), goto(`/unit?id=${project.id}`))}>Skip for now</button>
+				<button class="btn primary" onclick={addFurnitureNow}><Icon name="sofa" size={18} />Add furniture</button>
+			</div>
+		</div>
+	{/if}
 
 	{#if sheet}
 		<button class="scrim" aria-label="Close" onclick={() => (sheet = null)}></button>
@@ -660,6 +694,23 @@
 	}
 	.done {
 		min-height: 44px;
+	}
+	.back {
+		min-height: 44px;
+		padding: 0 12px;
+	}
+	.tools button.pulse {
+		color: var(--on-primary);
+		background: var(--forest);
+		animation: pulse 1.2s ease-in-out infinite;
+	}
+	@keyframes pulse {
+		50% {
+			box-shadow: 0 0 0 6px color-mix(in srgb, var(--forest) 30%, transparent);
+		}
+	}
+	.ask p {
+		margin: 0 0 14px;
 	}
 	.canvas {
 		flex: 1;

@@ -17,7 +17,7 @@
 	let open = $state(false);
 
 	// Settings / Profile / New unit get a back button that returns to wherever you came from.
-	const SUB_PAGES = ['/settings', '/profile', '/new', '/studio', '/admin'];
+	const SUB_PAGES = ['/settings', '/profile', '/new', '/studio', '/rotate', '/admin'];
 	const isSub = $derived(SUB_PAGES.includes(page.url.pathname));
 	let inAppSteps = 0;
 	afterNavigate((n) => {

@@ -36,11 +36,21 @@
 	let photoError = $state<string | null>(null);
 	let fileInput = $state<HTMLInputElement>();
 
-	async function addPhotos(e: Event) {
+	let dragging = $state(false);
+	function addPhotos(e: Event) {
 		const input = e.currentTarget as HTMLInputElement;
-		const files = [...(input.files ?? [])].filter((f) => f.type.startsWith('image/'));
+		const files = [...(input.files ?? [])];
 		input.value = '';
-		photoError = null;
+		void addFiles(files);
+	}
+	function onDrop(e: DragEvent) {
+		e.preventDefault();
+		dragging = false;
+		void addFiles([...(e.dataTransfer?.files ?? [])]);
+	}
+	async function addFiles(all: File[]) {
+		const files = all.filter((f) => f.type.startsWith('image/'));
+		photoError = all.length && !files.length ? 'Only photos and images can be added.' : null;
 		const room = MAX_PHOTOS - photos.length;
 		if (files.length > room) photoError = `Only ${MAX_PHOTOS} photos per project — the first ${room} were added.`;
 		const take = files.slice(0, room);
@@ -85,23 +95,27 @@
 
 	let searchTimer: ReturnType<typeof setTimeout> | undefined;
 	let ctrl: AbortController | null = null;
+	// Searches when a full 6-digit postal code is typed, on Enter, or with the Search button (not on every key).
 	function onAddrInput() {
 		place = null;
 		address = addrQuery;
 		clearTimeout(searchTimer);
-		searchTimer = setTimeout(async () => {
-			ctrl?.abort();
-			ctrl = new AbortController();
-			searching = true;
-			addrError = null;
-			try {
-				results = await searchAddress(addrQuery, ctrl.signal);
-			} catch (e) {
-				if ((e as Error).name !== 'AbortError') addrError = 'Address search is unavailable — you can still type the address.';
-				results = [];
-			}
-			searching = false;
-		}, 350);
+		if (/^\d{6}$/.test(addrQuery.trim())) searchTimer = setTimeout(runSearch, 250);
+	}
+	async function runSearch() {
+		if (addrQuery.trim().length < 3) return;
+		ctrl?.abort();
+		ctrl = new AbortController();
+		searching = true;
+		addrError = null;
+		try {
+			results = await searchAddress(addrQuery, ctrl.signal);
+			if (!results.length) addrError = 'No matches — check the postal code, or just type the address.';
+		} catch (e) {
+			if ((e as Error).name !== 'AbortError') addrError = (e as Error).message || 'Address search is unavailable — you can still type the address.';
+			results = [];
+		}
+		searching = false;
 	}
 	function pickPlace(p: Place) {
 		place = p;
@@ -116,9 +130,9 @@
 
 	function validateDetails() {
 		const n = validateProjectName(name);
-		const u = unitNo.trim() ? validateUnitNumber(unitNo) : ({ ok: true, value: '' } as const);
-		const a = validateFreeText(address, { max: 120, label: 'Address' });
 		const l = level.trim() ? validateFloorLevel(level) : ({ ok: true, value: null } as const);
+		const u = unitNo.trim() ? validateUnitNumber(unitNo, l.ok ? l.value : null) : ({ ok: true, value: '' } as const);
+		const a = validateFreeText(address, { max: 120, label: 'Address' });
 		const s = validateSizeSqft(size);
 		const c = validateCeilingHeightM(ceiling);
 		errors = {
@@ -171,7 +185,7 @@
 				lat: place?.lat ?? null,
 				lon: place?.lon ?? null
 			});
-			await saveFloorPlan(project.id, rotated);
+			await saveFloorPlan(project.id, { ...rotated, original: planPhoto.img.dataUrl, angle });
 
 			// AI processing (when signed in and an AI key is set up). Photos travel in the request only.
 			if (supabaseConfigured && auth.status === 'signed-in') {
@@ -236,18 +250,31 @@
 	{#if step === 0}
 		<section>
 			<p class="muted lead">Add the <strong>developer's floor plan</strong>, plus anything that helps: site plan or location map (for north), and interior photos (we'll use them to place furniture). Up to {MAX_PHOTOS} photos.</p>
-			<div class="grid">
-				{#each photos as p (p.id)}
-					<figure class:plan={p.id === planId}>
-						<img src={p.img.dataUrl} alt="" decoding="async" />
-						<button class="x" onclick={() => removePhoto(p.id)} aria-label="Remove photo"><Icon name="close" size={16} /></button>
-					</figure>
-				{/each}
-				{#each Array(adding) as _, i (i)}<figure class="loading"><Spinner size={18} /></figure>{/each}
-				{#if photos.length + adding < MAX_PHOTOS}
-					<button class="add" onclick={() => fileInput?.click()}><Icon name="camera" size={26} /><span>Add photos</span></button>
-				{/if}
-			</div>
+			{#if photos.length + adding < MAX_PHOTOS}
+				<button
+					class="drop"
+					class:over={dragging}
+					onclick={() => fileInput?.click()}
+					ondragover={(e) => (e.preventDefault(), (dragging = true))}
+					ondragleave={() => (dragging = false)}
+					ondrop={onDrop}
+				>
+					<Icon name="camera" size={34} />
+					<strong>{dragging ? 'Drop the photos here' : 'Drag & drop photos here'}</strong>
+					<span class="muted">or tap to choose · up to {MAX_PHOTOS - photos.length} more</span>
+				</button>
+			{/if}
+			{#if photos.length || adding}
+				<div class="grid">
+					{#each photos as p (p.id)}
+						<figure>
+							<img src={p.img.dataUrl} alt="" decoding="async" />
+							<button class="x" onclick={() => removePhoto(p.id)} aria-label="Remove photo"><Icon name="close" size={16} /></button>
+						</figure>
+					{/each}
+					{#each Array(adding) as _, i (i)}<figure class="loading"><Spinner size={18} /></figure>{/each}
+				</div>
+			{/if}
 			<input bind:this={fileInput} type="file" accept="image/*" multiple hidden onchange={addPhotos} />
 			<p class="muted count">{photos.length} / {MAX_PHOTOS} · shrunk on your device before anything is sent</p>
 			{#if photoError}<p class="error">{photoError}</p>{/if}
@@ -256,7 +283,18 @@
 		<section class="form">
 			<div class="field">
 				<label for="addr">Address or postal code</label>
-				<input id="addr" autocomplete="off" maxlength="120" placeholder="e.g. 392088 or 88B Jalan Satu" bind:value={addrQuery} oninput={onAddrInput} />
+				<div class="searchrow">
+					<input
+						id="addr"
+						autocomplete="off"
+						maxlength="120"
+						placeholder="e.g. 560123 or 12 Example Street"
+						bind:value={addrQuery}
+						oninput={onAddrInput}
+						onkeydown={(e) => e.key === 'Enter' && (e.preventDefault(), runSearch())}
+					/>
+					<button type="button" class="btn" onclick={runSearch} disabled={searching || addrQuery.trim().length < 3}>Search</button>
+				</div>
 				{#if searching}<span class="muted small">Searching…</span>{/if}
 				{#if results.length}
 					<ul class="results">
@@ -271,18 +309,18 @@
 			</div>
 			<div class="field">
 				<label for="pname">Project name</label>
-				<input id="pname" maxlength="60" placeholder="e.g. Dakota One #10-125" bind:value={name} />
+				<input id="pname" maxlength="60" placeholder="e.g. Riverside Residences" bind:value={name} />
 				{#if errors.name}<span class="error">{errors.name}</span>{/if}
 			</div>
 			<div class="row2">
 				<div class="field">
 					<label for="unit">Unit number</label>
-					<input id="unit" maxlength="10" placeholder="#12-04" bind:value={unitNo} />
+					<input id="unit" maxlength="10" placeholder="125" bind:value={unitNo} />
 					{#if errors.unitNo}<span class="error">{errors.unitNo}</span>{/if}
 				</div>
 				<div class="field">
 					<label for="lvl">Floor level</label>
-					<input id="lvl" inputmode="numeric" maxlength="3" placeholder="12" bind:value={level} />
+					<input id="lvl" inputmode="numeric" maxlength="3" placeholder="5" bind:value={level} />
 					{#if errors.level}<span class="error">{errors.level}</span>{/if}
 				</div>
 			</div>
@@ -295,7 +333,7 @@
 			<div class="row2">
 				<div class="field">
 					<label for="size">Size (sq ft)</label>
-					<input id="size" inputmode="numeric" maxlength="6" placeholder="732" bind:value={size} />
+					<input id="size" inputmode="numeric" maxlength="6" placeholder="950" bind:value={size} />
 					{#if errors.size}<span class="error">{errors.size}</span>{:else}<span class="muted small">Sets the plan's scale</span>{/if}
 				</div>
 				<div class="field">
@@ -400,8 +438,35 @@
 		grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
 		gap: 8px;
 	}
-	figure,
-	.add {
+	.drop {
+		width: 100%;
+		min-height: 220px;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 8px;
+		border: 2px dashed var(--line);
+		border-radius: var(--radius);
+		background: var(--surface);
+		color: var(--forest);
+		cursor: pointer;
+		margin-bottom: 12px;
+		transition: border-color 0.15s, background 0.15s;
+	}
+	.drop strong {
+		font-size: 17px;
+		color: var(--text);
+	}
+	.drop .muted {
+		font-size: 13px;
+	}
+	.drop:hover,
+	.drop.over {
+		border-color: var(--forest);
+		background: color-mix(in srgb, var(--forest) 7%, var(--surface));
+	}
+	figure {
 		position: relative;
 		margin: 0;
 		aspect-ratio: 1;
@@ -439,18 +504,6 @@
 		position: absolute;
 		inset: -6px;
 	}
-	.add {
-		border: 2px dashed var(--line);
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-		gap: 4px;
-		color: var(--forest);
-		font-weight: 600;
-		font-size: 13px;
-		cursor: pointer;
-	}
 	.count {
 		font-size: 13px;
 		margin: 10px 0 0;
@@ -477,6 +530,14 @@
 		border: 1px solid var(--line);
 		background: var(--surface);
 		font-size: 16px;
+	}
+	.searchrow {
+		display: flex;
+		gap: 8px;
+	}
+	.searchrow input {
+		flex: 1;
+		min-width: 0;
 	}
 	.row2 {
 		display: grid;
