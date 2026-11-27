@@ -14,6 +14,7 @@
 		{ id: 'openai', label: 'OpenAI' },
 		{ id: 'anthropic', label: 'Anthropic (Claude)' },
 		{ id: 'google', label: 'Google Gemini' },
+		{ id: 'deepseek', label: 'DeepSeek' },
 		{ id: 'other', label: 'Other' }
 	] as const;
 	type ProviderId = (typeof PROVIDERS)[number]['id'];

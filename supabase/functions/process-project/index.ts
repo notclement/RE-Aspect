@@ -13,7 +13,8 @@ const ALLOWED_ORIGINS = [
 const MODELS = {
 	openai: Deno.env.get('OPENAI_MODEL') ?? 'gpt-4.1',
 	anthropic: Deno.env.get('ANTHROPIC_MODEL') ?? 'claude-sonnet-5-5',
-	google: Deno.env.get('GOOGLE_MODEL') ?? 'gemini-2.5-flash'
+	google: Deno.env.get('GOOGLE_MODEL') ?? 'gemini-2.5-flash',
+	deepseek: Deno.env.get('DEEPSEEK_MODEL') ?? 'deepseek-flash' // V4.1 Flash: text + images
 };
 const KINDS = ['sofa', 'bed', 'table', 'chair', 'counter', 'console', 'wardrobe', 'rug', 'plant', 'desk', 'bath'];
 const COLORS: Record<string, string> = {
@@ -59,18 +60,20 @@ function parseJson(text: string): Record<string, unknown> {
 
 async function callAI(provider: string, key: string, prompt: string, images: string[]): Promise<Record<string, unknown>> {
 	const signal = AbortSignal.timeout(110_000);
-	if (provider === 'openai') {
-		const r = await fetch('https://api.openai.com/v1/chat/completions', {
+	if (provider === 'openai' || provider === 'deepseek') {
+		// DeepSeek uses the same OpenAI-compatible Chat Completions format.
+		const ds = provider === 'deepseek';
+		const r = await fetch(ds ? 'https://api.deepseek.com/chat/completions' : 'https://api.openai.com/v1/chat/completions', {
 			method: 'POST',
 			signal,
 			headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
 			body: JSON.stringify({
-				model: MODELS.openai,
+				model: ds ? MODELS.deepseek : MODELS.openai,
 				response_format: { type: 'json_object' },
 				messages: [{ role: 'user', content: [{ type: 'text', text: prompt }, ...images.map((url) => ({ type: 'image_url', image_url: { url, detail: 'high' } }))] }]
 			})
 		});
-		if (!r.ok) throw new Error(`OpenAI ${r.status}`);
+		if (!r.ok) throw new Error(`${ds ? 'DeepSeek' : 'OpenAI'} ${r.status}`);
 		const d = await r.json();
 		return parseJson(d.choices?.[0]?.message?.content ?? '');
 	}
