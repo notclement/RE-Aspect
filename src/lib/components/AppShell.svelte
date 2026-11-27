@@ -10,7 +10,7 @@
 	import Avatar from './Avatar.svelte';
 	import { auth } from '#lib/stores/auth.svelte.ts';
 	import { nav } from '#lib/stores/nav.svelte.ts';
-	import { profile, ROLE_LABELS, type RoleView } from '#lib/stores/profile.svelte.ts';
+	import { profile, ROLE_LABELS } from '#lib/stores/profile.svelte.ts';
 	import { BRAND } from '#lib/config/brand.ts';
 	import { agency } from '#lib/stores/agency.svelte.ts';
 	import { promo } from '#lib/stores/promo.svelte.ts';
@@ -40,7 +40,6 @@
 	function outside(e: PointerEvent) {
 		if (acct && acctEl && !acctEl.contains(e.target as Node)) acct = false;
 	}
-	const roleList = Object.entries(ROLE_LABELS) as [RoleView, string][];
 	// "My agency" sits between Profile and Settings for agency leads / members (and admins previewing those roles).
 	const showAgency = $derived(!!agency.info || profile.viewAs === 'lead' || profile.viewAs === 'agency');
 	// "Upgrade to Pro" for people on Free (also during a promo, which is temporary). Not for Pro, agency or admins.
@@ -89,20 +88,7 @@
 					{#if auth.email}<span class="muted">{auth.email}</span>{/if}
 					<span class="rolebadge">{ROLE_LABELS[profile.role]}{#if profile.viewAs} · preview{/if}</span>
 				</div>
-				{#if profile.data.isAdmin}
-					<div class="viewas-menu">
-						<span class="muted">View the app as</span>
-						<div class="chips">
-							{#each roleList as [id, label] (id)}
-								<button
-									class:on={profile.role === id}
-									aria-pressed={profile.role === id}
-									onclick={() => profile.setViewAs(id === 'admin' ? null : id)}>{label}</button
-								>
-							{/each}
-						</div>
-					</div>
-				{/if}
+
 				{#if profile.data.isAdmin}
 					<a role="menuitem" href="/admin" class:on={page.url.pathname === '/admin'}><Icon name="shield" />Admin panel</a>
 				{/if}
@@ -271,31 +257,6 @@
 		border-radius: 6px;
 		background: var(--ochre-soft);
 		color: var(--ochre);
-	}
-	.viewas-menu {
-		padding: 6px 8px 10px;
-		border-bottom: 1px solid var(--line);
-		margin-bottom: 4px;
-		font-size: 12px;
-	}
-	.chips {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 6px;
-		margin-top: 6px;
-	}
-	.menu .chips button {
-		min-height: 44px;
-		padding: 0 12px;
-		border-radius: 22px;
-		border: 1px solid var(--line);
-		font-size: 12px;
-		font-weight: 600;
-	}
-	.menu .chips button.on {
-		background: var(--forest);
-		border-color: var(--forest);
-		color: var(--on-primary);
 	}
 	.menu a,
 	.menu > button {

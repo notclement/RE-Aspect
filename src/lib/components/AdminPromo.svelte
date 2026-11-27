@@ -1,5 +1,6 @@
 <script lang="ts">
 	/** Admin: give everyone Pro for N days with a message (one-time banner for each user). Reverts by itself. */
+	import { onMount } from 'svelte';
 	import { promo } from '#lib/stores/promo.svelte.ts';
 	import { validateNumber, validateFreeText } from '#lib/validate.ts';
 
@@ -8,6 +9,17 @@
 	let err = $state<string | null>(null);
 	let busy = $state(false);
 	let confirm = $state<'start' | 'end' | null>(null);
+	type Row = Awaited<ReturnType<typeof promo.list>>[number];
+	let rows = $state<Row[]>([]);
+	let confirmDelete = $state<string | null>(null);
+	async function loadList() {
+		try {
+			rows = await promo.list();
+		} catch (e) {
+			err = e instanceof Error ? e.message : 'Could not load promos.';
+		}
+	}
+	onMount(loadList);
 	const fmt = (s: string) => new Date(s).toLocaleString('en-SG', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' });
 
 	function check(): { d: number; m: string } | null {
@@ -26,6 +38,8 @@
 		try {
 			await fn();
 			confirm = null;
+			confirmDelete = null;
+			await loadList();
 		} catch (e) {
 			err = e instanceof Error ? e.message : 'Could not update.';
 		}
@@ -66,6 +80,32 @@
 	{/if}
 	{#if err}<p class="err">{err}</p>{/if}
 </section>
+
+{#if rows.length}
+	<section class="card promo">
+		<h3>All promos</h3>
+		<ul class="list">
+			{#each rows as r (r.id)}
+				<li>
+					<div class="ltext">
+						<strong>{r.active ? 'Running' : new Date(r.endsAt).getTime() > Date.now() ? 'Scheduled' : 'Ended'}</strong>
+						<span class="muted small">{fmt(r.startsAt)} → {fmt(r.endsAt)}</span>
+						<span class="small">{r.message}</span>
+					</div>
+					{#if confirmDelete === r.id}
+						<div class="row">
+							<span>{r.active ? 'Delete it? It ends now — everyone goes back to their own plan and the banner disappears.' : 'Delete this promo?'}</span>
+							<button class="btn" onclick={() => (confirmDelete = null)}>Cancel</button>
+							<button class="btn danger" disabled={busy} onclick={() => run(() => promo.remove(r.id))}>Delete</button>
+						</div>
+					{:else}
+						<button class="btn danger" onclick={() => (confirmDelete = r.id)}>Delete</button>
+					{/if}
+				</li>
+			{/each}
+		</ul>
+	</section>
+{/if}
 
 <style>
 	.promo {
@@ -109,6 +149,34 @@
 	}
 	.small {
 		font-size: 13px;
+	}
+	.promo + .promo {
+		margin-top: 14px;
+	}
+	.list {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		width: 100%;
+	}
+	.list li {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: space-between;
+		gap: 10px;
+		padding: 10px 0;
+	}
+	.list li + li {
+		border-top: 1px solid var(--line);
+	}
+	.ltext {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		min-width: 0;
+		flex: 1;
+		white-space: pre-wrap;
 	}
 	.err {
 		color: #b5483a;

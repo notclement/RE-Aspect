@@ -58,6 +58,27 @@ class PromoStore {
 		if (error) throw new Error(error.message);
 		await this.refresh();
 	}
+	/** Admin: all promos (newest first). */
+	async list(): Promise<{ id: string; message: string; startsAt: string; endsAt: string; active: boolean }[]> {
+		const sb = await getSupabase();
+		const { data, error } = await sb.rpc('admin_list_promos');
+		if (error) throw new Error(error.message);
+		return ((data ?? []) as Record<string, unknown>[]).map((r) => ({
+			id: clean(r.id, 40),
+			message: clean(r.message, 280),
+			startsAt: clean(r.starts_at, 40),
+			endsAt: clean(r.ends_at, 40),
+			active: r.active === true
+		}));
+	}
+	/** Admin: delete a promo. Deleting the running one ends it immediately. */
+	async remove(id: string) {
+		const sb = await getSupabase();
+		const { error } = await sb.rpc('admin_delete_promo', { p_id: id });
+		if (error) throw new Error(error.message);
+		if (this.current?.id === id) this.clear();
+		else await this.refresh();
+	}
 	async end() {
 		const sb = await getSupabase();
 		const { error } = await sb.rpc('admin_end_promo');
