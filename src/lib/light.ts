@@ -198,3 +198,42 @@ export function smooth(x: number): number {
 	const t = Math.max(0, Math.min(1, x));
 	return t * t * (3 - 2 * t);
 }
+
+// ---------------------------------------------------------------- rays through windows
+
+export interface WindowRay {
+	at: Pt; // where the ray crosses the window
+	land: Pt; // where light starts reaching the floor (past the sill wall's shadow)
+	end: Pt; // furthest point the light reaches (from the top of the window)
+	win: number; // index into unit.windows
+}
+
+/**
+ * Sunbeams entering through each sun-facing window, spaced evenly along the window so they
+ * move smoothly with the sun (no beams appearing/disappearing). The solid sill wall (lower 1/3)
+ * keeps the floor right by the window in shade: light lands from sill·cot(alt) to head·cot(alt).
+ */
+export function windowRays(unit: Unit, azimuth: number, altitude: number, spacing = 60): WindowRay[] {
+	if (altitude <= 0.3) return [];
+	const az = (azimuth - unit.bearing) * RAD;
+	const s: Pt = [Math.sin(az), -Math.cos(az)];
+	const d: Pt = [-s[0], -s[1]];
+	const cot = Math.min(1 / Math.tan(altitude * RAD), LOW_SUN_COT);
+	const out: WindowRay[] = [];
+	for (const [wi, w] of unit.windows.entries()) {
+		if (s[0] * w.normal[0] + s[1] * w.normal[1] <= 0.03) continue;
+		const len = Math.hypot(w.b[0] - w.a[0], w.b[1] - w.a[1]);
+		const n = Math.max(2, Math.round(len / spacing));
+		for (let k = 0; k < n; k++) {
+			const t = (k + 0.5) / n;
+			const at: Pt = [w.a[0] + (w.b[0] - w.a[0]) * t, w.a[1] + (w.b[1] - w.a[1]) * t];
+			out.push({
+				at,
+				land: [at[0] + d[0] * w.sill * cot, at[1] + d[1] * w.sill * cot],
+				end: [at[0] + d[0] * w.head * cot, at[1] + d[1] * w.head * cot],
+				win: wi
+			});
+		}
+	}
+	return out;
+}

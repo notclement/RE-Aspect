@@ -8,7 +8,7 @@
 	 * pinch or wheel = zoom.
 	 */
 	import type { Unit, Item } from '#lib/sample-unit.ts';
-	import { hull, smooth, type Patch, type FurnitureLight } from '#lib/light.ts';
+	import { hull, smooth, roomFor, type Patch, type FurnitureLight, type WindowRay } from '#lib/light.ts';
 
 	let {
 		unit,
@@ -17,6 +17,7 @@
 		dark,
 		sun,
 		furniture,
+		windowRays = [],
 		showSun = false,
 		grid = $bindable(true)
 	}: {
@@ -26,6 +27,7 @@
 		dark: number;
 		sun: { azimuth: number; altitude: number };
 		furniture: FurnitureLight;
+		windowRays?: WindowRay[];
 		showSun?: boolean;
 		grid?: boolean;
 	} = $props();
@@ -183,9 +185,16 @@
 			<rect x={vb.x - 3000} y={vb.y - 3000} width={vb.w + 6000} height={vb.h + 6000} fill="url(#rayfade)" />
 			<polygon points={buildingShadow} fill="#000" />
 		</mask>
-		<pattern id="beams" width="70" height="70" patternUnits="userSpaceOnUse" patternTransform="rotate({beamAngle})">
-			<line x1="0" y1="35" x2="70" y2="35" stroke="#E39A1E" stroke-width="5" stroke-opacity=".75" />
+		<pattern id="beams" width="160" height="70" patternUnits="userSpaceOnUse" patternTransform="rotate({beamAngle})">
+			<line x1="0" y1="35" x2="160" y2="35" stroke="#E39A1E" stroke-width="5" stroke-opacity=".7" />
+			<path d="M96 22 L116 35 L96 48" fill="none" stroke="#E39A1E" stroke-width="5" stroke-opacity=".85" stroke-linecap="round" stroke-linejoin="round" />
 		</pattern>
+		<marker id="arrowhead" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+			<path d="M0 0 L10 5 L0 10 z" fill="#C97F0E" />
+		</marker>
+		{#each unit.windows as w, k (k)}
+			<clipPath id="wroom{k}"><polygon points={pts(roomFor(unit, w))} /></clipPath>
+		{/each}
 		<clipPath id="unitclip"><polygon points={outline} /></clipPath>
 		<clipPath id="litarea">
 			{#each patches as p, i (i)}<polygon points={pts(p.points)} />{/each}
@@ -217,8 +226,13 @@
 	{#if sunUp}
 		<g opacity={beamFade}>
 			<rect class="beams" x={vb.x - 3000} y={vb.y - 3000} width={vb.w + 6000} height={vb.h + 6000} fill="url(#beams)" mask="url(#raymask)" />
-			{#each patches as p, i (i)}
-				<polygon points={pts(p.points)} fill="url(#beams)" opacity={p.intensity * 0.7} clip-path="url(#room{i})" />
+			{#each windowRays as r, k (k)}
+				<g clip-path="url(#wroom{r.win})">
+					<!-- through the glass, over the shaded strip behind the sill wall -->
+					<line class="wr-air" x1={r.at[0]} y1={r.at[1]} x2={r.land[0]} y2={r.land[1]} />
+					<!-- where the light reaches the floor -->
+					<line class="wr-lit" x1={r.land[0]} y1={r.land[1]} x2={r.end[0]} y2={r.end[1]} marker-end="url(#arrowhead)" />
+				</g>
 			{/each}
 		</g>
 	{/if}
@@ -379,7 +393,20 @@
 		letter-spacing: 2px;
 		fill: #7b8077;
 	}
-.sundisc text {
+	.wr-air {
+		stroke: #e39a1e;
+		stroke-width: 4;
+		stroke-dasharray: 6 10;
+		stroke-linecap: round;
+		opacity: 0.55;
+	}
+	.wr-lit {
+		stroke: #c97f0e;
+		stroke-width: 5;
+		stroke-linecap: round;
+		opacity: 0.85;
+	}
+	.sundisc text {
 		font: 700 40px var(--font);
 		paint-order: stroke;
 		stroke: var(--paper);

@@ -46,7 +46,10 @@ export interface Unit {
 const S = 3.4; // design units → cm
 const p = (x: number, y: number): [number, number] => [x * S, y * S];
 const w = (x1: number, y1: number, x2: number, y2: number, t = 6): Wall => ({ a: p(x1, y1), b: p(x2, y2), t: t * S });
-const win = (x1: number, y1: number, x2: number, y2: number, n: [number, number], sill = 45, head = 240): Opening => ({
+// Windows: lower 1/3 of the wall height is solid wall (sill), upper 2/3 is glass, up to the ceiling.
+const CEILING = 280;
+const SILL = Math.round(CEILING / 3);
+const win = (x1: number, y1: number, x2: number, y2: number, n: [number, number], sill = SILL, head = CEILING): Opening => ({
 	a: p(x1, y1),
 	b: p(x2, y2),
 	normal: n,
@@ -69,7 +72,7 @@ export const SAMPLE_UNIT: Unit = {
 	name: 'Sample Residence',
 	unitNo: '#12-04',
 	level: 12,
-	ceiling: 280,
+	ceiling: CEILING,
 	sizeSqft: 1076,
 	lat: 1.3521,
 	lon: 103.8198,
@@ -83,11 +86,11 @@ export const SAMPLE_UNIT: Unit = {
 		w(250, 140, 380, 140)
 	],
 	windows: [
-		win(40, 260, 230, 260, [0, 1], 0, 250), // living → balcony (full height)
+		win(40, 260, 230, 260, [0, 1]), // living, south (onto balcony)
 		win(270, 260, 360, 260, [0, 1]), // bedroom 2, south
 		win(380, 40, 380, 120, [1, 0]), // bedroom 1, east
 		win(380, 160, 380, 240, [1, 0]), // bedroom 2, east
-		win(30, 20, 110, 20, [0, -1], 105, 210) // kitchen, north
+		win(30, 20, 110, 20, [0, -1]) // kitchen, north
 	],
 	rooms: [
 		{ name: 'Kitchen', x: 75, y: 70 },
