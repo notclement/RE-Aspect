@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { pendingJoin } from '#lib/stores/agency.svelte.ts';
+	import { validateInviteCode } from '#lib/validate.ts';
 	import '../app.css';
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
@@ -29,7 +31,13 @@
 	$effect(() => {
 		const path = page.url.pathname;
 		if (auth.status === 'loading' || !profile.loaded) return;
+		// A scanned agency QR (/join?code=…) survives the sign-in: keep the code until /join handles it.
+		if (path === '/join') {
+			const c = validateInviteCode(page.url.searchParams.get('code') ?? '');
+			if (c.ok) pendingJoin.set(c.value);
+		}
 		if (auth.status === 'signed-out' && path !== '/login') goto('/login', { replaceState: true });
+		else if (auth.status === 'signed-in' && profile.data.name && path !== '/join' && pendingJoin.get()) goto('/join', { replaceState: true });
 		else if (auth.status !== 'signed-out' && !profile.data.name && !BARE.includes(path))
 			goto('/welcome', { replaceState: true });
 		// Already named (e.g. returning user, or name taken from Google) → never ask again.

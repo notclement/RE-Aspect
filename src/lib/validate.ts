@@ -93,3 +93,23 @@ export function validateFreeText(input: string, { max, label, multiline = false 
 	if (v.length > max) return fail(`${label} must be under ${max} characters.`);
 	return ok(v);
 }
+
+/** Agency / company name: same rules as a project name. */
+export function validateCompanyName(input: string): Result<string> {
+	const r = validateProjectName(input);
+	return r.ok ? r : fail(r.error.replace('project name', 'company name'));
+}
+
+/** Agency invite code from a QR link: 8 characters, A–Z / 2–9 (no 0 O 1 I). */
+export function validateInviteCode(input: string): Result<string> {
+	const v = cleanText(input).toUpperCase().replace(/[\s-]/g, '');
+	if (!/^[A-HJ-NP-Z2-9]{8}$/.test(v)) return fail('That invite code isn\'t valid.');
+	return ok(v);
+}
+
+/** Phone (optional): digits, spaces, + ( ) - only, up to 20 characters. */
+export function validatePhone(input: string): Result<string> {
+	const v = cleanText(input);
+	if (v.length > 20 || !/^[0-9 +()-]*$/.test(v)) return fail('Use digits, spaces and + ( ) - only.');
+	return ok(v);
+}

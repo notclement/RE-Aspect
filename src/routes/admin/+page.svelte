@@ -15,14 +15,17 @@
 	import { SAMPLE_UNITS } from '#lib/sample-unit.ts';
 	import Avatar from '#lib/components/Avatar.svelte';
 	import AdminAiKeys from '#lib/components/AdminAiKeys.svelte';
+	import AdminAgency, { type AgencyRow } from '#lib/components/AdminAgency.svelte';
+	import AdminEnquiries from '#lib/components/AdminEnquiries.svelte';
 	import { ROLE_LABELS, type RoleView } from '#lib/stores/profile.svelte.ts';
 
 	const roleList = Object.entries(ROLE_LABELS) as [RoleView, string][];
-	let tab = $state<'users' | 'ai'>('users');
-	type Filter = 'all' | 'pro' | 'free' | 'full' | 'disabled';
+	let tab = $state<'users' | 'ai' | 'enquiries'>('users');
+	type Filter = 'all' | 'pro' | 'agency' | 'free' | 'full' | 'disabled';
 	const FILTERS: { id: Filter; label: string }[] = [
 		{ id: 'all', label: 'All' },
 		{ id: 'pro', label: 'Pro' },
+		{ id: 'agency', label: 'Agency' },
 		{ id: 'free', label: 'Free' },
 		{ id: 'full', label: 'Full' },
 		{ id: 'disabled', label: 'Disabled' }
@@ -77,7 +80,7 @@
 			? true
 			: f === 'disabled'
 				? u.disabled
-				: !u.disabled && (f === 'all' || status(u).kind === f);
+				: !u.disabled && (f === 'all' || (f === 'agency' ? !!agencies[u.id] : status(u).kind === f && !(f === 'free' && agencies[u.id]?.status === 'active')));
 	const counts = $derived(Object.fromEntries(FILTERS.map((f) => [f.id, users.filter((u) => inFilter(u, f.id)).length])) as Record<Filter, number>);
 	// Live search — filters as you type, no button needed.
 	const filtered = $derived.by(() => {
@@ -114,12 +117,25 @@
 			const { data, error: e } = await sb.rpc('admin_list_users');
 			if (e) throw e;
 			users = (data ?? []) as UserRow[];
+			await loadAgencies();
 			const { data: s2 } = await sb.auth.getSession();
 			me = s2.session?.user.id ?? null;
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Could not load users.';
 		}
 		loading = false;
+	}
+
+	let agencies = $state<Record<string, AgencyRow>>({});
+	async function loadAgencies() {
+		try {
+			const sb = await getSupabase();
+			const { data, error: e } = await sb.rpc('admin_agencies');
+			if (e) throw e;
+			agencies = Object.fromEntries(((data ?? []) as AgencyRow[]).map((r) => [r.member, r]));
+		} catch (e) {
+			console.warn('[admin] agencies', e);
+		}
 	}
 
 	async function toggle(u: UserRow) {
@@ -203,11 +219,14 @@
 
 	<div class="seg" role="tablist">
 		<button role="tab" aria-selected={tab === 'users'} class:on={tab === 'users'} onclick={() => (tab = 'users')}><Icon name="user" size={18} />Users</button>
+		<button role="tab" aria-selected={tab === 'enquiries'} class:on={tab === 'enquiries'} onclick={() => (tab = 'enquiries')}><Icon name="users" size={18} />Enquiries</button>
 		<button role="tab" aria-selected={tab === 'ai'} class:on={tab === 'ai'} onclick={() => (tab = 'ai')}><Icon name="key" size={18} />AI keys</button>
 	</div>
 
 	{#if tab === 'ai'}
 		<AdminAiKeys />
+	{:else if tab === 'enquiries'}
+		<AdminEnquiries />
 	{:else}
 	<div class="stats">
 		<div class="card"><span class="muted">Users</span><strong>{stats.users}</strong></div>
@@ -246,6 +265,10 @@
 								{:else}
 									{#if u.is_admin}<span class="tag adm">Admin</span>{/if}
 									<span class="tag" class:pro={st.kind !== 'free'}>{st.label}</span>
+								{/if}
+								{#if agencies[u.id]}
+									{@const ag = agencies[u.id]}
+									<span class="tag lead">{ag.role === 'lead' ? 'Agency Lead' : ag.status === 'pending' ? 'Agency · pending' : 'Agency member'} · {ag.agency_name}</span>
 								{/if}
 								<span class="tag">{u.project_count} project{Number(u.project_count) === 1 ? '' : 's'}</span>
 							</span>
@@ -301,6 +324,9 @@
 								</div>
 								<p class="muted small">1 month adds to any time they already have. During the launch everyone gets Pro features anyway — grants decide who keeps Pro after launch.</p>
 							{/if}
+
+							<h4>Agency</h4>
+							<AdminAgency userId={u.id} userName={u.name || u.email} row={agencies[u.id]} onchange={loadAgencies} />
 
 							<h4>Account</h4>
 							{#if u.id === me}

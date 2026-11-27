@@ -3,6 +3,7 @@ import { profile, sanitizeSettings } from './profile.svelte';
 import { theme } from './theme.svelte.ts';
 import { syncProjects, signOutProjects } from './projects.svelte.ts';
 import { isAvatarDataUrl } from '#lib/image.ts';
+import { agency } from './agency.svelte.ts';
 
 export type AuthStatus = 'loading' | 'signed-in' | 'signed-out' | 'preview';
 
@@ -41,6 +42,7 @@ class Auth {
 		if (!user) {
 			this.status = 'signed-out';
 			this.email = null;
+			agency.clear();
 			return;
 		}
 		this.email = user.email ?? null;
@@ -49,7 +51,7 @@ class Auth {
 		if (!profile.data.name && typeof googleName === 'string') {
 			profile.update({ name: googleName.slice(0, 40) });
 		}
-		await this.loadProfile();
+		await Promise.all([this.loadProfile(), agency.refresh()]);
 		this.status = 'signed-in';
 		void syncProjects();
 	}
@@ -146,6 +148,7 @@ class Auth {
 			profile.setViewAs(null);
 			profile.update({ name: '', plan: 'free', proUntil: null, isAdmin: false, avatar: null, disabled: false });
 			signOutProjects();
+			agency.clear();
 		}
 		this.status = supabaseConfigured ? 'signed-out' : 'preview';
 	}

@@ -9,6 +9,7 @@
 	import Avatar from '#lib/components/Avatar.svelte';
 	import Icon from '#lib/components/Icon.svelte';
 	import CropSquare from '#lib/components/CropSquare.svelte';
+	import { agency } from '#lib/stores/agency.svelte.ts';
 
 	let fileInput = $state<HTMLInputElement>();
 	let photoBusy = $state(false);
@@ -54,8 +55,8 @@
 	const plan = $derived(PLANS[profile.planId]);
 
 	// Usage: own projects (demos are free); AI re-runs are counted per project on the server.
-	const used = $derived(myProjects.length);
-	const included = $derived(plan.includedUnits ?? 0);
+	const used = $derived(agency.active && agency.info ? agency.info.used : myProjects.length);
+	const included = $derived(agency.active && agency.info ? agency.info.pool : (plan.includedUnits ?? 0));
 	const pct = $derived(included ? Math.min(100, Math.round((used / included) * 100)) : 0);
 	const until = $derived(profile.data.proUntil);
 	const planNote = $derived(
@@ -126,7 +127,7 @@
 
 <section class="card usage" aria-label="Usage">
 	<div class="u-head">
-		<strong>Projects</strong>
+		<strong>{agency.active ? `${agency.info?.name} · shared projects` : 'Projects'}</strong>
 		<span><b>{used}</b> / {included || '—'}</span>
 	</div>
 	<div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax={included} aria-valuenow={used} aria-label="Projects used">
@@ -138,6 +139,7 @@
 		{#if plan.extraUnitOneOffSgd}<span><b>S${plan.extraUnitOneOffSgd}</b> per extra project</span>{/if}
 	</div>
 	{#if FREE_LAUNCH}<p class="muted small">Launch period: everyone gets Pro features free while we test. Demo projects don't count.</p>{/if}
+	<a class="plans-link" href="/upgrade">See plans<Icon name="chevron" size={16} /></a>
 </section>
 
 <style>
@@ -303,6 +305,19 @@
 	}
 	.usage .small {
 		margin: 10px 0 0;
+	}
+	.plans-link {
+		display: inline-flex;
+		align-items: center;
+		gap: 2px;
+		min-height: 44px;
+		margin-top: 4px;
+		color: var(--forest);
+		font-weight: 600;
+		text-decoration: none;
+	}
+	.plans-link :global(svg) {
+		transform: rotate(-90deg);
 	}
 	@media (max-width: 420px) {
 		.head {

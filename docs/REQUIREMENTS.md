@@ -144,3 +144,19 @@
 
 ## Module ideas (later)
 West-sun heat warning · air-con cost estimate · cross-ventilation · furniture fit check · nearby MRT / schools / amenities.
+
+
+## Agency (27 Nov 2026)
+- **Only an admin makes someone an Agency Lead** (Admin → user → Agency → name + paid seats). Members = seats + 1 (lead on top); shared pool = ceil(seats × 10 × 1.25 / 10) × 10 projects. Admin can change seats/name or remove the agency.
+- **My agency** page (account menu, between Profile and Settings) for leads and members.
+  - Lead: rename; **invite QR** (one reusable code per agency, copy link / share / save image; "Make a new QR code" stops old QRs); **approve / decline** join requests (blocked when seats are full); team list with each member's projects; remove a member.
+  - Members: see everyone in the team (photo, name, role, projects used) and the shared quota; leave the agency.
+- **Joining**: scan → `/join?code=…` → sign in (the code survives sign-in) → "Ask to join" → Pending until the lead approves. One agency per person.
+- Active members use the agency pool and Agency limits (5 AI re-runs per project). Projects made while in the agency belong to it: **when someone leaves or is removed, their agency projects move to the lead** (projects from before joining stay theirs).
+- **Plans page** (`/upgrade`, linked from Profile): Free · RE:Aspect Pro S$50/month · Agency "Contact us for agency rates" (form → enquiry listed under Admin → Enquiries).
+- Server: migration `0008_agency.sql` (all checks in security-definer functions; no direct table access).
+
+## AI functions (27 Nov 2026)
+- Edge functions need `grant select, update on public.projects to service_role` (new Supabase projects don't grant it) — in 0008.
+- On failure the functions return `provider` + `detail` (key-like strings redacted); the app shows the detail to admins only. OpenAI-compatible providers (OpenAI, DeepSeek) retry once without JSON mode on a 400/422.
+- Studio **Auto-trace** (floating chip on the canvas, needs the floor-plan photo on this device): re-traces outline/walls/windows/rooms with the AI, keeps placed furniture, undoable, uses one of the project's AI re-runs.

@@ -20,6 +20,11 @@
 	import { itemCorners, itemTransform, doorGeom } from '#lib/sample-unit.ts';
 	import { PRESETS, KIND_LABEL } from '#lib/studio/furniture.ts';
 	import { validateNumber } from '#lib/validate.ts';
+	import { getSupabase, supabaseConfigured } from '#lib/supabase.ts';
+	import { auth } from '#lib/stores/auth.svelte.ts';
+	import { fnError } from '#lib/fn-error.ts';
+	import { profile } from '#lib/stores/profile.svelte.ts';
+	import Spinner from '#lib/components/Spinner.svelte';
 
 	const id = page.url.searchParams.get('id');
 	const aiState = page.url.searchParams.get('ai');
@@ -509,6 +514,47 @@
 		commit(before);
 	}
 
+	// Auto-trace: ask the AI to trace the floor plan photo again (e.g. after the tracing was removed).
+	// Uses one of the project's AI re-runs (limits are checked on the server). Furniture already placed is kept.
+	let askTrace = $state(false);
+	let tracing = $state(false);
+	const canAutoTrace = $derived(!!backdrop && supabaseConfigured && auth.status === 'signed-in');
+	async function autoTrace() {
+		askTrace = false;
+		if (!project || !backdrop) return;
+		if (!project.sizeSqft || project.sizeSqft < 150) {
+			toast = 'Add the unit size (sq ft) on the project first — the AI uses it for the scale.';
+			setTimeout(() => (toast = null), 4000);
+			return;
+		}
+		tracing = true;
+		try {
+			const sb = await getSupabase();
+			const { data, error } = await sb.functions.invoke('process-project', {
+				body: { projectId: project.id, floorPlan: { dataUrl: backdrop.dataUrl, w: backdrop.w, h: backdrop.h }, interiors: [], sizeSqft: project.sizeSqft, propertyType: project.propertyType, ceilingCm: project.ceilingCm }
+			});
+			if (error) throw new Error(await fnError(error));
+			const p = sanitizePlan((data as { plan?: unknown })?.plan);
+			if (!p || p.outline.length < 3) throw new Error("The AI couldn't find the unit's outline in this photo.");
+			const before = snap();
+			plan = { ...p, items: plan.items.length ? plan.items : p.items };
+			sel = null;
+			draft = [];
+			wallStart = null;
+			mode = 'move';
+			commit(before);
+			fit();
+			toast = 'Traced — check the walls, windows and doors. Undo brings back what you had.';
+			setTimeout(() => (toast = null), 5000);
+		} catch (e) {
+			const msg = e instanceof Error ? e.message : 'Auto-trace failed.';
+			console.warn('[auto-trace]', msg);
+			toast = msg.includes('limit') ? 'No AI re-runs left for this project — trace it by hand with Outline.' : `Auto-trace didn't work${profile.data.isAdmin ? `: ${msg}` : ' — please trace with Outline, or try again later.'}`;
+			setTimeout(() => (toast = null), 6000);
+		}
+		tracing = false;
+	}
+
 	// Done: if there's no furniture yet, offer to add some first (furniture shows where the sun lands).
 	let askFurniture = $state(false);
 	let highlightFurniture = $state(false);
@@ -653,6 +699,11 @@
 			{/if}
 		</svg>
 
+		{#if canAutoTrace}
+			<button class="trace" onclick={() => (askTrace = true)} disabled={tracing}>
+				{#if tracing}<Spinner size={16} />Tracing…{:else}<Icon name="sparkle" size={18} />Auto-trace{/if}
+			</button>
+		{/if}
 		<div class="zoom" role="group" aria-label="Zoom">
 			<button onclick={() => zoomBtn(1 / 1.3)} aria-label="Zoom in"><Icon name="plus" size={20} /></button>
 			<button onclick={() => zoomBtn(1.3)} aria-label="Zoom out"><Icon name="minus" size={20} /></button>
@@ -719,6 +770,18 @@
 		</nav>
 		</div>
 	</div>
+
+	{#if askTrace}
+		<button class="scrim" aria-label="Cancel" onclick={() => (askTrace = false)}></button>
+		<div class="sheet ask" role="dialog" aria-modal="true" aria-labelledby="trace-title">
+			<h2 id="trace-title">Auto-trace this plan?</h2>
+			<p class="muted">The AI traces the floor plan photo again: outline, walls, windows and rooms.{plan.outline.length >= 3 || plan.walls.length ? ' This replaces what is traced now (Undo brings it back).' : ''} Furniture you've placed stays. Uses one of this project's AI re-runs.</p>
+			<div class="actions">
+				<button class="btn" onclick={() => (askTrace = false)}>Cancel</button>
+				<button class="btn primary" onclick={autoTrace}><Icon name="sparkle" size={18} />Auto-trace</button>
+			</div>
+		</div>
+	{/if}
 
 	{#if askFurniture}
 		<button class="scrim" aria-label="Close" onclick={() => (askFurniture = false)}></button>
@@ -839,6 +902,29 @@
 	}
 	.mini.on {
 		color: var(--forest);
+	}
+	.trace {
+		position: absolute;
+		left: 10px;
+		top: 106px;
+		z-index: 2;
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		min-height: 44px;
+		padding: 0 14px;
+		background: var(--surface);
+		border: 1px solid var(--line);
+		border-radius: 999px;
+		box-shadow: var(--shadow);
+		color: var(--forest);
+		font: inherit;
+		font-size: 14px;
+		font-weight: 600;
+		cursor: pointer;
+	}
+	.trace:disabled {
+		opacity: 0.7;
 	}
 	.done {
 		min-height: 44px;

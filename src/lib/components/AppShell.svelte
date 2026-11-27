@@ -12,12 +12,13 @@
 	import { nav } from '#lib/stores/nav.svelte.ts';
 	import { profile, ROLE_LABELS, type RoleView } from '#lib/stores/profile.svelte.ts';
 	import { BRAND } from '#lib/config/brand.ts';
+	import { agency } from '#lib/stores/agency.svelte.ts';
 
 	let { children }: { children: Snippet } = $props();
 	let open = $state(false);
 
 	// Settings / Profile / New unit get a back button that returns to wherever you came from.
-	const SUB_PAGES = ['/settings', '/profile', '/new', '/studio', '/rotate', '/admin'];
+	const SUB_PAGES = ['/settings', '/profile', '/agency', '/upgrade', '/join', '/new', '/studio', '/rotate', '/admin'];
 	const isSub = $derived(SUB_PAGES.includes(page.url.pathname));
 	let inAppSteps = 0;
 	afterNavigate((n) => {
@@ -39,10 +40,13 @@
 		if (acct && acctEl && !acctEl.contains(e.target as Node)) acct = false;
 	}
 	const roleList = Object.entries(ROLE_LABELS) as [RoleView, string][];
-	const acctLinks: { href: string; label: string; icon: IconName }[] = [
+	// "My agency" sits between Profile and Settings for agency leads / members (and admins previewing those roles).
+	const showAgency = $derived(!!agency.info || profile.viewAs === 'lead' || profile.viewAs === 'agency');
+	const acctLinks = $derived<{ href: string; label: string; icon: IconName }[]>([
 		{ href: '/profile', label: 'Profile', icon: 'user' },
+		...(showAgency ? [{ href: '/agency', label: 'My agency', icon: 'users' as IconName }] : []),
 		{ href: '/settings', label: 'Settings', icon: 'gear' }
-	];
+	]);
 
 	$effect(() => {
 		page.url.pathname; // close the menu on navigation

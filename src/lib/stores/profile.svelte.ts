@@ -4,6 +4,7 @@
  */
 import { effectivePlan, type PlanId } from '#lib/config/plans.ts';
 import { theme, isThemeChoice, type ThemeChoice } from './theme.svelte.ts';
+import { agency } from './agency.svelte.ts';
 
 /**
  * Roles the app can show. `isAdmin` comes from the server (profiles.is_admin) and can't be set from the browser.
@@ -120,6 +121,8 @@ class ProfileStore {
 	get role(): RoleView {
 		if (this.viewAs) return this.viewAs;
 		if (this.data.isAdmin) return 'admin';
+		if (agency.isLead) return 'lead';
+		if (agency.active) return 'agency';
 		return this.data.plan === 'agency' ? 'agency' : this.data.plan;
 	}
 
@@ -127,6 +130,7 @@ class ProfileStore {
 	get planId(): PlanId {
 		const r = this.viewAs;
 		if (r) return r === 'free' ? 'free' : r === 'agency' || r === 'lead' ? 'agency' : 'pro';
+		if (agency.active) return 'agency';
 		return this.data.isAdmin ? 'pro' : effectivePlan(this.data.plan);
 	}
 

@@ -9,6 +9,7 @@
 	import Spinner from '#lib/components/Spinner.svelte';
 	import { nav } from '#lib/stores/nav.svelte.ts';
 	import { profile } from '#lib/stores/profile.svelte.ts';
+	import { fnError } from '#lib/fn-error.ts';
 	import { auth } from '#lib/stores/auth.svelte.ts';
 	import { PLANS } from '#lib/config/plans.ts';
 	import { PROPERTY_TYPES, type PropertyType } from '#lib/config/property-types.ts';
@@ -172,7 +173,7 @@
 	}
 
 	// ── AI north check: look at all photos for north arrows / site plans, pre-turn the plan ─────────
-	type North = { state: 'idle' | 'checking' | 'found' | 'none' | 'off'; angle: number; confidence: string; evidence: string; forPlan: string | null };
+	type North = { state: 'idle' | 'checking' | 'found' | 'none' | 'failed' | 'off'; angle: number; confidence: string; evidence: string; forPlan: string | null; detail?: string };
 	let north = $state<North>({ state: 'idle', angle: 0, confidence: '', evidence: '', forPlan: null });
 	let userTurned = $state(false);
 	function setAngle(a: number) {
@@ -205,9 +206,15 @@
 			const sb = await getSupabase();
 			const { data, error } = await sb.functions.invoke('detect-north', { body: { floorPlan, others, context } });
 			if (planId !== pid) return; // user picked another photo meanwhile
-			const d = (data ?? {}) as { found?: boolean; angle?: number; confidence?: string; evidence?: string; reason?: string };
-			if (error || !d.found || !Number.isFinite(d.angle)) {
-				north = { state: d.reason === 'no-key' || error ? 'off' : 'none', angle: 0, confidence: '', evidence: String(d.evidence ?? ''), forPlan: pid };
+			const d = (data ?? {}) as { found?: boolean; angle?: number; confidence?: string; evidence?: string; reason?: string; provider?: string; detail?: string };
+			if (error || d.reason === 'error') {
+				const detail = error ? await fnError(error) : `${d.provider ?? 'AI'}: ${d.detail ?? 'error'}`;
+				console.warn('[detect-north]', detail);
+				north = { state: 'failed', angle: 0, confidence: '', evidence: '', forPlan: pid, detail: detail.slice(0, 240) };
+				return;
+			}
+			if (!d.found || !Number.isFinite(d.angle)) {
+				north = { state: d.reason === 'no-key' ? 'off' : 'none', angle: 0, confidence: '', evidence: String(d.evidence ?? ''), forPlan: pid };
 				return;
 			}
 			north = { state: 'found', angle: Number(d.angle), confidence: String(d.confidence ?? 'low'), evidence: String(d.evidence ?? '').slice(0, 240), forPlan: pid };
@@ -256,7 +263,7 @@
 					const { data, error } = await sb.functions.invoke('process-project', {
 						body: { projectId: project.id, floorPlan: rotated, interiors, sizeSqft: d.sizeSqft, propertyType, ceilingCm: d.ceilingCm }
 					});
-					if (error) throw error;
+					if (error) throw new Error(await fnError(error));
 					const p = sanitizePlan((data as { plan?: unknown })?.plan);
 					if (p && p.outline.length >= 3) {
 						updateProject(project.id, { plan: p, status: 'ready' });
@@ -264,7 +271,8 @@
 						return void goto(`/studio?id=${project.id}&ai=ok`, { replaceState: true });
 					}
 					throw new Error('no plan');
-				} catch {
+				} catch (e) {
+					console.warn('[process-project]', e instanceof Error ? e.message : e);
 					updateProject(project.id, { status: 'failed' });
 				} finally {
 					clearInterval(tick);
@@ -423,6 +431,8 @@
 						</div>
 						{#if !suggestionApplied}<button class="btn" onclick={() => setAngle(north.angle)}>Apply</button>{/if}
 					</div>
+				{:else if north.state === 'failed'}
+					<div class="ai none"><Icon name="info" size={18} /><span>The AI couldn't check the photos right now — please turn the plan yourself.{#if profile.data.isAdmin && north.detail}<br /><small class="muted">Admin: {north.detail}</small>{/if}</span></div>
 				{:else if north.state === 'none'}
 					<div class="ai none"><Icon name="info" size={18} /><span>The photos didn't give enough clues to work out north — please turn the plan yourself. Tip: add a site plan or location map with a north arrow.</span></div>
 				{:else}

@@ -64,20 +64,33 @@ function parseJson(text: string): Record<string, unknown> {
 async function callAI(provider: string, key: string, prompt: string, images: string[]): Promise<Record<string, unknown>> {
 	const signal = AbortSignal.timeout(90_000);
 	if (provider === 'openai' || provider === 'deepseek') {
+		// DeepSeek uses the same OpenAI-compatible Chat Completions format (deepseek-flash reads images).
 		const ds = provider === 'deepseek';
-		const r = await fetch(ds ? 'https://api.deepseek.com/chat/completions' : 'https://api.openai.com/v1/chat/completions', {
-			method: 'POST',
-			signal,
-			headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-			body: JSON.stringify({
-				model: ds ? MODELS.deepseek : MODELS.openai,
-				response_format: { type: 'json_object' },
-				messages: [{ role: 'user', content: [{ type: 'text', text: prompt }, ...images.map((url) => ({ type: 'image_url', image_url: { url, detail: 'high' } }))] }]
-			})
-		});
-		if (!r.ok) throw new Error(`${ds ? 'DeepSeek' : 'OpenAI'} ${r.status}`);
+		const name = ds ? 'DeepSeek' : 'OpenAI';
+		const send = (jsonMode: boolean) =>
+			fetch(ds ? 'https://api.deepseek.com/chat/completions' : 'https://api.openai.com/v1/chat/completions', {
+				method: 'POST',
+				signal,
+				headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					model: ds ? MODELS.deepseek : MODELS.openai,
+					...(jsonMode ? { response_format: { type: 'json_object' } } : {}),
+					messages: [{ role: 'user', content: [{ type: 'text', text: prompt }, ...images.map((url) => ({ type: 'image_url', image_url: { url, detail: 'high' } }))] }]
+				})
+			});
+		let r = await send(true);
+		// Some models / providers reject JSON mode together with images — retry once without it.
+		if (r.status === 400 || r.status === 422) {
+			const first = await r.text().catch(() => '');
+			console.warn(`[ai] ${name} ${r.status} with JSON mode, retrying without:`, first.slice(0, 300));
+			r = await send(false);
+		}
+		if (!r.ok) throw new Error(`${name} ${r.status}: ${(await r.text().catch(() => '')).replace(/\s+/g, ' ').slice(0, 300)}`);
 		const d = await r.json();
-		return parseJson(d.choices?.[0]?.message?.content ?? '');
+		const msg = d.choices?.[0]?.message ?? {};
+		const text: string = msg.content || '';
+		if (!text) throw new Error(`${name} returned an empty reply (finish: ${d.choices?.[0]?.finish_reason ?? '?'}${msg.refusal ? `, refusal: ${String(msg.refusal).slice(0, 120)}` : ''})`);
+		return parseJson(text);
 	}
 	if (provider === 'anthropic') {
 		const r = await fetch('https://api.anthropic.com/v1/messages', {
@@ -99,7 +112,7 @@ async function callAI(provider: string, key: string, prompt: string, images: str
 				}]
 			})
 		});
-		if (!r.ok) throw new Error(`Anthropic ${r.status}`);
+		if (!r.ok) throw new Error(`Anthropic ${r.status}: ${(await r.text().catch(() => '')).replace(/\s+/g, ' ').slice(0, 300)}`);
 		const d = await r.json();
 		return parseJson((d.content ?? []).map((c: { text?: string }) => c.text ?? '').join(''));
 	}
@@ -121,7 +134,7 @@ async function callAI(provider: string, key: string, prompt: string, images: str
 				generationConfig: { responseMimeType: 'application/json' }
 			})
 		});
-		if (!r.ok) throw new Error(`Gemini ${r.status}`);
+		if (!r.ok) throw new Error(`Gemini ${r.status}: ${(await r.text().catch(() => '')).replace(/\s+/g, ' ').slice(0, 300)}`);
 		const d = await r.json();
 		return parseJson(d.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text ?? '').join('') ?? '');
 	}
@@ -184,7 +197,8 @@ Deno.serve(async (req) => {
 		const evidence = typeof ai.evidence === 'string' ? ai.evidence.replace(/[<>{}\\\u0000-\u001f]/g, '').trim().slice(0, 240) : '';
 		return json(req, { found, angle: found ? deg : 0, confidence, evidence });
 	} catch (e) {
-		console.error('[detect-north]', e instanceof Error ? e.message : e);
-		return json(req, { found: false, reason: 'error' });
+		const detail = (e instanceof Error ? e.message : String(e)).replace(/[<>{}\\\u0000-\u001f]/g, '').replace(/\b(sk|key|AIza)[-_A-Za-z0-9*]{8,}/g, '[key]').slice(0, 240);
+		console.error('[detect-north]', k.provider, detail);
+		return json(req, { found: false, reason: 'error', provider: k.provider, detail });
 	}
 });
