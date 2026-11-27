@@ -2,11 +2,11 @@
 	import Icon from '#lib/components/Icon.svelte';
 	import { profile, greeting } from '#lib/stores/profile.svelte.ts';
 	import { nav } from '#lib/stores/nav.svelte.ts';
-	import { PLANS, effectivePlan } from '#lib/config/plans.ts';
+	import { PLANS } from '#lib/config/plans.ts';
 	import { SAMPLE_UNIT } from '#lib/sample-unit.ts';
 
 	$effect(() => nav.set({ label: 'Units' }));
-	const plan = $derived(PLANS[effectivePlan(profile.data.plan)]);
+	const plan = $derived(PLANS[profile.planId]);
 	const myUnits: unknown[] = []; // Phase 1: loaded from Supabase / local cache
 </script>
 

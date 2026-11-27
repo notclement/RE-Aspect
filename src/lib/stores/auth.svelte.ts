@@ -55,13 +55,14 @@ class Auth {
 			const sb = await getSupabase();
 			const { data, error } = await sb
 				.from('profiles')
-				.select('name, plan')
+				.select('name, plan, is_admin')
 				.eq('id', this.userId)
 				.maybeSingle();
 			if (error) throw error;
 			if (data) {
 				const plan = data.plan === 'pro' || data.plan === 'agency' ? data.plan : 'free';
-				profile.update({ plan, ...(data.name ? { name: data.name } : {}) });
+				profile.update({ plan, isAdmin: data.is_admin === true, ...(data.name ? { name: data.name } : {}) });
+				if (!data.is_admin) profile.setViewAs(null);
 			}
 		} catch (e) {
 			console.warn('[auth] could not load profile', e);

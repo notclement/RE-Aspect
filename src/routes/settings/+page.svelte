@@ -4,7 +4,7 @@
 	import Icon, { type IconName } from '#lib/components/Icon.svelte';
 	import InstallCard from '#lib/components/InstallCard.svelte';
 	import { theme, type ThemeChoice } from '#lib/stores/theme.svelte.ts';
-	import { profile } from '#lib/stores/profile.svelte.ts';
+	import { profile, ROLE_LABELS, type RoleView } from '#lib/stores/profile.svelte.ts';
 	import { auth } from '#lib/stores/auth.svelte.ts';
 	import { BRAND } from '#lib/config/brand.ts';
 	import { validateBodyHeightCm } from '#lib/validate.ts';
@@ -14,6 +14,8 @@
 		{ id: 'dark', label: 'Dark', icon: 'moon' },
 		{ id: 'system', label: 'System', icon: 'monitor' }
 	];
+
+	const roles = Object.entries(ROLE_LABELS) as [RoleView, string][];
 
 	let height = $state(String(profile.data.bodyHeightCm));
 	let heightError = $state<string | null>(null);
@@ -33,6 +35,25 @@
 	<span class="grow"><strong>{profile.data.name}</strong><br /><span class="muted">{auth.email ?? 'Preview mode'}</span></span>
 	<Icon name="chevron" />
 </a>
+
+{#if profile.data.isAdmin}
+	<h3>Admin</h3>
+	<div class="card admin">
+		<p class="role"><Icon name="shield" size={18} /> You're an <strong>Admin</strong></p>
+		<label class="muted small" for="viewas">View the app as</label>
+		<div class="roles" id="viewas" role="radiogroup" aria-label="View the app as">
+			{#each roles as [id, label] (id)}
+				<button
+					role="radio"
+					aria-checked={profile.role === id}
+					class:on={profile.role === id}
+					onclick={() => profile.setViewAs(id === 'admin' ? null : id)}>{label}</button
+				>
+			{/each}
+		</div>
+		<p class="muted note">Preview only — changes what you see (limits, menus, badges). Your real admin access stays on, and the server still enforces every permission.</p>
+	</div>
+{/if}
 
 <h3>Appearance</h3>
 <div class="seg" role="radiogroup" aria-label="Theme">
@@ -180,6 +201,39 @@
 		font-weight: 600;
 		color: var(--sky);
 		text-decoration: none;
+	}
+	.admin .role {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		margin: 0 0 12px;
+		color: var(--forest);
+	}
+	.small {
+		font-size: 12px;
+		font-weight: 600;
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
+	}
+	.roles {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 8px;
+		margin-top: 8px;
+	}
+	.roles button {
+		min-height: 40px;
+		padding: 0 14px;
+		border-radius: 20px;
+		border: 1px solid var(--line);
+		background: var(--surface);
+		font-weight: 600;
+		cursor: pointer;
+	}
+	.roles button.on {
+		background: var(--forest);
+		border-color: var(--forest);
+		color: #fff;
 	}
 	.signout {
 		margin-top: 24px;

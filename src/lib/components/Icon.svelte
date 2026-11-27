@@ -26,6 +26,8 @@
 		pin: '<path d="M12 21s7-6.2 7-12a7 7 0 0 0-14 0c0 5.8 7 12 7 12z"/><circle cx="12" cy="9" r="2.5"/>',
 		cal: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
 		playo: '<path d="M7 5l12 7-12 7z"/>',
+		back: '<path d="M15 5l-7 7 7 7"/>',
+		shield: '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/>',
 		chevron: '<path d="M9 5l7 7-7 7"/>'
 	} as const;
 	export type IconName = keyof typeof PATHS;

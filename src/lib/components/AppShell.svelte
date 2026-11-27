@@ -5,14 +5,27 @@
 	 */
 	import type { Snippet } from 'svelte';
 	import { page } from '$app/state';
+	import { afterNavigate, goto } from '$app/navigation';
 	import Icon, { type IconName } from './Icon.svelte';
 	import { auth } from '#lib/stores/auth.svelte.ts';
 	import { nav } from '#lib/stores/nav.svelte.ts';
-	import { profile } from '#lib/stores/profile.svelte.ts';
+	import { profile, ROLE_LABELS } from '#lib/stores/profile.svelte.ts';
 	import { BRAND } from '#lib/config/brand.ts';
 
 	let { children }: { children: Snippet } = $props();
 	let open = $state(false);
+
+	// Settings / Profile / New unit get a back button that returns to wherever you came from.
+	const SUB_PAGES = ['/settings', '/profile', '/anchor'];
+	const isSub = $derived(SUB_PAGES.includes(page.url.pathname));
+	let inAppSteps = 0;
+	afterNavigate((n) => {
+		if (n.type !== 'enter') inAppSteps++;
+	});
+	function back() {
+		if (inAppSteps > 0 && history.length > 1) history.back();
+		else goto('/');
+	}
 
 	const links: { href: string; label: string; icon: IconName }[] = [
 		{ href: '/', label: 'Units', icon: 'home' },
@@ -28,7 +41,11 @@
 </script>
 
 <header class="top">
-	<button class="iconbtn" onclick={() => (open = true)} aria-label="Open menu"><Icon name="menu" size={20} /></button>
+	{#if isSub}
+		<button class="iconbtn" onclick={back} aria-label="Back"><Icon name="back" size={22} /></button>
+	{:else}
+		<button class="iconbtn" onclick={() => (open = true)} aria-label="Open menu"><Icon name="menu" size={20} /></button>
+	{/if}
 	<nav class="crumbs" aria-label="Breadcrumb">
 		{#each nav.crumbs as c, i (i)}
 			{#if i > 0}<span class="sep">/</span>{/if}
@@ -40,6 +57,12 @@
 
 {#if auth.status === 'preview'}
 	<div class="preview">Preview mode — data stays in this browser.</div>
+{/if}
+{#if profile.viewAs}
+	<div class="preview viewas">
+		Viewing as <strong>{ROLE_LABELS[profile.viewAs]}</strong>
+		<button onclick={() => profile.setViewAs(null)}>Back to admin</button>
+	</div>
 {/if}
 
 <main class="main">{@render children()}</main>
@@ -119,6 +142,23 @@
 		background: var(--ochre-soft);
 		color: var(--ochre);
 	}
+	.viewas {
+		background: color-mix(in srgb, var(--forest) 14%, var(--surface));
+		color: var(--forest);
+		display: flex;
+		justify-content: center;
+		align-items: center;
+		gap: 10px;
+	}
+	.viewas button {
+		border: 1px solid currentColor;
+		background: none;
+		color: inherit;
+		border-radius: 8px;
+		padding: 2px 8px;
+		font-size: 12px;
+		cursor: pointer;
+	}
 	.main {
 		padding: 18px 16px calc(28px + var(--safe-b));
 		max-width: 1040px;
@@ -184,5 +224,6 @@
 	.small {
 		font-size: 13px;
 		padding: 0 4px;
+		text-align: center;
 	}
 </style>

@@ -1,15 +1,15 @@
 <script lang="ts">
 	import { nav } from '#lib/stores/nav.svelte.ts';
 	$effect(() => nav.set({ label: 'Profile' }));
-	import { profile } from '#lib/stores/profile.svelte.ts';
+	import { profile, ROLE_LABELS } from '#lib/stores/profile.svelte.ts';
 	import { auth } from '#lib/stores/auth.svelte.ts';
-	import { PLANS, effectivePlan, FREE_LAUNCH } from '#lib/config/plans.ts';
+	import { PLANS, FREE_LAUNCH } from '#lib/config/plans.ts';
 	import { validateName } from '#lib/validate.ts';
 
 	let name = $state(profile.data.name);
 	let error = $state<string | null>(null);
 	let saved = $state(false);
-	const plan = $derived(PLANS[effectivePlan(profile.data.plan)]);
+	const plan = $derived(PLANS[profile.planId]);
 
 	function save(e: SubmitEvent) {
 		e.preventDefault();
@@ -38,6 +38,10 @@
 
 <div class="card list">
 	<div class="li"><span class="muted">Email</span><span>{auth.email ?? '—'}</span></div>
+	<div class="li">
+		<span class="muted">Role</span>
+		<span>{ROLE_LABELS[profile.role]}{#if profile.viewAs} <span class="muted">(preview)</span>{/if}</span>
+	</div>
 	<div class="li"><span class="muted">Plan</span><span class="tag pro">{plan.label}</span></div>
 	<div class="li"><span class="muted">Units included</span><span>{plan.includedUnits}</span></div>
 	<div class="li"><span class="muted">AI re-runs per function</span><span>{plan.aiRunsPerFunctionPerUnit}</span></div>

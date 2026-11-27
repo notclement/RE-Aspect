@@ -10,12 +10,12 @@
 	import SunTimeline from '#lib/components/SunTimeline.svelte';
 	import Collapse from '#lib/components/Collapse.svelte';
 	import { SAMPLE_UNIT } from '#lib/sample-unit.ts';
-	import { sunPosition, localDate, sunTimes, todaySG, nowMinutesSG, compass } from '#lib/sun.ts';
+	import { sunPosition, localDate, sunTimes, compass } from '#lib/sun.ts';
 	import { sunPatches, darkness } from '#lib/light.ts';
 	import { nav } from '#lib/stores/nav.svelte.ts';
 	import { profile } from '#lib/stores/profile.svelte.ts';
 
-	type View = '3d' | 'top' | 'walk';
+	import { unitView, type View } from '#lib/stores/unit-view.svelte.ts';
 	const views: { id: View; label: string }[] = [
 		{ id: '3d', label: '3D plan' },
 		{ id: 'top', label: 'Top down' },
@@ -27,19 +27,48 @@
 	const unitId = $derived(page.url.searchParams.get('id') ?? 'sample');
 	const unit = SAMPLE_UNIT;
 
-	let view = $state<View>('3d');
-	let date = $state(todaySG());
-	let minutes = $state(Math.max(7 * 60, Math.min(18 * 60, nowMinutesSG())));
+	// View, date and time live in a session store so leaving the page and coming back restores them.
+	// (Created outside any $derived so it doesn't mutate state during a read.)
+	const vs = unitView(page.url.searchParams.get('id') ?? 'sample');
 	let grid = $state(true);
 	let planView = $state<PlanView>();
+
+	// Canvas height: compact by default so the sun timeline stays on screen; drag the handle to resize.
+	const H_KEY = 'rea.canvasH';
+	let canvasH = $state(320);
+	$effect(() => {
+		const saved = Number(localStorage.getItem(H_KEY));
+		canvasH = saved > 0 ? clampH(saved) : clampH(Math.round(innerHeight * 0.38));
+	});
+	function clampH(h: number) {
+		return Math.round(Math.min(innerHeight * 0.85, Math.max(220, h)));
+	}
+	let dragY: number | null = null;
+	function hDown(e: PointerEvent) {
+		(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+		dragY = e.clientY;
+	}
+	function hMove(e: PointerEvent) {
+		if (dragY === null) return;
+		canvasH = clampH(canvasH + (e.clientY - dragY));
+		dragY = e.clientY;
+	}
+	function hUp() {
+		dragY = null;
+		try {
+			localStorage.setItem(H_KEY, String(canvasH));
+		} catch {
+			/* ignore */
+		}
+	}
 	let zoomPct = $state(100);
 
 	$effect(() => nav.set({ label: 'Units', href: '/' }, { label: 'Sun study' }));
 
-	const sun = $derived(sunPosition(localDate(date, minutes), unit.lat, unit.lon));
+	const sun = $derived(sunPosition(localDate(vs.date, vs.minutes), unit.lat, unit.lon));
 	const patches = $derived(sunPatches(unit, sun.azimuth, sun.altitude));
 	const dark = $derived(darkness(sun.altitude));
-	const times = $derived(sunTimes(date, unit.lat, unit.lon));
+	const times = $derived(sunTimes(vs.date, unit.lat, unit.lon));
 
 	const litWalls = $derived(
 		[...new Set(unit.windows.filter((w) => {
@@ -75,20 +104,20 @@
 <section class="viewer">
 	<div class="seg" role="tablist" aria-label="View">
 		{#each views as v (v.id)}
-			<button role="tab" aria-selected={view === v.id} class:on={view === v.id} onclick={() => { view = v.id; zoomPct = 100; }}>{v.label}</button>
+			<button role="tab" aria-selected={vs.view === v.id} class:on={vs.view === v.id} onclick={() => { vs.view = v.id; zoomPct = 100; }}>{v.label}</button>
 		{/each}
 	</div>
 
-	<div class="canvas">
-		{#if view === 'walk'}
+	<div class="canvas" style:height="{canvasH}px">
+		{#if vs.view === 'walk'}
 			<div class="walk">
 				<Icon name="walk" size={34} />
 				<strong>Walkthrough</strong>
 				<p class="muted">Walk the unit at your own eye level ({profile.eyeLevelCm} cm). Arrives in Phase 3.</p>
 			</div>
 		{:else}
-			{#key view}
-				<PlanView bind:this={planView} {unit} mode={view} {patches} {dark} {grid} />
+			{#key vs.view}
+				<PlanView bind:this={planView} {unit} mode={vs.view} {patches} {dark} {sun} {grid} />
 			{/key}
 			<div class="zoom">
 				<button onclick={() => zoom(1 / 1.2)} aria-label="Zoom out"><Icon name="minus" size={18} /></button>
@@ -98,11 +127,31 @@
 			</div>
 		{/if}
 	</div>
+	<div
+		class="grip"
+		role="slider"
+		aria-label="Resize view"
+		aria-valuenow={canvasH}
+		tabindex="0"
+		onpointerdown={hDown}
+		onpointermove={hMove}
+		onpointerup={hUp}
+		onpointercancel={hUp}
+		onkeydown={(e) => {
+			if (e.key === 'ArrowDown') canvasH = clampH(canvasH + 30);
+			else if (e.key === 'ArrowUp') canvasH = clampH(canvasH - 30);
+			else return;
+			e.preventDefault();
+			hUp();
+		}}
+	>
+		<span></span>
+	</div>
 </section>
 
 <p class="summary">{summary}</p>
 
-<SunTimeline bind:minutes bind:date />
+<SunTimeline bind:minutes={vs.minutes} bind:date={vs.date} />
 
 <div class="details">
 	<Collapse title="Study details">
@@ -165,9 +214,21 @@
 	}
 	.canvas {
 		position: relative;
-		height: min(62vh, 560px);
-		min-height: 340px;
 		border-top: 1px solid var(--line);
+	}
+	.grip {
+		height: 22px;
+		display: grid;
+		place-items: center;
+		cursor: ns-resize;
+		touch-action: none;
+		border-top: 1px solid var(--line);
+	}
+	.grip span {
+		width: 44px;
+		height: 5px;
+		border-radius: 3px;
+		background: color-mix(in srgb, var(--muted) 55%, transparent);
 	}
 	.zoom {
 		position: absolute;

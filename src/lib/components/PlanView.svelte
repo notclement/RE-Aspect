@@ -15,8 +15,16 @@
 		mode,
 		patches,
 		dark,
+		sun,
 		grid = $bindable(true)
-	}: { unit: Unit; mode: 'top' | '3d'; patches: Patch[]; dark: number; grid?: boolean } = $props();
+	}: {
+		unit: Unit;
+		mode: 'top' | '3d';
+		patches: Patch[];
+		dark: number;
+		sun: { azimuth: number; altitude: number };
+		grid?: boolean;
+	} = $props();
 
 	// ---- geometry
 	const xs = $derived(unit.outline.map((p) => p[0]));
@@ -30,6 +38,34 @@
 	});
 	const viewBox = $derived(`${vb.x} ${vb.y} ${vb.w} ${vb.h}`);
 	const outline = $derived(unit.outline.map((p) => p.join(',')).join(' '));
+
+	// ---- sun marker: where the sun is, relative to the unit
+	const cx = $derived(vb.x + vb.w / 2);
+	const cy = $derived(vb.y + vb.h / 2);
+	const R = $derived(Math.max(vb.w, vb.h) * 0.62);
+	const sdir = $derived.by(() => {
+		const a = ((sun.azimuth - unit.bearing) * Math.PI) / 180;
+		return [Math.sin(a), -Math.cos(a)] as const;
+	});
+	const sunUp = $derived(sun.altitude > 0);
+	const altR = $derived((Math.max(0, sun.altitude) * Math.PI) / 180);
+	// Top down: the higher the sun, the closer to "overhead" (the centre of the plan).
+	const topSun = $derived.by(() => {
+		const r = R * (1 - Math.max(0, sun.altitude) / 90);
+		return [cx + sdir[0] * r, cy + sdir[1] * r] as const;
+	});
+	// Where sunlight comes from at ground level (horizon point in the sun's direction).
+	const horizon = $derived([cx + sdir[0] * R, cy + sdir[1] * R] as const);
+	let stageW = $state(600);
+	// 3D plan: sun placed on a dome around the unit (horizon distance shrinks, height grows with altitude).
+	const sky3d = $derived.by(() => {
+		const k = (stageW * 0.92) / vb.w;
+		return {
+			gx: ((cx + sdir[0] * R * 0.6 * Math.cos(altR) - vb.x) / vb.w) * 100,
+			gy: ((cy + sdir[1] * R * 0.6 * Math.cos(altR) - vb.y) / vb.h) * 100,
+			z: sunUp ? R * 0.6 * Math.sin(altR) * k * 0.8 : 0
+		};
+	});
 	const pts = (ps: [number, number][]) => ps.map((p) => p.join(',')).join(' ');
 
 	// ---- view transform
@@ -77,7 +113,7 @@
 			return;
 		}
 		if (mode === '3d') {
-			rot += dx * 0.35; // drag left → turns left
+			rot -= dx * 0.35; // natural: drag left → the model turns left
 			tilt = Math.min(70, Math.max(15, tilt - dy * 0.25));
 		} else {
 			panX += dx;
@@ -107,7 +143,7 @@
 		return `#${c((n >> 16) & 255)}${c((n >> 8) & 255)}${c(n & 255)}`;
 	}
 
-	const dim = $derived(`brightness(${1 - dark * 0.45}) saturate(${1 - dark * 0.35})`);
+	const dim = $derived(`brightness(${1 - dark * 0.22}) saturate(${1 - dark * 0.25})`);
 	const north = $derived(mode === '3d' ? rot + unit.bearing : unit.bearing);
 </script>
 
@@ -139,7 +175,25 @@
 	{#each patches as p, i (i)}
 		<polygon points={pts(p.points)} fill="url(#sunfill)" opacity={0.25 + p.intensity * 0.65} clip-path="url(#room{i})" />
 	{/each}
-	<polygon points={outline} fill="#1A2740" opacity={dark * 0.5} />
+	<polygon points={outline} fill="#1A2740" opacity={dark * 0.28} />
+	{#if sunUp}
+		<g class="ray" opacity={Math.min(1, sun.altitude / 8)}>
+			<line x1={horizon[0]} y1={horizon[1]} x2={cx + sdir[0] * R * 0.55} y2={cy + sdir[1] * R * 0.55} />
+			<path
+				d="M0 -22 L40 0 L0 22 Z"
+				transform="translate({cx + sdir[0] * R * 0.55} {cy + sdir[1] * R * 0.55}) rotate({(Math.atan2(-sdir[1], -sdir[0]) * 180) / Math.PI})"
+			/>
+		</g>
+	{/if}
+{/snippet}
+
+{#snippet sunDisc(x: number, y: number, size: number)}
+	<g class="sundisc" transform="translate({x} {y})" opacity={sunUp ? 1 : 0.35}>
+		<circle r={size * 2.2} fill="#F6C453" opacity=".18" />
+		<circle r={size * 1.45} fill="#F6C453" opacity=".28" />
+		<circle r={size} fill={sunUp ? '#F2B84B' : '#9AA094'} stroke="#fff" stroke-width={size * 0.18} />
+		<text y={size * 3.2} text-anchor="middle">{sunUp ? `${Math.round(sun.altitude)}° up` : 'below horizon'}</text>
+	</g>
 {/snippet}
 
 {#snippet items(z: number | null)}
@@ -193,6 +247,7 @@
 	onpointerup={up}
 	onpointercancel={up}
 	onwheel={wheel}
+	bind:clientWidth={stageW}
 	role="application"
 	aria-label={mode === '3d' ? '3D plan — drag to rotate, pinch to zoom' : 'Top-down plan — drag to move, pinch to zoom'}
 >
@@ -210,6 +265,7 @@
 				{#each unit.rooms as r (r.name)}
 					<text x={r.x} y={r.y} class="label" text-anchor="middle">{r.name.toUpperCase()}</text>
 				{/each}
+				{@render sunDisc(sunUp ? topSun[0] : horizon[0], sunUp ? topSun[1] : horizon[1], 46)}
 			</svg>
 		</div>
 	{:else}
@@ -221,6 +277,16 @@
 			{#each wallLayers as z, k (z)}
 				<svg {viewBox} style:transform="translateZ({z}px)" style:filter={dim}>{@render walls(k === wallLayers.length - 1)}</svg>
 			{/each}
+			{#if sunUp}
+			<div
+				class="sky"
+				style:left="{sky3d.gx}%"
+				style:top="{sky3d.gy}%"
+				style:transform="translate(-50%,-50%) translateZ({sky3d.z}px) rotateZ({-rot}deg) rotateX({-tilt}deg)"
+			>
+				<svg viewBox="-110 -110 220 260" width="78" height="92">{@render sunDisc(0, 0, 34)}</svg>
+			</div>
+			{/if}
 		</div>
 	{/if}
 </div>
@@ -235,7 +301,7 @@
 		--balcony: #e4e2d8;
 		position: relative;
 		height: 100%;
-		min-height: 320px;
+		min-height: 200px;
 		overflow: hidden;
 		touch-action: none;
 		cursor: grab;
@@ -275,6 +341,33 @@
 		font: 600 26px var(--font);
 		letter-spacing: 2px;
 		fill: #7b8077;
+	}
+.ray line {
+		stroke: var(--ochre);
+		stroke-width: 7;
+		stroke-dasharray: 18 14;
+		stroke-linecap: round;
+	}
+	.ray path {
+		fill: var(--ochre);
+	}
+	.sundisc text {
+		font: 700 40px var(--font);
+		paint-order: stroke;
+		stroke: var(--paper);
+		stroke-width: 8px;
+		fill: var(--ochre);
+	}
+	.sky {
+		position: absolute;
+		pointer-events: none;
+	}
+	.model .sky svg {
+		position: static;
+		display: block;
+		width: 78px;
+		height: 92px;
+		overflow: visible;
 	}
 	.north {
 		position: absolute;

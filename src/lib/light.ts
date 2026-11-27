@@ -53,7 +53,7 @@ export function sunPatches(unit: Unit, azimuth: number, altitude: number): Patch
 
 /** 0 (full day) … 1 (night): drives the "dark → light" shading of the unit. */
 export function darkness(altitude: number): number {
-	if (altitude >= 12) return 0;
+	if (altitude >= 10) return 0;
 	if (altitude <= -6) return 1;
-	return (12 - altitude) / 18;
+	return (10 - altitude) / 16;
 }
