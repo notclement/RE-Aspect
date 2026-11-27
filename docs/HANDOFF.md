@@ -68,11 +68,40 @@ All of these are documented in `docs/REQUIREMENTS.md`:
 
 ## In flight: north detection (`supabase/functions/detect-north`)
 
-**Clement's instruction:** do **not** commit or push the north detection code to `dev` until it is robust (>90 %) and he approves.
+**Clement's instruction:** do **not** merge the north detection work into `dev` until it is robust (>90 %) and he approves.
 
-- The working version is deployed to the **test** Supabase only.
-- Its source is the *uncommitted* change to `supabase/functions/detect-north/index.ts` in the local clone (SHA-1 `32610f83…`). If that clone is lost, copy the code from the test project's dashboard Code page.
-- Also uncommitted: `deno.lock`, made by a local `deno check`. It can be deleted.
+- The code is on its own branch, **`wip/north-detection`** (based on `dev`):
+  - `supabase/functions/detect-north/index.ts`: the version deployed to the **test** Supabase (SHA-1 `32610f83…`).
+  - `tools/north-test/`: the test scripts. See their `README.md`.
+- `dev` and production still have the older detect-north.
+
+### Taking over
+
+1. **Get the code:** `git fetch && git checkout wip/north-detection`. Keep it up to date with `git merge origin/dev` (or rebase).
+2. **Type check:** `deno check supabase/functions/detect-north/index.ts`. Deno also installs from npm: `npm i deno`, then `npx deno check …`.
+3. **Deploy to the test project only** (`kyupdztsvwegaelrkyfd` → Edge Functions → detect-north → Code):
+   1. Paste or replace the code.
+   2. Click "Deploy updates", then the confirm dialog's "Deploy updates".
+   3. Keep "Verify JWT with legacy secret" OFF.
+   4. To be sure the dashboard holds exactly the branch file, compare a SHA-1 of the editor text (`monaco.editor.getModels()[0].getValue()`) with `sha1sum` of the file.
+4. **Run the tests:**
+   1. Unzip Clement's `hdb-test-set.zip` (never commit it).
+   2. Put an admin session token from the test site in `token.txt`. It lasts about 1 h; the steps are in the tools README.
+   3. Then run:
+      ```
+      cd tools/north-test
+      pip install --break-system-packages pillow numpy scipy opencv-python-headless
+      NORTH_SET=../../hdb-test-set SUPABASE_PUBLISHABLE_KEY=… CONC=2 python3 run.py x2
+      ```
+      Admins have no daily limit. Keep `CONC` at 2–3, since 6 at once hits the CPU limit.
+5. **Check doubtful answers by eye:** `python3 lay.py 00:168,263` draws the plan on the site at those angles, with the front door in red.
+6. **Add new test sets:** add the answer to `GT` in `run.py` (and the door pixel to `DOOR` in `lay.py`).
+7. **Ship when ready:** once a full run is >90 % across all sets, tell Clement with the numbers. Only after his OK: merge into `dev`, add an entry to `docs/REQUIREMENTS.md`, and send the test link. Live Supabase only on "push to prod".
+8. **Tuning knobs in `index.ts`:**
+   - `PROMPT_FIND` / `PROMPT_READ` / `PROMPT_CHOOSE`.
+   - `pixelTilt`: window radius `32 / 1400` × image size, 4× upscale.
+   - The vote weights in step 3: choice 1, runner-up 0.5, door reading +1, ties to the door.
+   - `planTiles` size: 380 px tiles. Bigger didn't help Dakota.
 
 ### How it works now
 
@@ -114,7 +143,7 @@ All of these are documented in `docs/REQUIREMENTS.md`:
   - Next idea: send site plans to the server at about 2000 px instead of 1400 (client: `shrinkPhoto(…, 1400, …)` in `src/routes/new/+page.svelte`), or add a check that the label is really in the crop.
 - Clement is generating more test sets. Re-run all of them after any change.
 
-### Testing tools (in `/tmp`; rebuild if gone)
+### Testing tools (copies in `tools/north-test/` on the branch)
 
 - `/tmp/hs/run.py [cases] [xN]`: calls the test function with the admin `debug` flag. `CONC=2` sets parallelism. It prints pass/fail, candidates and scores.
   - It needs Clement's session token in `/tmp/nt/tok.txt` (read from the test site's localStorage while signed in; it lasts about 1 h). Never show the token to anyone.
