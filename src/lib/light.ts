@@ -275,3 +275,40 @@ export function windowRays(unit: Unit, azimuth: number, altitude: number, spacin
 	}
 	return out;
 }
+
+// ---------------------------------------------------------------- sun inside, through the day
+
+function polyArea(p: Pt[]): number {
+	let s = 0;
+	for (let i = 0; i < p.length; i++) {
+		const [x1, y1] = p[i];
+		const [x2, y2] = p[(i + 1) % p.length];
+		s += x1 * y2 - x2 * y1;
+	}
+	return Math.abs(s) / 2;
+}
+
+/**
+ * How much direct sun lands inside the home across the day (sunlit floor area × strength), sampled
+ * from sunrise to sunset. `v` is 0..1 (1 = the day's peak); `peak` is the minute with the most sun inside.
+ * Uses the same patches as the plan views, so walls already block the light.
+ */
+export function indoorExposure(
+	unit: Unit,
+	sunAt: (minutes: number) => { azimuth: number; altitude: number },
+	sunrise: number,
+	sunset: number,
+	samples = 60
+): { pts: { m: number; v: number }[]; peak: number | null; total: number } {
+	const raw: { m: number; v: number }[] = [];
+	for (let i = 0; i <= samples; i++) {
+		const m = sunrise + ((sunset - sunrise) * i) / samples;
+		const s = sunAt(m);
+		const v = sunPatches(unit, s.azimuth, s.altitude).reduce((sum, p) => sum + polyArea(p.points) * p.intensity, 0);
+		raw.push({ m, v });
+	}
+	const max = Math.max(...raw.map((r) => r.v));
+	if (!(max > 0)) return { pts: raw.map((r) => ({ m: r.m, v: 0 })), peak: null, total: 0 };
+	const best = raw.reduce((a, b) => (b.v > a.v ? b : a));
+	return { pts: raw.map((r) => ({ m: r.m, v: r.v / max })), peak: best.m, total: raw.reduce((s, r) => s + r.v, 0) };
+}

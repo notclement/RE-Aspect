@@ -16,7 +16,9 @@
 		altitude,
 		azimuth,
 		fmt,
-		full = false
+		full = false,
+		exposure = null,
+		onpick
 	}: {
 		date: string;
 		minutes: number;
@@ -29,6 +31,10 @@
 		fmt: (m: number) => string;
 		/** Always show every detail (used in the Sun info sheet); otherwise phones get a compact version. */
 		full?: boolean;
+		/** Sun inside the home through the day (0..1 per sample) and the minute it peaks. */
+		exposure?: { pts: { m: number; v: number }[]; peak: number | null } | null;
+		/** Jump the timeline to a minute (tapping the peak). */
+		onpick?: (m: number) => void;
 	} = $props();
 
 	const W = 300;
@@ -56,6 +62,14 @@
 	const line = $derived(path ? path.pts.map((p, i) => `${i ? 'L' : 'M'}${xAt(p.m).toFixed(1)} ${yAt(p.alt).toFixed(1)}`).join(' ') : '');
 	const area = $derived(path ? `${line} L${X1} ${BASE} L${X0} ${BASE} Z` : '');
 
+	// Sun inside the home: a warm band under the arc, tallest when the most sunlight lands indoors.
+	const inside = $derived.by(() => {
+		if (!path || !exposure || exposure.peak === null) return null;
+		const top = (BASE - 12) * 0.62;
+		const pts = exposure.pts.map((p) => `${xAt(p.m).toFixed(1)} ${(BASE - p.v * top).toFixed(1)}`);
+		return { d: `M${xAt(exposure.pts[0].m).toFixed(1)} ${BASE} L${pts.join(' L')} L${xAt(exposure.pts[exposure.pts.length - 1].m).toFixed(1)} ${BASE} Z`, px: xAt(exposure.peak), py: BASE - top };
+	});
+
 	const up = $derived(path !== null && minutes >= sunrise! && minutes <= sunset! && altitude > -0.833);
 	const sx = $derived(up ? xAt(minutes) : 0);
 	const sy = $derived(up ? yAt(altitude) : BASE);
@@ -81,6 +95,10 @@
 	<svg class="arc" viewBox="0 0 {W} {H}" aria-label="Sun path for the day" role="img">
 		{#if path}
 			<path d={area} class="fill" />
+			{#if inside}
+				<path d={inside.d} class="inside" />
+				<line x1={inside.px} y1={inside.py - 4} x2={inside.px} y2={BASE} class="peakline" />
+			{/if}
 			<path d={line} class="path" />
 		{/if}
 		<line x1="4" y1={BASE} x2={W - 4} y2={BASE} class="horizon" />
@@ -94,6 +112,15 @@
 		<span>Rise <strong>{sunrise === null ? '—' : fmt(sunrise)}</strong></span>
 		<span>Set <strong>{sunset === null ? '—' : fmt(sunset)}</strong></span>
 	</div>
+	{#if exposure}
+		{#if exposure.peak !== null}
+			<button class="peak" onclick={() => onpick?.(exposure!.peak!)} aria-label="Jump to the most sun inside, {fmt(exposure.peak)}">
+				<span class="swatch"></span><span class="long">Most sun inside</span><span class="short">Peak inside</span> <strong>{fmt(exposure.peak)}</strong>
+			</button>
+		{:else}
+			<p class="peak none">No direct sun inside on this day</p>
+		{/if}
+	{/if}
 	</div>
 
 	<div class="stats">
@@ -159,6 +186,50 @@
 	.fill {
 		fill: var(--ochre-soft);
 		opacity: 0.75;
+	}
+	.inside {
+		fill: var(--ochre);
+		opacity: 0.45;
+	}
+	.peakline {
+		stroke: var(--ochre);
+		stroke-width: 1.5;
+	}
+	.peak {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		margin-top: 6px;
+		min-height: 36px;
+		padding: 4px 10px;
+		border: 1px solid color-mix(in srgb, var(--ochre) 45%, transparent);
+		border-radius: 999px;
+		background: none;
+		color: var(--muted);
+		font: inherit;
+		font-size: 13px;
+		cursor: pointer;
+	}
+	.peak strong {
+		color: var(--text);
+	}
+	.peak {
+		white-space: nowrap;
+	}
+	.short {
+		display: none;
+	}
+	.peak.none {
+		border: 0;
+		cursor: default;
+		padding-left: 0;
+	}
+	.swatch {
+		width: 10px;
+		height: 10px;
+		border-radius: 3px;
+		background: var(--ochre);
+		opacity: 0.7;
 	}
 	.path {
 		fill: none;
@@ -242,6 +313,16 @@
 		.sp:not(.full) .stats,
 		.sp:not(.full) .rs {
 			display: none;
+		}
+		.sp:not(.full) .long {
+			display: none;
+		}
+		.sp:not(.full) .short {
+			display: inline;
+		}
+		.sp:not(.full) .peak {
+			font-size: 12px;
+			padding: 2px 8px;
 		}
 		.sp:not(.full) .bubble {
 			width: 36px;

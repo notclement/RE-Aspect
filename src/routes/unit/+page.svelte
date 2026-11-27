@@ -18,7 +18,7 @@
 	import { projectDetails, saveProjectDetails, getProject, type ProjectDetails } from '#lib/stores/projects.svelte.ts';
 	import { validateProjectName, validateUnitNumber, validateFreeText } from '#lib/validate.ts';
 	import { sunPosition, localDate, sunTimes, compass } from '#lib/sun.ts';
-	import { sunPatches, darkness, furnitureLight, ITEM_LABELS } from '#lib/light.ts';
+	import { sunPatches, darkness, furnitureLight, indoorExposure, ITEM_LABELS } from '#lib/light.ts';
 	import { nav } from '#lib/stores/nav.svelte.ts';
 	import { profile } from '#lib/stores/profile.svelte.ts';
 
@@ -127,6 +127,12 @@
 		[...new Set([...furniture.lit].map((i) => ITEM_LABELS[unit.items[i].kind]).filter((n) => n !== 'Rug'))]
 	);
 	const times = $derived(sunTimes(vs.date, unit.lat, unit.lon));
+	// Sun inside the home through the day (for the timeline: when the most light lands indoors).
+	const exposure = $derived(
+		times.sunrise !== null && times.sunset !== null
+			? indoorExposure(unit, (m) => sunPosition(localDate(vs.date, m), unit.lat, unit.lon), times.sunrise, times.sunset)
+			: null
+	);
 
 	const litWalls = $derived(
 		[...new Set(unit.windows.filter((w) => {
@@ -239,7 +245,7 @@
 
 <p class="summary">{summary}</p>
 
-<SunTimeline bind:minutes={vs.minutes} bind:date={vs.date} sunrise={times.sunrise} sunset={times.sunset} lat={unit.lat} lon={unit.lon} {sun} oninfo={() => (infoOpen = true)} />
+<SunTimeline bind:minutes={vs.minutes} bind:date={vs.date} sunrise={times.sunrise} sunset={times.sunset} lat={unit.lat} lon={unit.lon} {sun} {exposure} oninfo={() => (infoOpen = true)} />
 <SunInfoSheet bind:open={infoOpen} {unit} {sun} date={vs.date} minutes={vs.minutes} sunrise={times.sunrise} sunset={times.sunset} fmt={fmtTime} />
 
 {/if}

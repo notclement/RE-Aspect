@@ -16,6 +16,7 @@
 		lat = null,
 		lon = null,
 		sun = null,
+		exposure = null,
 		oninfo
 	}: {
 		minutes?: number;
@@ -26,6 +27,7 @@
 		lat?: number | null;
 		lon?: number | null;
 		sun?: { altitude: number; azimuth: number } | null;
+		exposure?: { pts: { m: number; v: number }[]; peak: number | null } | null;
 		oninfo?: () => void;
 	} = $props();
 	const withArc = $derived(!!sun && lat !== null && lon !== null);
@@ -104,7 +106,7 @@
 		{/if}
 	</div>
 	{#if withArc && sun && lat !== null && lon !== null}
-		<SunArc {date} {minutes} {lat} {lon} {sunrise} {sunset} altitude={sun.altitude} azimuth={sun.azimuth} {fmt} />
+		<SunArc {date} {minutes} {lat} {lon} {sunrise} {sunset} altitude={sun.altitude} azimuth={sun.azimuth} {fmt} {exposure} onpick={(m) => ((playing = false), (minutes = Math.round(m)))} />
 	{/if}
 	<div class="row">
 		<button class="auto" class:on={playing} onclick={toggle} aria-pressed={playing} aria-label={playing ? 'Pause auto sun' : 'Auto sun'}>
