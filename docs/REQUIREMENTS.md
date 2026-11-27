@@ -160,3 +160,4 @@ West-sun heat warning · air-con cost estimate · cross-ventilation · furniture
 - Edge functions need `grant select, update on public.projects to service_role` (new Supabase projects don't grant it) — in 0008.
 - On failure the functions return `provider` + `detail` (key-like strings redacted); the app shows the detail to admins only. OpenAI-compatible providers (OpenAI, DeepSeek) retry once without JSON mode on a 400/422.
 - Studio **Auto-trace** (floating chip on the canvas, needs the floor-plan photo on this device): re-traces outline/walls/windows/rooms with the AI, keeps placed furniture, undoable, uses one of the project's AI re-runs.
+- **Admins have unlimited AI** (per-project re-runs and daily checks like north detection; still counted) — migration 0009. Profile shows **∞×** AI re-runs for admins (the role's real number when previewing another role).

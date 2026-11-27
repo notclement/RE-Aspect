@@ -2,7 +2,7 @@
  * The user's profile + personal settings.
  * Phase 0: stored in this browser. Phase 1: synced to the Supabase `profiles` table on sign-in.
  */
-import { effectivePlan, type PlanId } from '#lib/config/plans.ts';
+import { effectivePlan, PLANS, type PlanId } from '#lib/config/plans.ts';
 import { theme, isThemeChoice, type ThemeChoice } from './theme.svelte.ts';
 import { agency } from './agency.svelte.ts';
 
@@ -132,6 +132,14 @@ class ProfileStore {
 		if (r) return r === 'free' ? 'free' : r === 'agency' || r === 'lead' ? 'agency' : 'pro';
 		if (agency.active) return 'agency';
 		return this.data.isAdmin ? 'pro' : effectivePlan(this.data.plan);
+	}
+
+	/** AI re-runs per project to show: admins (not previewing another role) are unlimited on the server. */
+	get aiRunsLabel(): string {
+		if (this.data.isAdmin && !this.viewAs) return '∞';
+		const r = this.viewAs;
+		const plan = r ? (r === 'free' ? 'free' : r === 'agency' || r === 'lead' ? 'agency' : 'pro') : this.planId;
+		return String(PLANS[plan].aiRunsPerFunctionPerUnit);
 	}
 
 	update(patch: Partial<Profile>, fromCloud = false) {

@@ -135,7 +135,7 @@
 	</div>
 	<div class="facts">
 		<span><b>{Math.max(0, included - used)}</b> projects left</span>
-		<span><b>{plan.aiRunsPerFunctionPerUnit}×</b> AI re-runs per project</span>
+		<span><b>{profile.aiRunsLabel}×</b> AI re-runs per project</span>
 		{#if plan.extraUnitOneOffSgd}<span><b>S${plan.extraUnitOneOffSgd}</b> per extra project</span>{/if}
 	</div>
 	{#if FREE_LAUNCH}<p class="muted small">Launch period: everyone gets Pro features free while we test. Demo projects don't count.</p>{/if}

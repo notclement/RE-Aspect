@@ -775,7 +775,7 @@
 		<button class="scrim" aria-label="Cancel" onclick={() => (askTrace = false)}></button>
 		<div class="sheet ask" role="dialog" aria-modal="true" aria-labelledby="trace-title">
 			<h2 id="trace-title">Auto-trace this plan?</h2>
-			<p class="muted">The AI traces the floor plan photo again: outline, walls, windows and rooms.{plan.outline.length >= 3 || plan.walls.length ? ' This replaces what is traced now (Undo brings it back).' : ''} Furniture you've placed stays. Uses one of this project's AI re-runs.</p>
+			<p class="muted">The AI traces the floor plan photo again: outline, walls, windows and rooms.{plan.outline.length >= 3 || plan.walls.length ? ' This replaces what is traced now (Undo brings it back).' : ''} Furniture you've placed stays. Uses one of this project's AI re-runs ({profile.aiRunsLabel} per project).</p>
 			<div class="actions">
 				<button class="btn" onclick={() => (askTrace = false)}>Cancel</button>
 				<button class="btn primary" onclick={autoTrace}><Icon name="sparkle" size={18} />Auto-trace</button>
