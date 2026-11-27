@@ -5,7 +5,7 @@
 	 * (built with Astra) will replace the 3D layer later — it receives the same Unit data.
 	 *
 	 * Gestures (natural, never inverted): drag = pan (top down) / orbit (3D: drag left → model turns left),
-	 * pinch or wheel = zoom.
+	 * zoom only with the + / − buttons (no pinch or wheel zoom).
 	 */
 	import type { Unit, Item } from '#lib/sample-unit.ts';
 	import { hull, smooth, roomFor, type Patch, type FurnitureLight, type WindowRay } from '#lib/light.ts';
@@ -106,22 +106,10 @@
 	}
 
 	const pointers = new Map<number, { x: number; y: number }>();
-	let pinchDist = 0;
-	let pinchScale = 1;
-	// Pinch follows the fingers but damped (exponent < 1) so small finger moves give small zooms.
-	const PINCH_DAMP = 0.6;
 
 	function down(e: PointerEvent) {
 		(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
 		pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-		if (pointers.size === 2) {
-			pinchDist = dist();
-			pinchScale = scale;
-		}
-	}
-	function dist() {
-		const [a, b] = [...pointers.values()];
-		return Math.hypot(a.x - b.x, a.y - b.y);
 	}
 	function move(e: PointerEvent) {
 		const prev = pointers.get(e.pointerId);
@@ -130,9 +118,7 @@
 		const dy = e.clientY - prev.y;
 		pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 		if (pointers.size >= 2) {
-			const d = dist();
-			if (pinchDist > 20) scale = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, pinchScale * (d / pinchDist) ** PINCH_DAMP));
-			return;
+			return; // two fingers: no zoom (zoom only with the + / − buttons)
 		}
 		if (mode === '3d') {
 			rot -= dx * 0.35; // natural: drag left → the model turns left
@@ -144,13 +130,10 @@
 	}
 	function up(e: PointerEvent) {
 		pointers.delete(e.pointerId);
-		if (pointers.size < 2) pinchDist = 0;
 	}
 	function wheel(e: WheelEvent) {
-		e.preventDefault();
-		// Proportional to the wheel delta: trackpad pinches (ctrlKey) send many small events, mouse wheels a few big ones.
-		const dy = Math.max(-50, Math.min(50, e.deltaY));
-		zoomBy(Math.exp(-dy * (e.ctrlKey ? 0.006 : 0.0025)));
+		// No wheel / trackpad-pinch zoom: zoom only with the + / − buttons. Block the browser's own pinch-zoom here.
+		if (e.ctrlKey) e.preventDefault();
 	}
 
 	// ---- 3D layer stack
@@ -309,7 +292,7 @@
 	onwheel={wheel}
 	bind:clientWidth={stageW}
 	role="application"
-	aria-label={mode === '3d' ? '3D plan — drag to rotate, pinch to zoom' : 'Top-down plan — drag to move, pinch to zoom'}
+	aria-label={mode === '3d' ? '3D plan — drag to rotate' : 'Top-down plan — drag to move'}
 >
 	<div class="north" style:transform="rotate({north}deg)" aria-label="North">
 		<span>N</span>
