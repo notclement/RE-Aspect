@@ -178,7 +178,7 @@
 		<div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax={info.pool} aria-valuenow={info.used} aria-label="Agency projects used">
 			<span style:width="{pct}%" class:full={pct >= 100}></span>
 		</div>
-		<p class="muted small">Everyone in the agency creates projects from this pool, with Agency limits (5 AI re-runs per project). {info.seats} paid seats + lead.</p>
+		<p class="muted small">Everyone in the agency creates projects from this pool, with Agency limits (25 AI re-runs per project). {info.seats} paid seats + lead.</p>
 	</section>
 
 	{#if error}<p class="error card">{error}</p>{/if}

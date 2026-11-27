@@ -549,7 +549,7 @@
 		} catch (e) {
 			const msg = e instanceof Error ? e.message : 'Auto-trace failed.';
 			console.warn('[auto-trace]', msg);
-			toast = msg.includes('limit') ? 'No AI re-runs left for this project — trace it by hand with Outline.' : `Auto-trace didn't work${profile.data.isAdmin ? `: ${msg}` : ' — please trace with Outline, or try again later.'}`;
+			toast = msg.includes('Daily') ? "You've reached today's AI limit — try again tomorrow, or trace with Outline." : msg.includes('limit') ? 'No AI re-runs left for this project — trace it by hand with Outline.' : `Auto-trace didn't work${profile.data.isAdmin ? `: ${msg}` : ' — please trace with Outline, or try again later.'}`;
 			setTimeout(() => (toast = null), 6000);
 		}
 		tracing = false;

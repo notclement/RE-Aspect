@@ -5,6 +5,9 @@
  */
 export type PlanId = 'free' | 'pro' | 'agency';
 
+/** Safety cap (server, 0010): AI runs per person per day across all projects; admins exempt. */
+export const AI_DAILY_CAP = 40;
+
 export interface Plan {
 	id: PlanId;
 	label: string;
@@ -25,7 +28,7 @@ export const PLANS: Record<PlanId, Plan> = {
 		priceSgdMonthly: 0,
 		includedUnits: 1,
 		extraUnitOneOffSgd: null,
-		aiRunsPerFunctionPerUnit: 1,
+		aiRunsPerFunctionPerUnit: 5,
 		canImport: false,
 		canExport: true,
 		modules: false,
@@ -37,7 +40,7 @@ export const PLANS: Record<PlanId, Plan> = {
 		priceSgdMonthly: 50,
 		includedUnits: 10,
 		extraUnitOneOffSgd: 5, // each unit beyond 10 is a one-off $5
-		aiRunsPerFunctionPerUnit: 3,
+		aiRunsPerFunctionPerUnit: 25,
 		canImport: true,
 		canExport: true,
 		modules: true,
@@ -49,7 +52,7 @@ export const PLANS: Record<PlanId, Plan> = {
 		priceSgdMonthly: null, // custom quote
 		includedUnits: null, // see agencyUnitPool()
 		extraUnitOneOffSgd: 5,
-		aiRunsPerFunctionPerUnit: 5,
+		aiRunsPerFunctionPerUnit: 25,
 		canImport: true,
 		canExport: true,
 		modules: true,

@@ -138,7 +138,10 @@ class ProfileStore {
 	get aiRunsLabel(): string {
 		if (this.data.isAdmin && !this.viewAs) return '∞';
 		const r = this.viewAs;
-		const plan = r ? (r === 'free' ? 'free' : r === 'agency' || r === 'lead' ? 'agency' : 'pro') : this.planId;
+		// AI limits follow the real plan (the free launch doesn't raise them): Free 5 · Pro 25 · Agency 25.
+		const plan: PlanId = r
+			? r === 'free' ? 'free' : r === 'agency' || r === 'lead' ? 'agency' : 'pro'
+			: agency.active ? 'agency' : this.data.plan;
 		return String(PLANS[plan].aiRunsPerFunctionPerUnit);
 	}
 

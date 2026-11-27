@@ -34,7 +34,7 @@ Then the user lands in **Studio** to check and fix the result.
 3. **Furnish** from interior shots (if any) → furniture list with approximate sizes, assigned to rooms. No interior shots → a sensible default layout per room type.
 4. Saves the result as the project's **plan** (our own compact JSON — the same `Unit` shape the sun engine already uses).
 5. **Deletes every uploaded photo** (storage objects + temp rows). A scheduled sweep also deletes anything older than 24 h as a safety net. Only the distilled plan is kept.
-6. Counts the AI run against the plan's per-function limit (Free 1 / Pro 3 / Agency 5 re-runs), enforced in the database.
+6. Counts the AI run against the plan's per-function limit (Free 5 / Pro 25 / Agency 25 re-runs, admins unlimited; 40 runs per person per day), enforced in the database.
 
 ## 3. Studio (`/studio?id=…`) — open after processing, or any time via *Edit in Studio*
 
