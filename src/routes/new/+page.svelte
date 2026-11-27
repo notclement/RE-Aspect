@@ -308,7 +308,7 @@
 
 {#if phase !== 'edit'}
 	<div class="busy">
-		<div class="busy-art"><RoomArt height={220} eager /></div>
+		<div class="busy-art"><RoomArt height={200} eager /></div>
 		<Spinner size={28} />
 		<h2>{phase === 'creating' ? 'Creating your project…' : STAGES[stage]}</h2>
 		<p class="muted">{phase === 'processing' ? 'This usually takes under a minute. Your photos are deleted as soon as it’s done.' : ''}</p>

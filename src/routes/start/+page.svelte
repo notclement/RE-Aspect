@@ -27,7 +27,7 @@
 	</header>
 
 	<main class="hero">
-		<div class="art"><RoomArt height={260} eager /></div>
+		<div class="art"><RoomArt height={240} eager /></div>
 		<div class="copy">
 			<h1>{BRAND.tagline}</h1>
 			<p class="lead">{BRAND.sunFeature} turns a floor plan into a live sunlight study. Share it with buyers on WhatsApp in one tap.</p>
@@ -152,8 +152,8 @@
 			order: 2;
 			margin: 0;
 		}
-		.art :global(.room-art) {
-			height: 400px !important;
+		.art :global(.stage) {
+			height: 420px !important;
 		}
 		.copy {
 			margin-top: 0;

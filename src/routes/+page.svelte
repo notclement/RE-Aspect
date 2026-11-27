@@ -75,7 +75,7 @@
 
 {#if myProjects.length === 0}
 	<section class="first card">
-		<RoomArt height={190} />
+		<RoomArt height={176} flush />
 		<div class="first-body">
 			<h2>No projects yet, {profile.firstName}</h2>
 			<p class="muted">Upload a floor plan and see the sun move through each room in a few minutes.</p>
@@ -206,9 +206,6 @@
 		overflow: hidden;
 		margin-bottom: 10px;
 		max-width: 560px;
-	}
-	.first :global(.room-art) {
-		margin-top: 16px;
 	}
 	.first-body {
 		display: flex;
