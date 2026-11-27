@@ -8,7 +8,11 @@ from PIL import Image
 tok=open(os.environ.get('NORTH_TOKEN_FILE','token.txt')).read().strip()  # session token of an ADMIN on the test site (never commit it)
 pk=os.environ['SUPABASE_PUBLISHABLE_KEY']  # test project publishable key
 FN=os.environ.get('NORTH_FN','https://kyupdztsvwegaelrkyfd.supabase.co/functions/v1/detect-north')
-GT={'00':168,'01':293,'02':0,'03':0,'04':0,'05':190,'06':125,'07':205}
+GT={'00':168,'01':293,'02':0,'03':0,'04':0,'05':190,'06':125,'07':205,
+    # set 2 (1024 px, 28 Nov): read by eye at 1024 px (tilt by Hough on the unit outlines); '?' = less sure, see README
+    '08':270,'09':83,'10':180,'11':180,'12':180,'13':180,'14':353,'15':212,'16':154,'18':90}
+# 17 Rajah Summit and 19 Toa Payoh Ascent are left out: their 2_floor-plan-3room.jpg is a 4-ROOM plan.
+UNSURE={'10','11'}
 def enc(f,maxs,q):
     im=Image.open(f).convert('RGB'); im.thumbnail((maxs,maxs)); b=io.BytesIO(); im.save(b,'JPEG',quality=int(q*100))
     return 'data:image/jpeg;base64,'+base64.b64encode(b.getvalue()).decode()
@@ -28,9 +32,9 @@ def one(arg):
 cases=[a for a in sys.argv[1:] if not a.startswith('x')] or list(GT)
 reps=int(([a[1:] for a in sys.argv[1:] if a.startswith('x')] or ['1'])[0])
 jobs=[]
-for d in sorted(glob.glob(SET+'/0*')):
+for d in sorted(glob.glob(SET+'/[0-9][0-9]_*')):
     n=d.split('/')[-1][:2]
-    if n in cases:
+    if n in cases and n in GT:
         b=body(d); jobs+= [(n,d,b)]*reps
 with concurrent.futures.ThreadPoolExecutor(int(__import__("os").environ.get("CONC","6"))) as ex: res=list(ex.map(one,jobs))
 ok=0
@@ -42,4 +46,7 @@ for r in res:
     print(r['_case'],'PASS' if good else 'FAIL', a,'want',g, r.get('method'), r.get('_s'),'s | est',f.get('rotate_cw_deg'),'stack',f.get('stack_found'),f.get('stack_label'),'N',f.get('north_tail'),f.get('north_tip'),
       '| runs',[(x['deg'],x['ai'].get('ring_label'),{k:round(v) for k,v in (x['geo'] or {}).items() if isinstance(v,(int,float))}) for x in runs], '| chose',d.get('chose'),[ (v['order'],v['ai'].get('choice'),v['ai'].get('second')) for v in d.get('votes',[])], (r.get('detail') or r.get('body') or r.get('err') or r.get('reason') or '')[:160])
 print(f'{ok}/{len(res)} pass')
+for g in sorted(set(r['_case'] for r in res)):
+    rr=[r for r in res if r['_case']==g]; a=[r.get('angle') for r in rr]
+    print(g, 'want', GT[g], '(unsure)' if g in UNSURE else '', 'got', a)
 json.dump(res,open(f'{OUT}/res-{int(time.time())}.json','w'))

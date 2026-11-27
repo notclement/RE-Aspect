@@ -6,6 +6,7 @@ Python 3 with `pillow numpy scipy opencv-python-headless` (`pip install --break-
 |---|---|
 | `run.py [cases] [xN]` | Calls the deployed `detect-north` for each case (`debug: true`, admin only) and prints PASS/FAIL against the answer key (±15°), the 4 candidates, vote scores and pixel tilts. Saves raw replies to `$NORTH_OUT/res-*.json`. `CONC=2` = requests in parallel (6+ at once can hit the server's CPU limit). |
 | `gt.py` | Answer-key helper: cuts the circled stack out of the site plan and the flat out of the floor plan and scores every rotation by overlap. Good at the full-size images only; check by eye with `lay.py`. |
+| `tilt.py 08 15 16` | Block tilt (0–89°, clockwise) from the unit outlines around the ring (Hough lines), with the axes drawn on a zoom (`tilt.png`) to check by eye. Use `HF=1.3` for a tighter window when a linkway skews it. |
 | `lay.py 01:283,301 06:125` | Lays the floor plan over its stack at the given angles (clockwise), front door as a red dot. The right angle has the outline matching and the door on the corridor. |
 
 Environment:
@@ -19,3 +20,14 @@ Environment:
 `run.py` builds each request like the app does (floor plan ≤1536 px, other photos ≤1400 px, JPEG) and sends `Blk <block> <project>` as the address and `#<unit>` as the unit number.
 
 New cases: add an entry to `GT` in `run.py` (and `DOOR` in `lay.py` for the door dot: the plan pixel of the main door).
+
+## Answer key, set 2 (1024 px, 28 Nov 2026)
+
+`gt.py` shape matching doesn't work at 1024 px (units are ~30 px across), so cases 08–18 were keyed by eye: block tilt from `tilt.py` (checked against 00–07: within ~2°, except 05), door side = the side where the stack meets its common corridor, then the plan's main door turned onto it.
+
+| Case | 08 | 09 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Expected | 270 | 83 | 180? | 180? | 180 | 180 | 353 | 212 | 154 | 90 |
+
+`?` = less sure (corridor side or outline unclear at this size); look again if the function disagrees.
+Left out: **17 Rajah Summit** and **19 Toa Payoh Ascent** — their `2_floor-plan-3room.jpg` is a 4-ROOM plan.

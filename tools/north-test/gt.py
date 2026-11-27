@@ -13,7 +13,11 @@ def circle(d):
     a = glob.glob(d + '/answer*')[0]
     A = np.asarray(Image.open(a).convert('RGB')).astype(int)
     S = np.asarray(Image.open(d + '/1_site-plan.jpg').convert('RGB')).astype(int)
-    ys, xs = np.nonzero(np.abs(A - S).sum(2) > 120)
+    # the red ring only: strongly red in the answer image and clearly redder than the site plan there
+    # (a plain difference picks up JPEG noise everywhere on re-encoded, low-res sets)
+    red = (A[..., 0] > 170) & (A[..., 1] < 90) & (A[..., 2] < 90) & (A[..., 0] - S[..., 0] + S[..., 1] - A[..., 1] > 60)
+    red = ndi.binary_opening(red, iterations=1) if red.sum() > 200 else red
+    ys, xs = np.nonzero(red)
     return int(xs.mean()), int(ys.mean()), int(max(np.ptp(xs), np.ptp(ys)) / 2)
 
 def site_mask(d, dil=1):
