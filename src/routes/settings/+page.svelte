@@ -1,18 +1,18 @@
 <script lang="ts">
 	import { nav } from '#lib/stores/nav.svelte.ts';
 	$effect(() => nav.set({ label: 'Settings' }));
-	import Icon, { type IconName } from '#lib/components/Icon.svelte';
+	import Icon from '#lib/components/Icon.svelte';
 	import InstallCard from '#lib/components/InstallCard.svelte';
 	import { theme, type ThemeChoice } from '#lib/stores/theme.svelte.ts';
+	import { THEMES, type ThemeId } from '#lib/config/themes.ts';
 	import { profile, ROLE_LABELS, NIGHT_SPEED_MIN, NIGHT_SPEED_MAX, type RoleView } from '#lib/stores/profile.svelte.ts';
 	import { auth } from '#lib/stores/auth.svelte.ts';
 	import { BRAND } from '#lib/config/brand.ts';
 	import { validateBodyHeightCm } from '#lib/validate.ts';
 
-	const themes: { id: ThemeChoice; label: string; icon: IconName }[] = [
-		{ id: 'light', label: 'Light', icon: 'sun' },
-		{ id: 'dark', label: 'Dark', icon: 'moon' },
-		{ id: 'system', label: 'System', icon: 'monitor' }
+	const themeChoices: { id: ThemeChoice; label: string; tagline: string; preview: ThemeId; swatch: string[] }[] = [
+		{ id: 'system', label: 'Match device', tagline: 'Basic light or dark, following your device', preview: 'light', swatch: ['#f7f6f1', '#141815', '#2f4a3b', '#d39a45'] },
+		...THEMES.map((t) => ({ id: t.id, label: t.label, tagline: t.tagline, preview: t.id, swatch: t.swatch }))
 	];
 
 	const roles = Object.entries(ROLE_LABELS) as [RoleView, string][];
@@ -29,12 +29,6 @@
 <svelte:head><title>Settings · RE:Aspect</title></svelte:head>
 
 <h1>Settings</h1>
-
-<a class="card row profile" href="/profile">
-	<span class="avatar">{profile.firstName.slice(0, 1).toUpperCase() || '?'}</span>
-	<span class="grow"><strong>{profile.data.name}</strong><br /><span class="muted">{auth.email ?? 'Preview mode'}</span></span>
-	<Icon name="chevron" />
-</a>
 
 {#if profile.data.isAdmin}
 	<h3>Admin</h3>
@@ -55,15 +49,26 @@
 	</div>
 {/if}
 
-<h3>Appearance</h3>
-<div class="seg" role="radiogroup" aria-label="Theme">
-	{#each themes as t (t.id)}
-		<button role="radio" aria-checked={theme.choice === t.id} class:on={theme.choice === t.id} onclick={() => theme.set(t.id)}>
-			<Icon name={t.icon} size={18} />{t.label}
+<h3>Theme</h3>
+<div class="themes" role="radiogroup" aria-label="Theme">
+	{#each themeChoices as t (t.id)}
+		<button
+			role="radio"
+			aria-checked={theme.choice === t.id}
+			class="theme"
+			class:on={theme.choice === t.id}
+			data-theme={t.preview}
+			onclick={() => theme.set(t.id)}
+		>
+			<span class="sw">{#each t.swatch as c, i (i)}<i style:background={c}></i>{/each}</span>
+			<span class="tname">{t.label}</span>
+			<span class="tline">{t.tagline}</span>
+			<span class="mini" aria-hidden="true"><b></b><em></em></span>
+			{#if theme.choice === t.id}<span class="tick">✓</span>{/if}
 		</button>
 	{/each}
 </div>
-<p class="muted note">Remembered on this browser.</p>
+<p class="muted note">Saved to your account — it follows you to any device you sign in on.</p>
 
 <h3>Sun view</h3>
 <div class="card list">
@@ -152,24 +157,93 @@
 		letter-spacing: 0.06em;
 		color: var(--muted);
 	}
-	.row {
-		display: flex;
-		align-items: center;
-		gap: 12px;
-		text-decoration: none;
+	.themes {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+		gap: 10px;
 	}
-	.grow {
-		flex: 1;
+	.theme {
+		position: relative;
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 4px;
+		text-align: left;
+		padding: 12px;
+		min-height: 128px;
+		border: 1.5px solid var(--line);
+		border-radius: var(--radius);
+		background: var(--paper);
+		background-image: var(--paper-pattern);
+		background-size: var(--paper-pattern-size);
+		color: var(--text);
+		font-family: var(--font);
+		cursor: pointer;
+		transition: border-color 0.2s, transform 0.1s;
+	}
+	.theme:active {
+		transform: scale(0.98);
+	}
+	.theme.on {
+		border-color: var(--forest);
+		box-shadow: 0 0 0 2px var(--forest);
+	}
+	.sw {
+		display: flex;
+		margin-bottom: 4px;
+	}
+	.sw i {
+		width: 20px;
+		height: 20px;
+		border-radius: 50%;
+		border: 2px solid var(--surface);
+		margin-right: -6px;
+	}
+	.tname {
+		font-family: var(--serif);
+		font-weight: var(--heading-weight);
+		letter-spacing: var(--heading-tracking);
+		font-size: 16px;
+		line-height: 1.2;
+	}
+	.tline {
+		font-size: 12px;
+		color: var(--muted);
 		line-height: 1.3;
 	}
-	.avatar {
-		width: 44px;
-		height: 44px;
+	.mini {
+		margin-top: auto;
+		display: flex;
+		gap: 6px;
+		align-items: center;
+		width: 100%;
+		padding-top: 8px;
+	}
+	.mini b {
+		height: 22px;
+		width: 58px;
+		border-radius: var(--radius-sm);
+		background: var(--forest);
+	}
+	.mini em {
+		flex: 1;
+		height: 22px;
+		border-radius: var(--radius-sm);
+		background: var(--surface);
+		border: 1px solid var(--line);
+	}
+	.tick {
+		position: absolute;
+		top: 10px;
+		right: 10px;
+		width: 22px;
+		height: 22px;
 		border-radius: 50%;
-		background: var(--dusk);
-		color: #fff;
+		background: var(--forest);
+		color: var(--on-primary);
 		display: grid;
 		place-items: center;
+		font-size: 13px;
 		font-weight: 700;
 	}
 	.seg {
@@ -270,7 +344,7 @@
 	.roles button.on {
 		background: var(--forest);
 		border-color: var(--forest);
-		color: #fff;
+		color: var(--on-primary);
 	}
 	.toggle {
 		gap: 12px;

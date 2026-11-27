@@ -1,3 +1,4 @@
+@import './themes.css';
 /* RE:Aspect design tokens — see docs/REQUIREMENTS.md and the design brief. */
 :root {
 	/* Palette from the approved mockup: warm paper, forest green, ochre sun. */
@@ -18,6 +19,9 @@
 	--dusk: var(--ochre); /* legacy alias */
 	--ink: #1f2a24;
 
+	--on-primary: #ffffff;
+	--heading-weight: 600;
+	--heading-tracking: -0.02em;
 	--radius: 18px;
 	--radius-sm: 10px;
 	--shadow: 0 4px 16px rgba(36, 48, 42, 0.07);
@@ -29,34 +33,22 @@
 	color-scheme: light;
 }
 
-:root[data-theme='dark'] {
-	--paper: #141815;
-	--surface: #1c211d;
-	--surface-2: #262c27;
-	--canvas: #1a1f1b;
-	--line: #303731;
-	--text: #ecebe4;
-	--muted: #9aa094;
-	--forest: #5f8a70;
-	--forest-2: #6f9a80;
-	--ochre: #d39a45;
-	--ochre-soft: #3a3120;
-	--ink: #0d100e;
-	--shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
-	color-scheme: dark;
-}
-
 *,
 *::before,
 *::after {
 	box-sizing: border-box;
 }
 
+html {
+	transition: background-color 0.3s ease;
+}
 html,
 body {
 	margin: 0;
 	height: 100%;
 	background: var(--paper);
+	background-image: var(--paper-pattern, none);
+	background-size: var(--paper-pattern-size, auto);
 	color: var(--text);
 	font-family: var(--font);
 	font-size: 15px;
@@ -71,9 +63,9 @@ body {
 
 h1 {
 	font-family: var(--serif);
-	font-weight: 600;
-	font-size: 34px;
-	letter-spacing: -0.02em;
+	font-weight: var(--heading-weight);
+	font-size: clamp(26px, 7.4vw, 34px);
+	letter-spacing: var(--heading-tracking);
 }
 
 h1,
@@ -102,12 +94,13 @@ select {
 	gap: 8px;
 	min-height: 44px;
 	padding: 0 18px;
-	border-radius: 10px;
+	border-radius: var(--radius-sm);
 	border: 1px solid var(--line);
 	background: var(--surface);
 	font-weight: 600;
 	cursor: pointer;
 	text-decoration: none;
+	white-space: nowrap;
 	transition: transform 0.08s ease;
 }
 .btn:active {
@@ -120,7 +113,7 @@ select {
 .btn.primary {
 	background: var(--forest);
 	border-color: var(--forest);
-	color: #fff;
+	color: var(--on-primary);
 }
 .btn.dark {
 	background: var(--text);
@@ -158,7 +151,7 @@ select {
 .field input {
 	min-height: 44px;
 	padding: 0 12px;
-	border-radius: 10px;
+	border-radius: var(--radius-sm);
 	border: 1px solid var(--line);
 	background: var(--surface);
 	font-size: 16px; /* ≥16px stops iOS auto-zoom on focus */

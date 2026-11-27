@@ -3,6 +3,7 @@
  * Phase 0: stored in this browser. Phase 1: synced to the Supabase `profiles` table on sign-in.
  */
 import { effectivePlan, type PlanId } from '#lib/config/plans.ts';
+import { theme, isThemeChoice, type ThemeChoice } from './theme.svelte.ts';
 
 /**
  * Roles the app can show. `isAdmin` comes from the server (profiles.is_admin) and can't be set from the browser.
@@ -46,11 +47,42 @@ const DEFAULTS: Profile = {
 };
 export const NIGHT_SPEED_MIN = 1;
 export const NIGHT_SPEED_MAX = 5;
+
+/** Personal settings that sync to the account (profiles.settings) so they follow the user across devices. */
+const SETTING_KEYS = ['bodyHeightCm', 'areaUnit', 'clock', 'walkSpeed', 'lookSensitivity', 'showSunMarker', 'nightSpeed'] as const;
+type SettingKey = (typeof SETTING_KEYS)[number];
+export type Settings = Pick<Profile, SettingKey> & { theme: ThemeChoice };
+
+const clamp = (v: unknown, lo: number, hi: number) => {
+	const n = Number(v);
+	return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : undefined;
+};
+/** Validate settings read from the server / storage: unknown keys dropped, numbers clamped, enums checked. */
+export function sanitizeSettings(raw: unknown): Partial<Settings> {
+	if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+	const r = raw as Record<string, unknown>;
+	const out: Partial<Settings> = {};
+	const h = clamp(r.bodyHeightCm, 100, 230);
+	if (h !== undefined) out.bodyHeightCm = Math.round(h);
+	if (r.areaUnit === 'sqft' || r.areaUnit === 'sqm') out.areaUnit = r.areaUnit;
+	if (r.clock === '12h' || r.clock === '24h') out.clock = r.clock;
+	const ws = clamp(r.walkSpeed, 0.5, 3);
+	if (ws !== undefined) out.walkSpeed = ws;
+	const ls = clamp(r.lookSensitivity, 0.3, 3);
+	if (ls !== undefined) out.lookSensitivity = ls;
+	if (typeof r.showSunMarker === 'boolean') out.showSunMarker = r.showSunMarker;
+	const ns = clamp(r.nightSpeed, NIGHT_SPEED_MIN, NIGHT_SPEED_MAX);
+	if (ns !== undefined) out.nightSpeed = ns;
+	if (isThemeChoice(r.theme)) out.theme = r.theme;
+	return out;
+}
 const VIEW_KEY = 'rea.viewAs';
 
 class ProfileStore {
 	data = $state<Profile>({ ...DEFAULTS });
 	loaded = $state(false);
+	/** Called after a synced setting changes (auth uses it to save to the account). */
+	onSettingsChange: (() => void) | null = null;
 	/** Admin-only preview role (null = see the app as yourself). */
 	viewAs = $state<RoleView | null>(null);
 
@@ -92,13 +124,27 @@ class ProfileStore {
 		return this.data.isAdmin ? 'pro' : effectivePlan(this.data.plan);
 	}
 
-	update(patch: Partial<Profile>) {
+	update(patch: Partial<Profile>, fromCloud = false) {
 		this.data = { ...this.data, ...patch };
 		try {
 			localStorage.setItem(KEY, JSON.stringify(this.data));
 		} catch {
 			/* ignore */
 		}
+		if (!fromCloud && Object.keys(patch).some((k) => (SETTING_KEYS as readonly string[]).includes(k))) this.onSettingsChange?.();
+	}
+
+	/** Current synced settings (incl. theme). */
+	get settings(): Settings {
+		const s = Object.fromEntries(SETTING_KEYS.map((k) => [k, this.data[k]])) as Pick<Profile, SettingKey>;
+		return { ...s, theme: theme.choice };
+	}
+
+	/** Apply settings loaded from the account (already sanitised) without echoing them back. */
+	applySettings(s: Partial<Settings>) {
+		const { theme: t, ...rest } = s;
+		if (Object.keys(rest).length) this.update(rest, true);
+		if (t) theme.set(t, true);
 	}
 
 	get firstName() {

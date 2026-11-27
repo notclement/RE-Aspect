@@ -365,7 +365,7 @@
 		user-select: none;
 		contain: strict;
 	}
-	:global([data-theme='dark']) .stage {
+	:global([data-mode='dark']) .stage {
 		--floor: #cbbfa6;
 		--floor-line: #bcae93;
 		--balcony: #4a4a44;

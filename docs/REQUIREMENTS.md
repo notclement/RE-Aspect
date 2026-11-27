@@ -30,11 +30,14 @@
 - Very clean; everything secondary is tucked behind tabs.
 - The **time slider is always visible** in Sun View, 3D and Walkthrough.
 - **Auto-play** runs through the full day in ~25 s, with the unit going dark → light as time passes. Night plays faster (Settings → Sun view, 1–5×, default **2.5×**), eased across sunrise/sunset.
+- Sun timeline has an **ⓘ Sun info** button opening a sheet (bottom sheet on phones) with the full sun position, daylight length, location and data sources; the old Sun info panel under the plan is gone. On phones the timeline is compact (time + small arc + icon Auto sun button).
 - The Sun timeline card includes a **sun position** panel: big time + "Morning/Afternoon sunlight", the day's sun-path arc (sunrise → sunset) with the sun marked, altitude, azimuth, rise/set.
-- **Account menu on the avatar** (top right): Profile, Settings, Sign out. The ☰ menu holds only Projects (+ signed-in name, Sign out).
+- **Account menu on the avatar** (top right): name, email, current role, Profile, Settings, Sign out; admins also get **View the app as** (Free / Pro / Agency member / Agency Lead / Admin). Settings has no profile card. The ☰ menu holds only Projects (+ signed-in name, Sign out).
+- Projects page counts the open projects (demos included) and hides "Set up your first project" when any exist.
 - Project cards show a **thumbnail of the actual plan** with today's sunniest-hour light.
 - Display name is asked only once (first sign-in with no name); returning sign-ins go straight to Projects.
-- **Light and dark mode**, remembered in the browser.
+- **Themes** (Settings → Theme), each with its own colours, corner shapes and type: Match device, Basic light, Basic dark, Japandi & Wabi-Sabi, Scandinavian, Modern Contemporary, Industrial (dark), Eclectic & Peranakan, Resort / Tropical. Defined in `src/themes.css` + `src/lib/config/themes.ts`.
+- **Settings sync to the account** (`profiles.settings` jsonb, migration 0002): theme, units, clock, sun marker, night speed, walkthrough settings follow the user to any device. Values are validated/clamped on read.
 - Hidden **"Sun Info"** tab for technical data (azimuth, altitude, …), showing live data only when opened. The main screen focuses on which walls get sun and how the sun falls on furniture.
 - Settings explains **Add to Home Screen**: one-tap install on Android/desktop, a short guide on iPhone (Share → Add to Home Screen).
 - Developer credit area with Clement's name and LinkedIn.

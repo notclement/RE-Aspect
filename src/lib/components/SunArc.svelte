@@ -15,7 +15,8 @@
 		sunset,
 		altitude,
 		azimuth,
-		fmt
+		fmt,
+		full = false
 	}: {
 		date: string;
 		minutes: number;
@@ -26,6 +27,8 @@
 		altitude: number;
 		azimuth: number;
 		fmt: (m: number) => string;
+		/** Always show every detail (used in the Sun info sheet); otherwise phones get a compact version. */
+		full?: boolean;
 	} = $props();
 
 	const W = 300;
@@ -65,7 +68,7 @@
 	});
 </script>
 
-<div class="sp" class:night={!up}>
+<div class="sp" class:night={!up} class:full>
 	<div class="now">
 		<span class="bubble"><Icon name={up ? 'sun' : 'moon'} size={24} /></span>
 		<div>
@@ -214,18 +217,46 @@
 	.rs strong {
 		color: var(--text);
 	}
+	.full {
+		grid-template-columns: 1fr;
+		grid-template-areas: 'now' 'mid' 'stats';
+		border-bottom: 0;
+		margin-bottom: 0;
+	}
+	.full .mid {
+		max-width: none;
+	}
+	.full .stats {
+		margin-top: 8px;
+		padding-top: 10px;
+		border-top: 1px solid var(--line);
+	}
 	@media (max-width: 720px) {
-		.sp {
-			grid-template-columns: 1fr;
-			grid-template-areas: 'now' 'mid' 'stats';
+		.sp:not(.full) {
+			grid-template-columns: 1fr minmax(0, 150px);
+			grid-template-areas: 'now mid';
+			gap: 10px;
+			padding-bottom: 8px;
+			margin-bottom: 8px;
 		}
-		.stats {
-			margin-top: 8px;
-			padding-top: 10px;
-			border-top: 1px solid var(--line);
+		.sp:not(.full) .stats,
+		.sp:not(.full) .rs {
+			display: none;
 		}
-		.stats div {
-			flex: 1;
+		.sp:not(.full) .bubble {
+			width: 36px;
+			height: 36px;
+		}
+		.sp:not(.full) .time {
+			font-size: 22px;
+		}
+		.sp:not(.full) .lbl {
+			font-size: 12px;
+			line-height: 1.25;
+		}
+		.sp:not(.full) .now {
+			gap: 10px;
+			min-width: 0;
 		}
 	}
 </style>

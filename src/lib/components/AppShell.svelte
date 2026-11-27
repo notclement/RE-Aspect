@@ -9,7 +9,7 @@
 	import Icon, { type IconName } from './Icon.svelte';
 	import { auth } from '#lib/stores/auth.svelte.ts';
 	import { nav } from '#lib/stores/nav.svelte.ts';
-	import { profile, ROLE_LABELS } from '#lib/stores/profile.svelte.ts';
+	import { profile, ROLE_LABELS, type RoleView } from '#lib/stores/profile.svelte.ts';
 	import { BRAND } from '#lib/config/brand.ts';
 
 	let { children }: { children: Snippet } = $props();
@@ -32,6 +32,7 @@
 	];
 	// Account menu (tap the avatar): Profile, Settings, Sign out.
 	let acct = $state(false);
+	const roleList = Object.entries(ROLE_LABELS) as [RoleView, string][];
 	const acctLinks: { href: string; label: string; icon: IconName }[] = [
 		{ href: '/profile', label: 'Profile', icon: 'user' },
 		{ href: '/settings', label: 'Settings', icon: 'gear' }
@@ -66,7 +67,22 @@
 				<div class="who">
 					<strong>{profile.data.name || 'You'}</strong>
 					{#if auth.email}<span class="muted">{auth.email}</span>{/if}
+					<span class="rolebadge">{ROLE_LABELS[profile.role]}{#if profile.viewAs} · preview{/if}</span>
 				</div>
+				{#if profile.data.isAdmin}
+					<div class="viewas-menu">
+						<span class="muted">View the app as</span>
+						<div class="chips">
+							{#each roleList as [id, label] (id)}
+								<button
+									class:on={profile.role === id}
+									aria-pressed={profile.role === id}
+									onclick={() => profile.setViewAs(id === 'admin' ? null : id)}>{label}</button
+								>
+							{/each}
+						</div>
+					</div>
+				{/if}
 				{#each acctLinks as l (l.href)}
 					<a role="menuitem" href={l.href} class:on={page.url.pathname === l.href}><Icon name={l.icon} />{l.label}</a>
 				{/each}
@@ -188,7 +204,7 @@
 		right: 0;
 		top: calc(100% + 8px);
 		z-index: 21;
-		width: 230px;
+		width: 260px;
 		background: var(--surface);
 		border: 1px solid var(--line);
 		border-radius: 14px;
@@ -220,8 +236,43 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 	}
+	.rolebadge {
+		align-self: flex-start;
+		margin-top: 4px;
+		font-size: 11px !important;
+		font-weight: 700;
+		padding: 2px 8px;
+		border-radius: 6px;
+		background: var(--ochre-soft);
+		color: var(--ochre);
+	}
+	.viewas-menu {
+		padding: 6px 8px 10px;
+		border-bottom: 1px solid var(--line);
+		margin-bottom: 4px;
+		font-size: 12px;
+	}
+	.chips {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 6px;
+		margin-top: 6px;
+	}
+	.menu .chips button {
+		min-height: 44px;
+		padding: 0 12px;
+		border-radius: 22px;
+		border: 1px solid var(--line);
+		font-size: 12px;
+		font-weight: 600;
+	}
+	.menu .chips button.on {
+		background: var(--forest);
+		border-color: var(--forest);
+		color: var(--on-primary);
+	}
 	.menu a,
-	.menu button {
+	.menu > button {
 		display: flex;
 		align-items: center;
 		gap: 12px;
@@ -238,7 +289,7 @@
 		text-align: left;
 	}
 	.menu a:hover,
-	.menu button:hover,
+	.menu > button:hover,
 	.menu a.on {
 		background: var(--surface-2);
 	}

@@ -8,6 +8,7 @@
 	import Icon from '#lib/components/Icon.svelte';
 	import PlanView from '#lib/components/PlanView.svelte';
 	import SunTimeline from '#lib/components/SunTimeline.svelte';
+	import SunInfoSheet from '#lib/components/SunInfoSheet.svelte';
 	import Collapse from '#lib/components/Collapse.svelte';
 	import { sampleById } from '#lib/sample-unit.ts';
 	import { projectDetails, saveProjectDetails, type ProjectDetails } from '#lib/stores/projects.svelte.ts';
@@ -123,8 +124,11 @@
 		planView?.zoomBy(f);
 		zoomPct = Math.round((planView?.getScale() ?? 1) * 100);
 	}
+	let infoOpen = $state(false);
+	const fmtTime = (m: number) => fmtMin(m);
 	function fmtMin(m: number | null) {
 		if (m === null) return '—';
+		m = ((Math.round(m) % 1440) + 1440) % 1440;
 		const h = Math.floor(m / 60);
 		const mm = String(m % 60).padStart(2, '0');
 		return profile.data.clock === '24h' ? `${String(h).padStart(2, '0')}:${mm}` : `${((h + 11) % 12) + 1}:${mm} ${h < 12 ? 'AM' : 'PM'}`;
@@ -194,7 +198,8 @@
 
 <p class="summary">{summary}</p>
 
-<SunTimeline bind:minutes={vs.minutes} bind:date={vs.date} sunrise={times.sunrise} sunset={times.sunset} lat={unit.lat} lon={unit.lon} {sun} />
+<SunTimeline bind:minutes={vs.minutes} bind:date={vs.date} sunrise={times.sunrise} sunset={times.sunset} lat={unit.lat} lon={unit.lon} {sun} oninfo={() => (infoOpen = true)} />
+<SunInfoSheet bind:open={infoOpen} {unit} {sun} date={vs.date} minutes={vs.minutes} sunrise={times.sunrise} sunset={times.sunset} fmt={fmtTime} />
 
 <div class="details">
 	<Collapse title="Project details" bind:open={detailsOpen}>
@@ -244,26 +249,6 @@
 			</dl>
 			<button class="btn editbtn" onclick={startEdit}>Edit details</button>
 		{/if}
-	</Collapse>
-	<Collapse title="Sun info">
-		<dl>
-			<dt>Azimuth</dt><dd>{sun.azimuth.toFixed(1)}° ({compass(sun.azimuth)})</dd>
-			<dt>Altitude</dt><dd>{sun.altitude.toFixed(1)}°</dd>
-			<dt>Location</dt><dd>{unit.lat.toFixed(4)}, {unit.lon.toFixed(4)}</dd>
-			<dt>Plan rotation</dt><dd>{unit.bearing}° from true north</dd>
-		</dl>
-		<dl class="src">
-			<dt>Data source</dt><dd>Calculated on this device — no internet or outside data needed</dd>
-			<dt>Method</dt><dd>Simplified NOAA solar-position equations (from Jean Meeus, <em>Astronomical Algorithms</em>), accurate to well under 1°</dd>
-			<dt>Sunrise / sunset</dt><dd>Sun centre 0.833° below the horizon (standard refraction allowance)</dd>
-			<dt>Time zone</dt><dd>Singapore, UTC+8 (no daylight saving)</dd>
-		</dl>
-		<p class="muted note">
-			Check against:
-			<a href="https://gml.noaa.gov/grad/solcalc/" target="_blank" rel="noopener noreferrer">NOAA Solar Calculator</a> ·
-			<a href="https://www.timeanddate.com/sun/singapore/singapore" target="_blank" rel="noopener noreferrer">timeanddate.com — Singapore</a>
-		</p>
-		<p class="muted note">Calculated estimates for guidance only.</p>
 	</Collapse>
 </div>
 
@@ -393,14 +378,6 @@
 	dd {
 		margin: 0;
 	}
-	.src {
-		margin-top: 14px;
-		padding-top: 12px;
-		border-top: 1px dashed var(--line);
-	}
-	.note a {
-		color: var(--forest);
-	}
 	.pre {
 		white-space: pre-wrap;
 	}
@@ -419,9 +396,5 @@
 		display: flex;
 		justify-content: flex-end;
 		gap: 8px;
-	}
-	.note {
-		font-size: 12px;
-		margin: 10px 0 0;
 	}
 </style>

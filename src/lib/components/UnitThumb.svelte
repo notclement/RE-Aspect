@@ -88,7 +88,7 @@
 		width: 100%;
 		height: 100%;
 	}
-	:global([data-theme='dark']) svg {
+	:global([data-mode='dark']) svg {
 		--floor: #cbbfa6;
 		--balcony: #4a4a44;
 	}

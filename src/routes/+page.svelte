@@ -9,7 +9,8 @@
 
 	$effect(() => nav.set({ label: 'Projects' }));
 	const plan = $derived(PLANS[profile.planId]);
-	const myUnits: unknown[] = []; // Phase 1: loaded from Supabase / local cache
+	// Open projects. Phase 1 adds the user's own projects (Supabase); for now the demo projects.
+	const projects = SAMPLE_UNITS;
 </script>
 
 <svelte:head><title>Projects · RE:Aspect</title></svelte:head>
@@ -19,9 +20,9 @@
 	<h1>Your projects</h1>
 	<a class="btn primary" href="/anchor"><Icon name="plus" size={18} /> New project</a>
 </div>
-<p class="muted meta">{myUnits.length} of {plan.includedUnits ?? '—'} projects · <span class="tag pro">{plan.label}</span></p>
+<p class="muted meta">{projects.length} of {plan.includedUnits ?? '—'} projects · <span class="tag pro">{plan.label}</span></p>
 
-{#each SAMPLE_UNITS as u (u.id)}
+{#each projects as u (u.id)}
 	{@const d = projectDetails(u.id)}
 	<a class="unit card" href="/unit?id={u.id}">
 		<div class="thumb"><UnitThumb unit={u} /></div>
@@ -35,7 +36,7 @@
 	</a>
 {/each}
 
-{#if myUnits.length === 0}
+{#if projects.length === 0}
 	<section class="empty">
 		<h2>Set up your first project</h2>
 		<p class="muted">

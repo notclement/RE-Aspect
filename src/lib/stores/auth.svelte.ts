@@ -1,5 +1,6 @@
 import { getSupabase, supabaseConfigured } from '#lib/supabase.ts';
-import { profile } from './profile.svelte';
+import { profile, sanitizeSettings } from './profile.svelte';
+import { theme } from './theme.svelte.ts';
 
 export type AuthStatus = 'loading' | 'signed-in' | 'signed-out' | 'preview';
 
@@ -9,6 +10,8 @@ class Auth {
 	error = $state<string | null>(null);
 
 	async init() {
+		// Any settings change (incl. theme) is saved to the account, debounced.
+		profile.onSettingsChange = theme.onChange = () => this.queueSettingsSave();
 		if (!supabaseConfigured) {
 			this.status = 'preview';
 			return;
@@ -55,7 +58,7 @@ class Auth {
 			const sb = await getSupabase();
 			const { data, error } = await sb
 				.from('profiles')
-				.select('name, plan, is_admin')
+				.select('name, plan, is_admin, settings')
 				.eq('id', this.userId)
 				.maybeSingle();
 			if (error) throw error;
@@ -63,9 +66,31 @@ class Auth {
 				const plan = data.plan === 'pro' || data.plan === 'agency' ? data.plan : 'free';
 				profile.update({ plan, isAdmin: data.is_admin === true, ...(data.name ? { name: data.name } : {}) });
 				if (!data.is_admin) profile.setViewAs(null);
+				// Settings follow the account: use the saved ones; first time on this account, upload this device's.
+				const saved = sanitizeSettings(data.settings);
+				if (Object.keys(saved).length) profile.applySettings(saved);
+				else this.queueSettingsSave(0);
 			}
 		} catch (e) {
 			console.warn('[auth] could not load profile', e);
+		}
+	}
+
+	private saveTimer: ReturnType<typeof setTimeout> | undefined;
+	/** Save the current settings to the account shortly after the last change. */
+	queueSettingsSave(delay = 800) {
+		if (!this.userId) return;
+		clearTimeout(this.saveTimer);
+		this.saveTimer = setTimeout(() => void this.saveSettings(), delay);
+	}
+	private async saveSettings() {
+		if (!this.userId) return;
+		try {
+			const sb = await getSupabase();
+			const { error } = await sb.from('profiles').update({ settings: profile.settings }).eq('id', this.userId);
+			if (error) throw error;
+		} catch (e) {
+			console.warn('[auth] could not save settings', e);
 		}
 	}
 

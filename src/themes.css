@@ -1,0 +1,206 @@
+/*
+ * RE:Aspect themes. Each sets colours, corner shapes and type so it has its own feel.
+ * Selectors are attribute-only (not :root) so the Settings picker can preview a theme inside a card.
+ * Light/dark details elsewhere key off <html data-mode> (set from src/lib/config/themes.ts).
+ */
+
+/* Shared defaults, so every theme (and each preview card in Settings) is complete on its own. */
+:root[data-theme],
+[data-theme] {
+	--on-primary: #ffffff;
+	--radius: 18px;
+	--radius-sm: 10px;
+	--shadow: 0 4px 16px rgba(36, 48, 42, 0.07);
+	--font: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+	--serif: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif;
+	--heading-weight: 600;
+	--heading-tracking: -0.02em;
+	--paper-pattern: none;
+	--paper-pattern-size: auto;
+}
+
+/* Basic light */
+:root[data-theme='light'],
+[data-theme='light'] {
+	--paper: #f7f6f1;
+	--surface: #ffffff;
+	--surface-2: #eeede6;
+	--canvas: #f0efe8;
+	--line: #e2e1d8;
+	--text: #24302a;
+	--muted: #7b8077;
+	--forest: #2f4a3b;
+	--forest-2: #3e5d4b;
+	--ochre: #b07a2a;
+	--ochre-soft: #f6ead2;
+	--ink: #1f2a24;
+	color-scheme: light;
+}
+
+/* Basic dark */
+:root[data-theme='dark'],
+[data-theme='dark'] {
+	--paper: #141815;
+	--surface: #1c211d;
+	--surface-2: #262c27;
+	--canvas: #1a1f1b;
+	--line: #303731;
+	--text: #ecebe4;
+	--muted: #9aa094;
+	--forest: #5f8a70;
+	--forest-2: #6f9a80;
+	--ochre: #d39a45;
+	--ochre-soft: #3a3120;
+	--ink: #0d100e;
+	--shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+	color-scheme: dark;
+}
+
+/* Japandi & Wabi-Sabi — washi paper, sumi charcoal, raw clay; soft corners, quiet mincho headings */
+:root[data-theme='japandi'],
+[data-theme='japandi'] {
+	--paper: #ece6dc;
+	--surface: #f6f2eb;
+	--surface-2: #ddd4c6;
+	--canvas: #e6dfd3;
+	--line: #d2c8b8;
+	--text: #2b2724;
+	--muted: #847a6e;
+	--forest: #3b3631;
+	--forest-2: #57504a;
+	--ochre: #9a6b47;
+	--ochre-soft: #eadccb;
+	--on-primary: #f6f2eb;
+	--radius: 8px;
+	--radius-sm: 4px;
+	--shadow: none;
+	--serif: 'Hiragino Mincho ProN', 'Yu Mincho', 'Shippori Mincho', 'Songti SC', Georgia, serif;
+	--heading-weight: 500;
+	--heading-tracking: 0.01em;
+	color-scheme: light;
+}
+
+/* Scandinavian — airy whites, fjord blue, birch; round and soft, clean sans headings */
+:root[data-theme='scandi'],
+[data-theme='scandi'] {
+	--paper: #f4f7f8;
+	--surface: #ffffff;
+	--surface-2: #e6ecef;
+	--canvas: #edf1f3;
+	--line: #dbe2e6;
+	--text: #1f2b33;
+	--muted: #71808a;
+	--forest: #3d5a6c;
+	--forest-2: #4f6f82;
+	--ochre: #c98a4b;
+	--ochre-soft: #f6e9d8;
+	--radius: 24px;
+	--radius-sm: 14px;
+	--shadow: 0 6px 22px rgba(31, 43, 51, 0.06);
+	--font: 'Avenir Next', 'Avenir', 'Segoe UI', 'Helvetica Neue', system-ui, sans-serif;
+	--serif: 'Avenir Next', 'Avenir', 'Segoe UI', 'Helvetica Neue', system-ui, sans-serif;
+	--heading-weight: 600;
+	--heading-tracking: -0.01em;
+	color-scheme: light;
+}
+
+/* Modern Contemporary — crisp black & white, brass accent, sharp corners, bold grotesk */
+:root[data-theme='modern'],
+[data-theme='modern'] {
+	--paper: #fafafa;
+	--surface: #ffffff;
+	--surface-2: #ececec;
+	--canvas: #f1f1f1;
+	--line: #dedede;
+	--text: #111111;
+	--muted: #6b6b6b;
+	--forest: #111111;
+	--forest-2: #333333;
+	--ochre: #b8913f;
+	--ochre-soft: #f3ead6;
+	--radius: 4px;
+	--radius-sm: 2px;
+	--shadow: 0 1px 0 rgba(0, 0, 0, 0.06);
+	--font: 'Helvetica Neue', Helvetica, Arial, system-ui, sans-serif;
+	--serif: 'Helvetica Neue', Helvetica, Arial, system-ui, sans-serif;
+	--heading-weight: 700;
+	--heading-tracking: -0.035em;
+	color-scheme: light;
+}
+
+/* Industrial — concrete, blackened steel, copper and Edison-bulb amber; tight corners, condensed type */
+:root[data-theme='industrial'],
+[data-theme='industrial'] {
+	--paper: #1b1c1d;
+	--surface: #242628;
+	--surface-2: #2f3235;
+	--canvas: #202224;
+	--line: #3a3e42;
+	--text: #e7e5e1;
+	--muted: #9a9a96;
+	--forest: #c8693a;
+	--forest-2: #d87b4c;
+	--ochre: #e0a458;
+	--ochre-soft: #3b2f22;
+	--ink: #0e0f10;
+	--radius: 4px;
+	--radius-sm: 3px;
+	--shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+	--font: 'DIN Alternate', 'Bahnschrift', 'Roboto Condensed', 'Arial Narrow', system-ui, sans-serif;
+	--serif: 'DIN Condensed', 'Bahnschrift', 'Roboto Condensed', 'Arial Narrow', system-ui, sans-serif;
+	--heading-weight: 700;
+	--heading-tracking: 0.02em;
+	color-scheme: dark;
+}
+
+/* Eclectic, Retro & Peranakan — cream, jade, Nyonya pink, gold; generous curves, high-contrast didone headings */
+:root[data-theme='peranakan'],
+[data-theme='peranakan'] {
+	--paper: #fbf0ec;
+	--surface: #fffaf6;
+	--surface-2: #f6d3db;
+	--canvas: #f8e4e4;
+	--line: #eec7cd;
+	--text: #2a2233;
+	--muted: #8a6f78;
+	--forest: #0f7f76;
+	--forest-2: #179188;
+	--ochre: #c38a22;
+	--ochre-soft: #f8e3bd;
+	--radius: 16px;
+	--radius-sm: 10px;
+	--shadow: 0 4px 0 rgba(15, 127, 118, 0.08);
+	--serif: 'Didot', 'Bodoni 72', 'Bodoni MT', 'Playfair Display', Georgia, serif;
+	--heading-weight: 700;
+	--heading-tracking: -0.01em;
+	/* faint Peranakan tile motif */
+	--paper-pattern: radial-gradient(circle at 50% 50%, rgba(15, 127, 118, 0.07) 0 3px, transparent 3.5px),
+		linear-gradient(45deg, transparent 46%, rgba(214, 110, 140, 0.08) 46% 54%, transparent 54%),
+		linear-gradient(-45deg, transparent 46%, rgba(214, 110, 140, 0.08) 46% 54%, transparent 54%);
+	--paper-pattern-size: 28px 28px;
+	color-scheme: light;
+}
+
+/* Resort / Tropical — sand, palm green, sunset coral; pebble-round corners, relaxed rounded type */
+:root[data-theme='tropical'],
+[data-theme='tropical'] {
+	--paper: #f6efdf;
+	--surface: #fffcf4;
+	--surface-2: #e6efe9;
+	--canvas: #eef1e6;
+	--line: #e0d6bd;
+	--text: #173a3d;
+	--muted: #6a7f7c;
+	--forest: #0e7c86;
+	--forest-2: #13939e;
+	--ochre: #e2703f;
+	--ochre-soft: #fde0cf;
+	--radius: 26px;
+	--radius-sm: 16px;
+	--shadow: 0 8px 24px rgba(14, 124, 134, 0.09);
+	--font: 'Avenir Next Rounded', 'Nunito', 'Trebuchet MS', system-ui, sans-serif;
+	--serif: 'Baskerville', 'Libre Baskerville', Georgia, serif;
+	--heading-weight: 600;
+	--heading-tracking: -0.01em;
+	color-scheme: light;
+}

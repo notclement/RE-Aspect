@@ -19,15 +19,19 @@
 		<meta name="apple-mobile-web-app-status-bar-style" content="default" />
 		<meta name="apple-mobile-web-app-title" content="RE:Aspect" />
 		<script>
-			// Apply the saved theme before first paint so there is no light/dark flash.
+			// Apply the saved theme before first paint so there is no colour flash (ids mirror src/lib/config/themes.ts).
 			(function () {
+				var el = document.documentElement;
 				try {
+					var ids = ['light', 'dark', 'japandi', 'scandi', 'modern', 'industrial', 'peranakan', 'tropical'];
+					var darkIds = { dark: 1, industrial: 1 };
 					var t = localStorage.getItem('rea.theme') || 'system';
-					var dark =
-						t === 'dark' || (t === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
-					document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+					if (ids.indexOf(t) < 0) t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+					el.dataset.theme = t;
+					el.dataset.mode = darkIds[t] ? 'dark' : 'light';
 				} catch (e) {
-					document.documentElement.dataset.theme = 'light';
+					el.dataset.theme = 'light';
+					el.dataset.mode = 'light';
 				}
 			})();
 		</script>

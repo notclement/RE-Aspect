@@ -15,7 +15,8 @@
 		sunset = null,
 		lat = null,
 		lon = null,
-		sun = null
+		sun = null,
+		oninfo
 	}: {
 		minutes?: number;
 		date?: string;
@@ -25,7 +26,9 @@
 		lat?: number | null;
 		lon?: number | null;
 		sun?: { altitude: number; azimuth: number } | null;
+		oninfo?: () => void;
 	} = $props();
+	const withArc = $derived(!!sun && lat !== null && lon !== null);
 
 	/** Night passes faster than daytime (Settings → Sun view, default 2.5×); the speed eases across sunrise/sunset so there's no jolt. */
 	function speedAt(m: number) {
@@ -96,14 +99,17 @@
 				onclick={() => dateInput.showPicker?.()}
 			/>
 		</label>
+		{#if oninfo}
+			<button class="info" onclick={oninfo} aria-label="Sun info"><Icon name="info" size={20} /></button>
+		{/if}
 	</div>
-	{#if sun && lat !== null && lon !== null}
+	{#if withArc && sun && lat !== null && lon !== null}
 		<SunArc {date} {minutes} {lat} {lon} {sunrise} {sunset} altitude={sun.altitude} azimuth={sun.azimuth} {fmt} />
 	{/if}
 	<div class="row">
-		<button class="auto" class:on={playing} onclick={toggle} aria-pressed={playing}>
+		<button class="auto" class:on={playing} onclick={toggle} aria-pressed={playing} aria-label={playing ? 'Pause auto sun' : 'Auto sun'}>
 			<Icon name={playing ? 'pause' : 'playo'} size={16} />
-			{playing ? 'Pause' : 'Auto sun'}
+			<span class="autolbl">{playing ? 'Pause' : 'Auto sun'}</span>
 		</button>
 		<div class="track">
 			<input
@@ -119,7 +125,7 @@
 			/>
 			<div class="ticks">{#each ticks as t (t)}<span>{fmt(t).replace(':00', '')}</span>{/each}</div>
 		</div>
-		<span class="pill">{fmt(minutes)}</span>
+		{#if !withArc}<span class="pill">{fmt(minutes)}</span>{/if}
 	</div>
 </section>
 
@@ -177,7 +183,7 @@
 		border: 0;
 		border-radius: 12px;
 		background: var(--forest);
-		color: #fff;
+		color: var(--on-primary);
 		font-weight: 600;
 		white-space: nowrap;
 		cursor: pointer;
@@ -237,16 +243,48 @@
 		text-align: center;
 		white-space: nowrap;
 	}
+	.info {
+		width: 44px;
+		height: 44px;
+		display: grid;
+		place-items: center;
+		border: 1px solid var(--line);
+		border-radius: var(--radius-sm);
+		background: var(--surface);
+		color: var(--text);
+		cursor: pointer;
+	}
 	@media (max-width: 560px) {
+		.tl {
+			padding: 10px 12px 8px;
+		}
+		.head {
+			gap: 8px;
+			margin-bottom: 8px;
+		}
+		.head strong {
+			font-size: 15px;
+		}
+		.date {
+			min-height: 44px;
+			padding: 0 10px;
+			font-size: 14px;
+		}
 		.row {
-			flex-wrap: wrap;
+			gap: 10px;
 		}
-		.track {
-			order: 3;
-			flex-basis: 100%;
+		.auto {
+			min-height: 44px;
+			padding: 0 12px;
 		}
-		.pill {
-			margin-left: auto;
+		.autolbl {
+			display: none;
+		}
+		input[type='range'] {
+			margin: 8px 0 4px;
+		}
+		.ticks {
+			font-size: 10px;
 		}
 	}
 </style>
