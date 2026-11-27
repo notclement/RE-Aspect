@@ -3,7 +3,7 @@
 	 * Small static top-down drawing of a project's actual plan, for the projects list.
 	 * Shows today's sunlight at the hour when the most sun comes in (so every card shows some light).
 	 */
-	import type { Unit } from '#lib/sample-unit.ts';
+	import { itemTransform, type Unit } from '#lib/sample-unit.ts';
 	import { sunPosition, localDate, todaySG } from '#lib/sun.ts';
 	import { sunPatches, type Patch } from '#lib/light.ts';
 
@@ -68,7 +68,7 @@
 		{#if i.kind === 'plant'}
 			<circle cx={i.x + i.w / 2} cy={i.y + i.d / 2} r={i.w / 2} fill={i.color} />
 		{:else if i.kind !== 'rug'}
-			<rect x={i.x} y={i.y} width={i.w} height={i.d} rx={i.r} fill={i.color} />
+			<rect x={i.x} y={i.y} width={i.w} height={i.d} rx={i.r} fill={i.color} transform={itemTransform(i)} />
 		{/if}
 	{/each}
 	{#each unit.walls as w, k (k)}
@@ -76,6 +76,9 @@
 	{/each}
 	{#each unit.windows as o, k (k)}
 		<line x1={o.a[0]} y1={o.a[1]} x2={o.b[0]} y2={o.b[1]} stroke="var(--glass)" stroke-width="18" />
+	{/each}
+	{#each unit.doors ?? [] as d, k (k)}
+		{#if !d.glass}<line x1={d.a[0]} y1={d.a[1]} x2={d.b[0]} y2={d.b[1]} stroke="var(--floor)" stroke-width="22" />{/if}
 	{/each}
 </svg>
 

@@ -189,18 +189,28 @@
 		north = { state: 'checking', angle: 0, confidence: '', evidence: '', forPlan: pid };
 		try {
 			const floorPlan = (await shrinkPhoto(planPhoto.img.dataUrl, 1536, 0.8)).dataUrl;
+			// Every other photo (up to 14), smaller, so the AI can combine all the clues.
 			const others = await Promise.all(
-				photos.filter((p) => p.id !== pid).slice(0, 6).map(async (p) => (await shrinkPhoto(p.img.dataUrl, 1024, 0.72)).dataUrl)
+				photos.filter((p) => p.id !== pid).map(async (p) => (await shrinkPhoto(p.img.dataUrl, 900, 0.7)).dataUrl)
 			);
+			const l = level.trim() ? validateFloorLevel(level) : null;
+			const context = {
+				address: address.trim().slice(0, 120),
+				unitNo: unitNo.trim().slice(0, 12),
+				level: l && l.ok ? l.value : null,
+				propertyType,
+				lat: place?.lat ?? null,
+				lon: place?.lon ?? null
+			};
 			const sb = await getSupabase();
-			const { data, error } = await sb.functions.invoke('detect-north', { body: { floorPlan, others } });
+			const { data, error } = await sb.functions.invoke('detect-north', { body: { floorPlan, others, context } });
 			if (planId !== pid) return; // user picked another photo meanwhile
 			const d = (data ?? {}) as { found?: boolean; angle?: number; confidence?: string; evidence?: string; reason?: string };
 			if (error || !d.found || !Number.isFinite(d.angle)) {
 				north = { state: d.reason === 'no-key' || error ? 'off' : 'none', angle: 0, confidence: '', evidence: String(d.evidence ?? ''), forPlan: pid };
 				return;
 			}
-			north = { state: 'found', angle: Number(d.angle), confidence: String(d.confidence ?? 'low'), evidence: String(d.evidence ?? '').slice(0, 160), forPlan: pid };
+			north = { state: 'found', angle: Number(d.angle), confidence: String(d.confidence ?? 'low'), evidence: String(d.evidence ?? '').slice(0, 240), forPlan: pid };
 			if (!userTurned) setAngle(north.angle);
 		} catch {
 			if (planId === pid) north = { ...north, state: 'off', forPlan: pid };
@@ -402,18 +412,19 @@
 			</div>
 			{#if planPhoto}
 				{#if north.state === 'checking'}
-					<div class="ai checking"><Spinner size={16} /><span>Looking at your photos for north arrows and site plans…</span></div>
+					<div class="ai checking"><Spinner size={16} /><span>Looking at all {photos.length} photo{photos.length === 1 ? '' : 's'} to work out where north is…</span></div>
 				{:else if north.state === 'found'}
 					<div class="ai found">
 						<Icon name="check" size={18} />
 						<div>
 							<strong>{suggestionApplied ? 'Turned for you' : 'Suggested turn'}: {north.angle}° clockwise</strong>
-							<span>Based on the images provided{north.evidence ? ` — ${north.evidence}` : ''}.{north.confidence === 'low' ? ' Low confidence — please check.' : ''} Adjust if needed, or just tap Next.</span>
+							<span>Based on the {photos.length} image{photos.length === 1 ? '' : 's'} provided{north.evidence ? `: ${north.evidence}` : ''}</span>
+							<span class="conf c-{north.confidence}">{north.confidence === 'high' ? 'High confidence' : north.confidence === 'medium' ? 'Medium confidence' : 'Low confidence — please check'} · adjust if needed, or just tap Next.</span>
 						</div>
 						{#if !suggestionApplied}<button class="btn" onclick={() => setAngle(north.angle)}>Apply</button>{/if}
 					</div>
 				{:else if north.state === 'none'}
-					<div class="ai none"><Icon name="info" size={18} /><span>No north arrow or site plan found in your photos — please turn the plan yourself. Tip: a site plan or location map with a north arrow helps.</span></div>
+					<div class="ai none"><Icon name="info" size={18} /><span>The photos didn't give enough clues to work out north — please turn the plan yourself. Tip: add a site plan or location map with a north arrow.</span></div>
 				{:else}
 					<p class="muted small tip">Tip: use the north arrow on the site plan or location map.</p>
 				{/if}
@@ -666,6 +677,19 @@
 	.ai.found > :global(svg) {
 		color: var(--forest);
 		margin-top: 2px;
+	}
+	.conf {
+		font-size: 12px;
+		font-weight: 600;
+	}
+	.c-high {
+		color: #2a8a50;
+	}
+	.c-medium {
+		color: var(--ochre);
+	}
+	.c-low {
+		color: #b5483a;
 	}
 	.ai.none {
 		background: var(--ochre-soft);

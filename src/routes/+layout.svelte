@@ -8,6 +8,7 @@
 	import { theme } from '#lib/stores/theme.svelte.ts';
 	import { profile } from '#lib/stores/profile.svelte.ts';
 	import { auth } from '#lib/stores/auth.svelte.ts';
+	import { blockPageZoom } from '#lib/no-zoom.ts';
 	import type { LayoutProps } from './$types';
 
 	let { children }: LayoutProps = $props();
@@ -17,9 +18,11 @@
 	const bare = $derived(BARE.includes(page.url.pathname));
 
 	onMount(() => {
+		const unblock = blockPageZoom();
 		theme.init();
 		profile.load();
 		auth.init();
+		return unblock;
 	});
 
 	// Route guard: signed-out → /login; signed-in (or preview) without a name → /welcome.

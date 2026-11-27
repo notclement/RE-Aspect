@@ -25,6 +25,40 @@ export interface Item {
 	h: number;
 	color: string;
 	r?: number; // corner radius
+	rot?: number; // degrees clockwise around the item's centre (0 = as drawn)
+}
+/** A door in a wall. 'door' = hinged (drawn with its swing); 'glass' = full-height sliding glass (lets sun in on an outside wall). */
+export interface Door {
+	a: [number, number];
+	b: [number, number];
+	glass: boolean;
+	flip: number; // 0–3: bit 1 = hinge at b, bit 2 = swings to the other side
+}
+
+/** The four floor corners of a piece of furniture, rotation applied. */
+export function itemCorners(it: Item): [number, number][] {
+	const cx = it.x + it.w / 2;
+	const cy = it.y + it.d / 2;
+	const r = ((it.rot ?? 0) * Math.PI) / 180;
+	const c = Math.cos(r);
+	const s = Math.sin(r);
+	return ([[-it.w / 2, -it.d / 2], [it.w / 2, -it.d / 2], [it.w / 2, it.d / 2], [-it.w / 2, it.d / 2]] as [number, number][]).map(
+		([x, y]) => [cx + x * c - y * s, cy + x * s + y * c]
+	);
+}
+/** SVG transform for a rotated item (undefined when it isn't rotated). */
+export const itemTransform = (it: Item) => (it.rot ? `rotate(${it.rot} ${it.x + it.w / 2} ${it.y + it.d / 2})` : undefined);
+
+/** Geometry for drawing a hinged door: the leaf (hinge → open end) and the swing arc path. */
+export function doorGeom(d: Door): { hinge: [number, number]; leaf: [number, number]; arc: string } {
+	const [h, e] = d.flip & 1 ? [d.b, d.a] : [d.a, d.b];
+	const dx = e[0] - h[0];
+	const dy = e[1] - h[1];
+	const L = Math.hypot(dx, dy) || 1;
+	const side = d.flip & 2 ? -1 : 1;
+	const leaf: [number, number] = [h[0] - (dy / L) * L * side, h[1] + (dx / L) * L * side];
+	const cross = dx * (leaf[1] - h[1]) - dy * (leaf[0] - h[0]);
+	return { hinge: h, leaf, arc: `M${e[0]} ${e[1]} A${L} ${L} 0 0 ${cross > 0 ? 1 : 0} ${leaf[0]} ${leaf[1]}` };
 }
 export interface Unit {
 	id: string;
@@ -41,6 +75,7 @@ export interface Unit {
 	windows: Opening[];
 	rooms: { name: string; x: number; y: number }[];
 	items: Item[];
+	doors?: Door[];
 	balcony?: { x: number; y: number; w: number; d: number };
 }
 

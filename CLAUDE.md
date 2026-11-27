@@ -19,7 +19,7 @@ Full requirements: `docs/REQUIREMENTS.md` (read it before changing behaviour).
 - Every user input goes through `src/lib/validate.ts`; repeat the checks server-side.
 - Plan limits live in `src/lib/config/plans.ts` (UI mirror) and **must** be enforced server-side. `FREE_LAUNCH` gives everyone Pro for now.
 - Never commit secrets. Only *publishable* keys go into public env vars. The AI key and Supabase secret key live in Supabase secrets.
-- Touch targets ≥ 44 px, inputs ≥ 16 px font (stops iOS zoom), `touch-action: manipulation` globally.
+- Touch targets ≥ 44 px, inputs ≥ 16 px font (stops iOS zoom). **No two-finger / pinch / page zoom anywhere** (`touch-action: pan-x pan-y` globally + `src/lib/no-zoom.ts`); zoom in the app only via + / − buttons.
 - Light and dark mode via CSS variables in `src/app.css` (`[data-theme='dark']`).
 - Natural gestures only (no inverted controls). The time slider stays visible in Sun View, 3D and Walk.
 

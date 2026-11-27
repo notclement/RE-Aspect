@@ -1,6 +1,7 @@
 // RE:Aspect · detect-north
-// Looks at the floor plan and the other photos (site plan, location map, brochure pages) for clues to true north —
-// north arrows, compass roses, a site plan that shows the same unit — and suggests how far to turn the floor plan.
+// Infers true north from ALL the photos together (north arrows, the unit's position on a site plan, streets on a
+// location map vs the address, views out of the windows) plus the project details, and suggests how far to turn
+// the floor plan. Gives a best estimate with a confidence level even without an explicit arrow.
 // Photos arrive in the request body only and are never stored. Limited per user per day (ai_daily_take).
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
@@ -38,12 +39,20 @@ function firstKey(name: string): string {
 	}
 }
 
-const PROMPT = (n: number) => `Image 1 is an apartment floor plan as the user photographed it.${n ? ` Images 2–${n + 1} are other photos the user provided (they may include a site plan, block plan, location map or brochure pages).` : ''}
-Find clues to TRUE NORTH: a north arrow or compass rose (on the floor plan or any other image), or a site/block plan with a north arrow on which you can recognise this unit's shape or block, then work out the unit's orientation.
+const PROMPT = (n: number, ctx: string) => `You help orient an apartment floor plan so TRUE NORTH points up, for a sunlight simulator.
+Image 1 is the floor plan as photographed.${n ? ` Images 2–${n + 1} are ALL the other photos the user provided — any mix of site plans, block plans, location maps, brochure pages, interior photos and views out of the windows.` : ''}
+${ctx ? `Known details: ${ctx}.` : ''}
+Look at EVERY image together and combine all the clues before answering:
+- north arrows / compass roses on the floor plan, site plan, block plan or location map;
+- where this unit sits in its block on a site plan (match the unit number / block, the unit's shape, the lift core and corridor side);
+- streets, MRT stations, parks or landmarks on a location map compared with the address;
+- what is visible out of the windows in interior photos (roads, landmarks, open views) and which room/window it is from;
+- sunlight or shadows in interior photos only as weak supporting evidence.
+Even without an explicit north arrow, give your best estimate when the clues point one way, and lower the confidence accordingly.
 Answer: by how many degrees must IMAGE 1 be rotated CLOCKWISE so that true north points straight up?
 Return ONLY JSON, no prose:
-{"found": true|false, "rotate_cw_deg": <0-359>, "confidence": "high"|"medium"|"low", "evidence": "<one short sentence saying what you used, e.g. 'North arrow on the site plan; unit 125 faces the bottom of block 88B'>"}
-If there is no reliable clue, return {"found": false, "rotate_cw_deg": 0, "confidence": "low", "evidence": "<what was missing>"}.`;
+{"found": true|false, "rotate_cw_deg": <0-359>, "confidence": "high"|"medium"|"low", "evidence": "<one or two short sentences naming the clues you combined, e.g. 'Site plan north arrow + unit 125 on the south side of block 88B; window view matches the park on the location map'>"}
+Use found=false only if the images give no usable clue at all.`;
 
 function parseJson(text: string): Record<string, unknown> {
 	const s = text.indexOf('{');
@@ -53,7 +62,7 @@ function parseJson(text: string): Record<string, unknown> {
 }
 
 async function callAI(provider: string, key: string, prompt: string, images: string[]): Promise<Record<string, unknown>> {
-	const signal = AbortSignal.timeout(60_000);
+	const signal = AbortSignal.timeout(90_000);
 	if (provider === 'openai' || provider === 'deepseek') {
 		const ds = provider === 'deepseek';
 		const r = await fetch(ds ? 'https://api.deepseek.com/chat/completions' : 'https://api.openai.com/v1/chat/completions', {
@@ -140,9 +149,23 @@ Deno.serve(async (req) => {
 	}
 	const plan = typeof body.floorPlan === 'string' && body.floorPlan.length < 4_000_000 && IMG.test(body.floorPlan) ? body.floorPlan : null;
 	const others = (Array.isArray(body.others) ? body.others : [])
-		.slice(0, 6)
-		.filter((x): x is string => typeof x === 'string' && x.length < 2_000_000 && IMG.test(x));
+		.slice(0, 14)
+		.filter((x): x is string => typeof x === 'string' && x.length < 1_200_000 && IMG.test(x));
 	if (!plan) return json(req, { error: 'Bad request' }, 400);
+	// Optional project details to help match the unit on site plans / maps (cleaned, short).
+	const c = (body.context ?? {}) as Record<string, unknown>;
+	const clean = (v: unknown, n: number) => (typeof v === 'string' ? v.replace(/[<>{}\\\u0000-\u001f`]/g, '').trim().slice(0, n) : '');
+	const lat = Number(c.lat);
+	const lon = Number(c.lon);
+	const ctx = [
+		clean(c.address, 120) && `address ${clean(c.address, 120)}`,
+		clean(c.unitNo, 12) && `unit ${clean(c.unitNo, 12)}`,
+		Number.isFinite(Number(c.level)) && c.level !== null ? `floor ${Math.round(Number(c.level))}` : '',
+		clean(c.propertyType, 20) && `type ${clean(c.propertyType, 20)}`,
+		Number.isFinite(lat) && Number.isFinite(lon) && lat > 1 && lat < 1.6 ? `location ${lat.toFixed(5)}, ${lon.toFixed(5)}` : ''
+	]
+		.filter(Boolean)
+		.join('; ');
 
 	const admin = createClient(url, service);
 	const { error: le } = await admin.rpc('ai_daily_take', { p_user: u.user.id, p_fn: 'north', p_limit: DAILY_LIMIT });
@@ -153,12 +176,12 @@ Deno.serve(async (req) => {
 	if (!k?.api_key) return json(req, { found: false, reason: 'no-key' });
 
 	try {
-		const ai = await callAI(k.provider, k.api_key, PROMPT(others.length), [plan, ...others]);
+		const ai = await callAI(k.provider, k.api_key, PROMPT(others.length, ctx), [plan, ...others]);
 		const found = ai.found === true;
 		let deg = Number(ai.rotate_cw_deg);
 		deg = Number.isFinite(deg) ? ((Math.round(deg * 2) / 2) % 360 + 360) % 360 : 0;
 		const confidence = ['high', 'medium', 'low'].includes(String(ai.confidence)) ? String(ai.confidence) : 'low';
-		const evidence = typeof ai.evidence === 'string' ? ai.evidence.replace(/[<>{}\\\u0000-\u001f]/g, '').trim().slice(0, 160) : '';
+		const evidence = typeof ai.evidence === 'string' ? ai.evidence.replace(/[<>{}\\\u0000-\u001f]/g, '').trim().slice(0, 240) : '';
 		return json(req, { found, angle: found ? deg : 0, confidence, evidence });
 	} catch (e) {
 		console.error('[detect-north]', e instanceof Error ? e.message : e);

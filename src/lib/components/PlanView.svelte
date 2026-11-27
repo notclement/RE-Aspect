@@ -7,7 +7,7 @@
 	 * Gestures (natural, never inverted): drag = pan (top down) / orbit (3D: drag left → model turns left),
 	 * zoom only with the + / − buttons (no pinch or wheel zoom).
 	 */
-	import type { Unit, Item } from '#lib/sample-unit.ts';
+	import { itemTransform, doorGeom, type Unit, type Item } from '#lib/sample-unit.ts';
 	import { hull, smooth, roomFor, type Patch, type FurnitureLight, type WindowRay } from '#lib/light.ts';
 
 	let {
@@ -252,19 +252,20 @@
 					width={i.w}
 					height={i.d}
 					rx={i.r}
+					transform={itemTransform(i)}
 					fill={top ? i.color : shade(i.color, 0.78)}
 					stroke={top ? shade(i.color, 0.8) : 'none'}
 					stroke-width="3"
 				/>
 				{#if i.kind === 'bed' && top}
-					<rect x={i.x + 10} y={i.y + 8} width={i.w - 20} height={i.d * 0.22} rx="10" fill="#F6F3EA" />
+					<rect x={i.x + 10} y={i.y + 8} width={i.w - 20} height={i.d * 0.22} rx="10" fill="#F6F3EA" transform={itemTransform(i)} />
 				{/if}
 			{/if}
 		{/if}
 	{/each}
 {/snippet}
 
-{#snippet walls(top: boolean)}
+{#snippet walls(top: boolean, flat = false)}
 	{#each unit.walls as w, k (k)}
 		<line
 			x1={w.a[0]}
@@ -278,6 +279,17 @@
 	{/each}
 	{#each unit.windows as o, k (k)}
 		<line x1={o.a[0]} y1={o.a[1]} x2={o.b[0]} y2={o.b[1]} stroke="var(--glass)" stroke-width="12" />
+	{/each}
+	{#each unit.doors ?? [] as d, k (k)}
+		{#if d.glass}
+			<line x1={d.a[0]} y1={d.a[1]} x2={d.b[0]} y2={d.b[1]} stroke="var(--glass)" stroke-width="12" />
+			<line x1={d.a[0]} y1={d.a[1]} x2={d.b[0]} y2={d.b[1]} stroke="var(--floor)" stroke-width="3" />
+		{:else if flat}
+			{@const g = doorGeom(d)}
+			<line x1={d.a[0]} y1={d.a[1]} x2={d.b[0]} y2={d.b[1]} stroke="var(--floor)" stroke-width="20" />
+			<path d={g.arc} fill="none" stroke="var(--wall-top)" stroke-width="2" stroke-dasharray="6 5" />
+			<line x1={g.hinge[0]} y1={g.hinge[1]} x2={g.leaf[0]} y2={g.leaf[1]} stroke="var(--wall-top)" stroke-width="5" />
+		{/if}
 	{/each}
 {/snippet}
 
@@ -304,7 +316,7 @@
 			<svg {viewBox}>
 				{@render floor()}
 				{@render items(null)}
-				{@render walls(false)}
+				{@render walls(false, true)}
 				{#each unit.rooms as r (r.name)}
 					<text x={r.x} y={r.y} class="label" text-anchor="middle">{r.name.toUpperCase()}</text>
 				{/each}

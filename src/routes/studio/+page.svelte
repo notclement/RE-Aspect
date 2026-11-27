@@ -1,11 +1,12 @@
 <script lang="ts">
 	/**
 	 * Studio — fix and finish a project's plan. Mobile-first, one SVG canvas in cm, tools at the bottom.
-	 *   Move     · tap to select; drag furniture / window ends; drag empty space to pan; pinch or wheel to zoom
+	 *   Move     · tap to select; drag furniture / window ends; drag empty space to pan; zoom with + / − (no pinch)
 	 *   Outline  · tap the unit's corners on the floor plan, tap the first corner to close (scale comes from sq ft)
 	 *   Wall     · tap start, tap end (snaps to straight lines)
 	 *   Window   · tap an outside wall to add a window; glass ⅓ · ½ · ⅔
-	 *   Furniture· pick from presets; move, rotate, exact size
+	 *   Door     · tap any wall to add a door (hinged, or full-height sliding glass); flip the swing
+	 *   Furniture· pick from presets; move, rotate to any angle (drag the round handle, ±15°, or type it), exact size
 	 * Every change autosaves; undo/redo. No sun preview here — that's on the project page.
 	 */
 	import { onMount } from 'svelte';
@@ -15,7 +16,8 @@
 	import { nav } from '#lib/stores/nav.svelte.ts';
 	import { getProject, updateProject, flush } from '#lib/stores/projects.svelte.ts';
 	import { loadFloorPlan, type FloorPlanImage } from '#lib/floorplan-store.ts';
-	import { emptyPlan, sanitizePlan, area, outlineEdges, GLASS_OPTIONS, type PlanData, type Pt } from '#lib/plan.ts';
+	import { emptyPlan, sanitizePlan, area, outlineEdges, segDist, GLASS_OPTIONS, type PlanData, type Pt } from '#lib/plan.ts';
+	import { itemCorners, itemTransform, doorGeom } from '#lib/sample-unit.ts';
 	import { PRESETS, KIND_LABEL } from '#lib/studio/furniture.ts';
 	import { validateNumber } from '#lib/validate.ts';
 
@@ -80,7 +82,7 @@
 	let svg = $state<SVGSVGElement>();
 	let vb = $state({ x: -100, y: -100, w: 1400, h: 1000 });
 	function fit() {
-		const pts: Pt[] = [...plan.outline, ...plan.items.flatMap((i) => [[i.x, i.y] as Pt, [i.x + i.w, i.y + i.d] as Pt])];
+		const pts: Pt[] = [...plan.outline, ...plan.items.flatMap((i) => itemCorners(i))];
 		if (backdrop && showBackdrop) pts.push([0, 0], [backdrop.w * imgScale, backdrop.h * imgScale]);
 		if (pts.length < 2) return;
 		const xs = pts.map((p) => p[0]);
@@ -103,12 +105,12 @@
 	}
 
 	// ── tools ────────────────────────────────────────────────────────────────
-	type Mode = 'move' | 'outline' | 'wall' | 'window';
+	type Mode = 'move' | 'outline' | 'wall' | 'window' | 'door';
 	let mode = $state<Mode>((project?.plan?.outline.length ?? 0) >= 3 ? 'move' : 'outline');
 	let draft = $state<Pt[]>([]); // outline in progress
 	let wallStart = $state<Pt | null>(null);
 	let hover = $state<Pt | null>(null);
-	type Sel = { t: 'item' | 'window' | 'wall'; i: number } | null;
+	type Sel = { t: 'item' | 'window' | 'door' | 'wall'; i: number } | null;
 	let sel = $state<Sel>(null);
 	let sheet = $state<'furniture' | 'size' | null>(null);
 	let toast = $state<string | null>(
@@ -121,10 +123,11 @@
 	if (aiState) setTimeout(() => (toast = null), 6000);
 
 	const HINT: Record<Mode, string> = {
-		move: 'Tap to select · drag to move · pinch to zoom',
+		move: 'Tap to select · drag to move · + / − to zoom',
 		outline: 'Tap each corner of the unit · tap the first corner to finish',
 		wall: 'Tap where the wall starts, then where it ends',
-		window: 'Tap an outside wall to add a window'
+		window: 'Tap an outside wall to add a window',
+		door: 'Tap any wall to add a door'
 	};
 
 	function snapPt(p: Pt, from: Pt | null): Pt {
@@ -157,6 +160,7 @@
 			pts = pts.map(s);
 			plan.walls = plan.walls.map((w) => ({ ...w, a: s(w.a), b: s(w.b) }));
 			plan.windows = plan.windows.map((w) => ({ ...w, a: s(w.a), b: s(w.b) }));
+			plan.doors = plan.doors.map((d) => ({ ...d, a: s(d.a), b: s(d.b) }));
 			plan.items = plan.items.map((i) => ({ ...i, x: Math.round(i.x * k), y: Math.round(i.y * k) }));
 		}
 		plan.outline = pts;
@@ -169,9 +173,10 @@
 		fit();
 	}
 
-	function nearestEdge(p: Pt): { a: Pt; b: Pt; t: number; dist: number } | null {
+	function nearestEdge(p: Pt, inner = false): { a: Pt; b: Pt; t: number; dist: number } | null {
 		let best: { a: Pt; b: Pt; t: number; dist: number } | null = null;
-		for (const [a, b] of outlineEdges(plan.outline)) {
+		const segs: [Pt, Pt][] = [...outlineEdges(plan.outline), ...(inner ? plan.walls.map((w) => [w.a, w.b] as [Pt, Pt]) : [])];
+		for (const [a, b] of segs) {
 			const dx = b[0] - a[0];
 			const dy = b[1] - a[1];
 			const L2 = dx * dx + dy * dy || 1;
@@ -201,28 +206,63 @@
 		commit(before);
 	}
 
+	function addDoorAt(p: Pt) {
+		const e = nearestEdge(p, true);
+		if (!e || e.dist > 40 * pxToCm()) {
+			toast = plan.outline.length < 3 && !plan.walls.length ? 'Trace the outline or a wall first.' : 'Tap closer to a wall.';
+			setTimeout(() => (toast = null), 2500);
+			return;
+		}
+		const len = Math.hypot(e.b[0] - e.a[0], e.b[1] - e.a[1]);
+		const half = Math.min(45, len * 0.45) / len;
+		const t0 = Math.max(0, e.t - half);
+		const t1 = Math.min(1, e.t + half);
+		const before = snap();
+		plan.doors.push({ a: lerp(e.a, e.b, t0), b: lerp(e.a, e.b, t1), glass: false, flip: 0 });
+		sel = { t: 'door', i: plan.doors.length - 1 };
+		commit(before);
+	}
+
+	/** Is p inside item i (rotation aware)? */
+	function inItem(p: Pt, i: number) {
+		const it = plan.items[i];
+		const cx = it.x + it.w / 2;
+		const cy = it.y + it.d / 2;
+		const r = (-(it.rot ?? 0) * Math.PI) / 180;
+		const dx = p[0] - cx;
+		const dy = p[1] - cy;
+		const lx = dx * Math.cos(r) - dy * Math.sin(r);
+		const ly = dx * Math.sin(r) + dy * Math.cos(r);
+		return Math.abs(lx) <= it.w / 2 && Math.abs(ly) <= it.d / 2;
+	}
+	/** Where the rotate handle of a selected item sits (beyond its "top" edge, following the rotation). */
+	function spinHandle(i: number): { c: Pt; h: Pt; edge: Pt } {
+		const it = plan.items[i];
+		const c: Pt = [it.x + it.w / 2, it.y + it.d / 2];
+		const r = ((it.rot ?? 0) * Math.PI) / 180;
+		const up: Pt = [Math.sin(r), -Math.cos(r)];
+		const off = it.d / 2 + handleR * 4;
+		return { c, h: [c[0] + up[0] * off, c[1] + up[1] * off], edge: [c[0] + (up[0] * it.d) / 2, c[1] + (up[1] * it.d) / 2] };
+	}
+
 	function hitTest(p: Pt): Sel {
 		const tol = 18 * pxToCm();
+		for (let i = plan.doors.length - 1; i >= 0; i--) {
+			const d = plan.doors[i];
+			if (segDist(p, d.a, d.b) < tol) return { t: 'door', i };
+		}
 		for (let i = plan.windows.length - 1; i >= 0; i--) {
 			const w = plan.windows[i];
 			if (segDist(p, w.a, w.b) < tol) return { t: 'window', i };
 		}
 		for (let i = plan.items.length - 1; i >= 0; i--) {
-			const it = plan.items[i];
-			if (p[0] >= it.x && p[0] <= it.x + it.w && p[1] >= it.y && p[1] <= it.y + it.d) return { t: 'item', i };
+			if (inItem(p, i)) return { t: 'item', i };
 		}
 		for (let i = plan.walls.length - 1; i >= 0; i--) {
 			const w = plan.walls[i];
 			if (segDist(p, w.a, w.b) < tol) return { t: 'wall', i };
 		}
 		return null;
-	}
-	function segDist(p: Pt, a: Pt, b: Pt) {
-		const dx = b[0] - a[0];
-		const dy = b[1] - a[1];
-		const L2 = dx * dx + dy * dy || 1;
-		const t = Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / L2));
-		return Math.hypot(p[0] - (a[0] + dx * t), p[1] - (a[1] + dy * t));
 	}
 
 	// ── pointer handling (pan, pinch, tap, drag) ─────────────────────────────
@@ -231,7 +271,8 @@
 		| { kind: 'pan'; sx: number; sy: number; vb0: typeof vb }
 		| { kind: 'pinch'; d0: number; vb0: typeof vb; mid: Pt }
 		| { kind: 'item'; i: number; off: Pt; before: string }
-		| { kind: 'handle'; i: number; end: 'a' | 'b'; before: string }
+		| { kind: 'handle'; t: 'window' | 'door'; i: number; end: 'a' | 'b'; before: string }
+		| { kind: 'spin'; i: number; before: string }
 		| null = null;
 	let downAt = { x: 0, y: 0, moved: false };
 
@@ -240,21 +281,31 @@
 		pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 		if (pointers.size === 2) {
 			const [a, b] = [...pointers.values()];
+			// Two fingers: no pinch-zoom (zoom is on the + / − buttons). Just ignore the gesture.
 			gesture = { kind: 'pinch', d0: Math.hypot(a.x - b.x, a.y - b.y), vb0: { ...vb }, mid: toCm((a.x + b.x) / 2, (a.y + b.y) / 2) };
+			downAt.moved = true;
 			return;
 		}
 		downAt = { x: e.clientX, y: e.clientY, moved: false };
 		const p = toCm(e.clientX, e.clientY);
 		if (mode === 'move') {
-			// window end handles of the selected window
-			if (sel?.t === 'window') {
-				const w = plan.windows[sel.i];
-				const tol = 22 * pxToCm();
+			const tol = 22 * pxToCm();
+			// end handles of the selected window / door
+			if (sel?.t === 'window' || sel?.t === 'door') {
+				const w = sel.t === 'window' ? plan.windows[sel.i] : plan.doors[sel.i];
 				for (const end of ['a', 'b'] as const) {
 					if (Math.hypot(w[end][0] - p[0], w[end][1] - p[1]) < tol) {
-						gesture = { kind: 'handle', i: sel.i, end, before: snap() };
+						gesture = { kind: 'handle', t: sel.t, i: sel.i, end, before: snap() };
 						return;
 					}
+				}
+			}
+			// rotate handle of the selected furniture
+			if (sel?.t === 'item') {
+				const { h } = spinHandle(sel.i);
+				if (Math.hypot(h[0] - p[0], h[1] - p[1]) < tol * 1.3) {
+					gesture = { kind: 'spin', i: sel.i, before: snap() };
+					return;
 				}
 			}
 			const hit = hitTest(p);
@@ -276,11 +327,8 @@
 			hover = snapPt(toCm(e.clientX, e.clientY), from);
 		}
 		if (!gesture) return;
-		if (gesture.kind === 'pinch' && pointers.size === 2) {
-			const [a, b] = [...pointers.values()];
-			const d = Math.hypot(a.x - b.x, a.y - b.y);
-			vb = gesture.vb0;
-			zoomAt((gesture.d0 / Math.max(1, d)) ** 0.6, gesture.mid);
+		if (gesture.kind === 'pinch') {
+			return;
 		} else if (gesture.kind === 'pan' && downAt.moved) {
 			const k = gesture.vb0.w / Math.max(1, svg!.clientWidth);
 			vb = { ...gesture.vb0, x: gesture.vb0.x - (e.clientX - gesture.sx) * k, y: gesture.vb0.y - (e.clientY - gesture.sy) * k };
@@ -289,9 +337,18 @@
 			const it = plan.items[gesture.i];
 			it.x = Math.round(p[0] - gesture.off[0]);
 			it.y = Math.round(p[1] - gesture.off[1]);
+		} else if (gesture.kind === 'spin') {
+			const p = toCm(e.clientX, e.clientY);
+			const { c } = spinHandle(gesture.i);
+			let deg = (Math.atan2(p[0] - c[0], -(p[1] - c[1])) * 180) / Math.PI;
+			deg = ((deg % 360) + 360) % 360;
+			// gentle snap to the square angles; anything else to the nearest degree
+			const sq = Math.round(deg / 90) * 90;
+			deg = Math.abs(deg - sq) < 3 ? sq % 360 : Math.round(deg);
+			setRot(plan.items[gesture.i], deg);
 		} else if (gesture.kind === 'handle') {
-			const w = plan.windows[gesture.i];
-			const e2 = nearestEdge(toCm(e.clientX, e.clientY));
+			const w = gesture.t === 'window' ? plan.windows[gesture.i] : plan.doors[gesture.i];
+			const e2 = nearestEdge(toCm(e.clientX, e.clientY), gesture.t === 'door');
 			if (e2) {
 				const q = lerp(e2.a, e2.b, e2.t);
 				const other = gesture.end === 'a' ? w.b : w.a;
@@ -311,7 +368,7 @@
 			return;
 		}
 		gesture = null;
-		if (g?.kind === 'item' || g?.kind === 'handle') return commit(g.before);
+		if (g?.kind === 'item' || g?.kind === 'handle' || g?.kind === 'spin') return commit(g.before);
 		if (g?.kind === 'pinch' || downAt.moved) return;
 		tap(toCm(e.clientX, e.clientY));
 	}
@@ -337,15 +394,22 @@
 			}
 		} else if (mode === 'window') {
 			addWindowAt(p);
+		} else if (mode === 'door') {
+			addDoorAt(p);
 		} else {
 			sel = hitTest(p);
 		}
 	}
 
+	// Wheel / two-finger trackpad scroll pans the plan (never zooms — zoom is on the + / − buttons).
 	function onWheel(e: WheelEvent) {
 		e.preventDefault();
-		const dy = Math.max(-50, Math.min(50, e.deltaY));
-		zoomAt(Math.exp(dy * (e.ctrlKey ? 0.006 : 0.0025)), toCm(e.clientX, e.clientY));
+		if (e.ctrlKey) return; // trackpad pinch: ignored
+		const k = vb.w / Math.max(1, svg?.clientWidth ?? 1);
+		vb = { ...vb, x: vb.x + e.deltaX * k, y: vb.y + e.deltaY * k };
+	}
+	function zoomBtn(f: number) {
+		zoomAt(f, [vb.x + vb.w / 2, vb.y + vb.h / 2]);
 	}
 
 	function setMode(m: Mode) {
@@ -366,19 +430,30 @@
 		const before = snap();
 		if (sel.t === 'item') plan.items.splice(sel.i, 1);
 		else if (sel.t === 'window') plan.windows.splice(sel.i, 1);
+		else if (sel.t === 'door') plan.doors.splice(sel.i, 1);
 		else plan.walls.splice(sel.i, 1);
 		sel = null;
 		commit(before);
 	}
-	function rotateItem() {
+	function setRot(it: (typeof plan.items)[number], deg: number) {
+		const r = Math.round((((deg % 360) + 360) % 360) * 10) / 10;
+		if (r) it.rot = r;
+		else delete it.rot;
+	}
+	function rotateBy(step: number) {
 		if (sel?.t !== 'item') return;
 		const before = snap();
 		const it = plan.items[sel.i];
-		const cx = it.x + it.w / 2;
-		const cy = it.y + it.d / 2;
-		[it.w, it.d] = [it.d, it.w];
-		it.x = Math.round(cx - it.w / 2);
-		it.y = Math.round(cy - it.d / 2);
+		// step to the next multiple of 15° in that direction
+		const cur = it.rot ?? 0;
+		const next = step > 0 ? Math.floor(cur / 15 + 1e-6) * 15 + 15 : Math.ceil(cur / 15 - 1e-6) * 15 - 15;
+		setRot(it, next);
+		commit(before);
+	}
+	function setDoor(patch: { glass?: boolean; flip?: number }) {
+		if (sel?.t !== 'door') return;
+		const before = snap();
+		Object.assign(plan.doors[sel.i], patch);
 		commit(before);
 	}
 	function setGlass(v: number) {
@@ -404,6 +479,7 @@
 	let sw = $state('');
 	let sd = $state('');
 	let sh = $state('');
+	let sa = $state('');
 	let sizeErr = $state<string | null>(null);
 	function openSize() {
 		if (sel?.t !== 'item') return;
@@ -411,6 +487,7 @@
 		sw = String(Math.round(it.w));
 		sd = String(Math.round(it.d));
 		sh = String(Math.round(it.h));
+		sa = String(it.rot ?? 0);
 		sizeErr = null;
 		sheet = 'size';
 	}
@@ -423,8 +500,11 @@
 		if (!w.ok) return void (sizeErr = w.error);
 		if (!d.ok) return void (sizeErr = d.error);
 		if (!h.ok) return void (sizeErr = h.error);
+		const a = validateNumber(sa || '0', { min: -360, max: 360, label: 'Angle', decimals: 1 });
+		if (!a.ok) return void (sizeErr = a.error);
 		const before = snap();
 		Object.assign(plan.items[sel.i], { w: w.value, d: d.value, h: h.value });
+		setRot(plan.items[sel.i], a.value);
 		sheet = null;
 		commit(before);
 	}
@@ -448,11 +528,14 @@
 
 	const selItem = $derived(sel?.t === 'item' ? plan.items[sel.i] : null);
 	const selWin = $derived(sel?.t === 'window' ? plan.windows[sel.i] : null);
+	const selDoor = $derived(sel?.t === 'door' ? plan.doors[sel.i] : null);
+	const spin = $derived(sel?.t === 'item' && plan.items[sel.i] ? spinHandle(sel.i) : null);
 	const tools: { id: Mode; label: string; icon: IconName }[] = [
 		{ id: 'move', label: 'Move', icon: 'hand' },
 		{ id: 'outline', label: 'Outline', icon: 'outline' },
 		{ id: 'wall', label: 'Wall', icon: 'wall' },
-		{ id: 'window', label: 'Window', icon: 'window' }
+		{ id: 'window', label: 'Window', icon: 'window' },
+		{ id: 'door', label: 'Door', icon: 'door' }
 	];
 
 	const pts = (p: Pt[]) => p.map((q) => q.join(',')).join(' ');
@@ -517,7 +600,7 @@
 				{#if it.kind === 'plant'}
 					<circle cx={it.x + it.w / 2} cy={it.y + it.d / 2} r={it.w / 2} fill={it.color} class:sel={sel?.t === 'item' && sel.i === i} />
 				{:else}
-					<rect x={it.x} y={it.y} width={it.w} height={it.d} rx={it.r} fill={it.color} opacity={it.kind === 'rug' ? 0.6 : 1} class="item" class:sel={sel?.t === 'item' && sel.i === i} style:stroke-width={stroke * 1.5} />
+					<rect x={it.x} y={it.y} width={it.w} height={it.d} rx={it.r} fill={it.color} opacity={it.kind === 'rug' ? 0.6 : 1} class="item" class:sel={sel?.t === 'item' && sel.i === i} style:stroke-width={stroke * 1.5} transform={itemTransform(it)} />
 				{/if}
 			{/each}
 			{#if plan.outline.length >= 3}
@@ -529,14 +612,32 @@
 			{#each plan.windows as w, i (i)}
 				<line x1={w.a[0]} y1={w.a[1]} x2={w.b[0]} y2={w.b[1]} class="win" class:sel={sel?.t === 'window' && sel.i === i} stroke-width={Math.max(12, stroke * 5)} />
 			{/each}
+			{#each plan.doors as d, i (i)}
+				{@const on = sel?.t === 'door' && sel.i === i}
+				{#if d.glass}
+					<line x1={d.a[0]} y1={d.a[1]} x2={d.b[0]} y2={d.b[1]} class="win" class:sel={on} stroke-width={Math.max(12, stroke * 5)} />
+					<line x1={d.a[0]} y1={d.a[1]} x2={d.b[0]} y2={d.b[1]} class="gap" stroke-width={Math.max(3, stroke * 1.2)} />
+				{:else}
+					{@const g = doorGeom(d)}
+					<line x1={d.a[0]} y1={d.a[1]} x2={d.b[0]} y2={d.b[1]} class="gap" stroke-width={Math.max(16, stroke * 6)} />
+					<path d={g.arc} class="swing" class:sel={on} style:stroke-width={stroke} />
+					<line x1={g.hinge[0]} y1={g.hinge[1]} x2={g.leaf[0]} y2={g.leaf[1]} class="leaf" class:sel={on} style:stroke-width={Math.max(4, stroke * 2)} />
+				{/if}
+			{/each}
 			{#each plan.rooms as r (r.name + r.x)}
 				<text x={r.x} y={r.y} class="room" font-size={Math.max(18, vb.w / 60)}>{r.name}</text>
 			{/each}
 
-			{#if selWin}
-				{#each [selWin.a, selWin.b] as h, k (k)}
+			{#if selWin || selDoor}
+				{@const s = (selWin ?? selDoor)!}
+				{#each [s.a, s.b] as h, k (k)}
 					<circle cx={h[0]} cy={h[1]} r={handleR} class="handle" style:stroke-width={stroke} />
 				{/each}
+			{/if}
+			{#if spin}
+				<line x1={spin.edge[0]} y1={spin.edge[1]} x2={spin.h[0]} y2={spin.h[1]} class="spin-arm" style:stroke-width={stroke} />
+				<circle cx={spin.h[0]} cy={spin.h[1]} r={handleR * 1.15} class="handle" style:stroke-width={stroke * 1.5} />
+				<path d="M{spin.h[0] - handleR * 0.5} {spin.h[1] + handleR * 0.15} a{handleR * 0.5} {handleR * 0.5} 0 1 1 {handleR * 0.35} {handleR * 0.4}" class="spin-glyph" style:stroke-width={stroke} />
 			{/if}
 
 			<!-- outline in progress -->
@@ -552,6 +653,10 @@
 			{/if}
 		</svg>
 
+		<div class="zoom" role="group" aria-label="Zoom">
+			<button onclick={() => zoomBtn(1 / 1.3)} aria-label="Zoom in"><Icon name="plus" size={20} /></button>
+			<button onclick={() => zoomBtn(1.3)} aria-label="Zoom out"><Icon name="minus" size={20} /></button>
+		</div>
 		{#if toast}<div class="toast" role="status">{toast}</div>{:else}<div class="hint">{HINT[mode]}</div>{/if}
 
 		<div class="foot">
@@ -560,7 +665,11 @@
 			<div class="ctx">
 				<strong>{KIND_LABEL[selItem.kind]}</strong>
 				<span class="muted">{Math.round(selItem.w)} × {Math.round(selItem.d)} cm</span>
-				<button class="btn" onclick={rotateItem}><Icon name="rotate" size={18} />Rotate</button>
+				<div class="rot" role="group" aria-label="Rotate">
+					<button onclick={() => rotateBy(-15)} aria-label="Rotate 15° anticlockwise"><span class="ccw"><Icon name="rotate" size={18} /></span></button>
+					<button class="deg" onclick={openSize} aria-label="Set exact angle">{Math.round(selItem.rot ?? 0)}°</button>
+					<button onclick={() => rotateBy(15)} aria-label="Rotate 15° clockwise"><Icon name="rotate" size={18} /></button>
+				</div>
 				<button class="btn" onclick={openSize}>Size</button>
 				<button class="btn icon" onclick={del} aria-label="Delete"><Icon name="trash" size={18} /></button>
 			</div>
@@ -574,6 +683,18 @@
 					{/each}
 				</div>
 				<button class="btn icon" onclick={del} aria-label="Delete window"><Icon name="trash" size={18} /></button>
+			</div>
+		{:else if selDoor}
+			<div class="ctx">
+				<strong>Door</strong>
+				<div class="glass" role="radiogroup" aria-label="Door type">
+					<button role="radio" aria-checked={!selDoor.glass} class:on={!selDoor.glass} onclick={() => setDoor({ glass: false })}>Hinged</button>
+					<button role="radio" aria-checked={selDoor.glass} class:on={selDoor.glass} onclick={() => setDoor({ glass: true })}>Glass</button>
+				</div>
+				{#if !selDoor.glass}
+					<button class="btn" onclick={() => setDoor({ flip: (selDoor.flip + 1) % 4 })}>Flip</button>
+				{/if}
+				<button class="btn icon" onclick={del} aria-label="Delete door"><Icon name="trash" size={18} /></button>
 			</div>
 		{:else if sel?.t === 'wall'}
 			<div class="ctx">
@@ -632,6 +753,7 @@
 						<div class="field"><label for="sw">Width</label><input id="sw" inputmode="numeric" maxlength="4" bind:value={sw} /></div>
 						<div class="field"><label for="sd">Depth</label><input id="sd" inputmode="numeric" maxlength="4" bind:value={sd} /></div>
 						<div class="field"><label for="sh">Height</label><input id="sh" inputmode="numeric" maxlength="3" bind:value={sh} /></div>
+						<div class="field"><label for="sa">Angle °</label><input id="sa" inputmode="decimal" maxlength="6" bind:value={sa} /></div>
 					</div>
 					{#if sizeErr}<p class="error">{sizeErr}</p>{/if}
 					<div class="actions"><button type="button" class="btn" onclick={() => (sheet = null)}>Cancel</button><button class="btn primary">Apply</button></div>
@@ -655,6 +777,32 @@
 		align-items: center;
 		gap: 8px;
 		padding: 6px 12px;
+	}
+	.zoom {
+		position: absolute;
+		right: 10px;
+		top: 106px;
+		z-index: 2;
+		display: flex;
+		flex-direction: column;
+		background: var(--surface);
+		border: 1px solid var(--line);
+		border-radius: var(--radius-sm);
+		box-shadow: var(--shadow);
+		overflow: hidden;
+	}
+	.zoom button {
+		width: 44px;
+		height: 44px;
+		display: grid;
+		place-items: center;
+		border: 0;
+		background: none;
+		color: var(--text);
+		cursor: pointer;
+	}
+	.zoom button + button {
+		border-top: 1px solid var(--line);
 	}
 	.hint {
 		position: absolute;
@@ -765,6 +913,61 @@
 	.handle {
 		fill: #fff;
 		stroke: var(--ochre);
+	}
+	.gap {
+		stroke: #ece4d4;
+		stroke-linecap: butt;
+	}
+	.swing {
+		fill: none;
+		stroke: #59625a;
+		stroke-dasharray: 6 5;
+	}
+	.leaf {
+		stroke: #59625a;
+		stroke-linecap: round;
+	}
+	.spin-arm {
+		stroke: var(--ochre);
+		stroke-dasharray: 4 4;
+	}
+	.spin-glyph {
+		fill: none;
+		stroke: var(--ochre);
+		stroke-linecap: round;
+		pointer-events: none;
+	}
+	.rot {
+		display: flex;
+		align-items: center;
+		gap: 2px;
+		background: var(--surface-2);
+		border-radius: var(--radius-sm);
+		padding: 2px;
+	}
+	.rot button {
+		min-width: 44px;
+		min-height: 44px;
+		border: 0;
+		background: transparent;
+		border-radius: calc(var(--radius-sm) - 2px);
+		display: grid;
+		place-items: center;
+		cursor: pointer;
+		color: inherit;
+		font-weight: 700;
+		font-size: 15px;
+	}
+	.rot .deg {
+		min-width: 52px;
+		font-variant-numeric: tabular-nums;
+	}
+	.ccw {
+		display: grid;
+		transform: scaleX(-1);
+	}
+	.glass button {
+		padding: 0 10px;
 	}
 	.draft {
 		fill: none;

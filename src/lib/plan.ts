@@ -3,7 +3,7 @@
  * All lengths in cm, plan "north-up" (+x = east, +y = south), so bearing is always 0.
  * The same checks run in the database (size cap) and the process-project edge function.
  */
-import type { Unit, Wall, Opening, Item } from './sample-unit.ts';
+import type { Unit, Wall, Opening, Item, Door } from './sample-unit.ts';
 
 export type Pt = [number, number];
 export const GLASS_OPTIONS: { v: number; label: string }[] = [
@@ -17,18 +17,20 @@ export interface PlanWindow {
 	b: Pt;
 	glass: number; // fraction of the wall height that is glass (from the ceiling down)
 }
+export type PlanDoor = Door;
 export interface PlanData {
 	v: 1;
 	outline: Pt[];
 	walls: { a: Pt; b: Pt; t: number }[];
 	windows: PlanWindow[];
+	doors: PlanDoor[];
 	items: Item[];
 	rooms: { name: string; x: number; y: number }[];
 	/** Floor-plan backdrop placement (cm per image pixel), used by Studio while tracing. */
 	imageScale?: number;
 }
 
-export const emptyPlan = (): PlanData => ({ v: 1, outline: [], walls: [], windows: [], items: [], rooms: [] });
+export const emptyPlan = (): PlanData => ({ v: 1, outline: [], walls: [], windows: [], doors: [], items: [], rooms: [] });
 
 export const ITEM_KINDS = ['sofa', 'bed', 'table', 'chair', 'counter', 'console', 'wardrobe', 'rug', 'plant', 'desk', 'bath'] as const;
 
@@ -71,6 +73,15 @@ export function sanitizePlan(raw: unknown): PlanData | null {
 			return a && b ? { a, b, glass } : null;
 		})
 		.filter((w): w is PlanWindow => !!w);
+	const doors = list(r.doors, 100)
+		.map((d) => {
+			const o = (d ?? {}) as Record<string, unknown>;
+			const a = pt(o.a);
+			const b = pt(o.b);
+			const flip = Math.round(num(o.flip, 0, 3) ?? 0);
+			return a && b ? { a, b, glass: o.glass === true, flip } : null;
+		})
+		.filter((d): d is PlanDoor => !!d);
 	const items = list(r.items, 200)
 		.map((i) => {
 			const o = (i ?? {}) as Record<string, unknown>;
@@ -82,6 +93,9 @@ export function sanitizePlan(raw: unknown): PlanData | null {
 			const h = num(o.h, 1, 400);
 			if (!kind || x === null || y === null || w === null || d === null || h === null) return null;
 			const item: Item = { kind, x, y, w, d, h, color: typeof o.color === 'string' && COLOR.test(o.color) ? o.color : '#B7BE9C', r: num(o.r, 0, 100) ?? 6 };
+			const rot = num(o.rot, -720, 720);
+			if (rot) item.rot = Math.round((((rot % 360) + 360) % 360) * 10) / 10 || undefined;
+			if (item.rot === undefined) delete item.rot;
 			return item;
 		})
 		.filter((i): i is Item => i !== null);
@@ -95,7 +109,7 @@ export function sanitizePlan(raw: unknown): PlanData | null {
 		})
 		.filter((rm): rm is PlanData['rooms'][number] => !!rm);
 	const imageScale = num(r.imageScale, 0.01, 100) ?? undefined;
-	return { v: 1, outline, walls, windows, items, rooms, ...(imageScale ? { imageScale } : {}) };
+	return { v: 1, outline, walls, windows, doors, items, rooms, ...(imageScale ? { imageScale } : {}) };
 }
 
 /** Is point p inside polygon poly (ray casting)? */
@@ -130,6 +144,15 @@ export function outwardNormal(a: Pt, b: Pt, outline: Pt[]): [number, number] {
 	return n;
 }
 
+/** Shortest distance from p to segment a–b. */
+export function segDist(p: Pt, a: Pt, b: Pt): number {
+	const dx = b[0] - a[0];
+	const dy = b[1] - a[1];
+	const L2 = dx * dx + dy * dy || 1;
+	const t = Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / L2));
+	return Math.hypot(p[0] - (a[0] + dx * t), p[1] - (a[1] + dy * t));
+}
+
 /** Outline edges as walls (exterior walls are drawn from the outline). */
 export function outlineEdges(outline: Pt[]): [Pt, Pt][] {
 	return outline.length < 2 ? [] : outline.map((p, i) => [p, outline[(i + 1) % outline.length]] as [Pt, Pt]);
@@ -149,6 +172,11 @@ export function planToUnit(
 		sill: Math.round(ceiling * (1 - w.glass)),
 		head: ceiling
 	}));
+	// Sliding glass doors on an outside wall let the sun in from the floor up.
+	const onOutline = (p: Pt) => outlineEdges(plan.outline).some(([a, b]) => segDist(p, a, b) < 3);
+	for (const d of plan.doors) {
+		if (d.glass && onOutline(d.a) && onOutline(d.b)) windows.push({ a: d.a, b: d.b, normal: outwardNormal(d.a, d.b, plan.outline), sill: 0, head: Math.min(ceiling, 240) });
+	}
 	return {
 		id: meta.id,
 		name: meta.name,
@@ -163,7 +191,8 @@ export function planToUnit(
 		walls,
 		windows,
 		rooms: plan.rooms,
-		items: plan.items
+		items: plan.items,
+		doors: plan.doors
 	};
 }
 

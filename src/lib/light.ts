@@ -2,7 +2,7 @@
  * DayTrace light model v1: project each window along the sun direction onto the floor.
  * Standalone unit — no neighbouring buildings (see docs/REQUIREMENTS.md §6).
  */
-import type { Unit, Opening } from './sample-unit.ts';
+import { itemCorners, type Unit, type Opening } from './sample-unit.ts';
 
 export interface Patch {
 	points: [number, number][];
@@ -95,9 +95,7 @@ export function furnitureLight(unit: Unit, azimuth: number, altitude: number, pa
 	const s: Pt = [Math.sin(az), -Math.cos(az)];
 	const cot = Math.min(1 / Math.tan((altitude * Math.PI) / 180), LOW_SUN_COT);
 	unit.items.forEach((it, i) => {
-		const foot: Pt[] = [
-			[it.x, it.y], [it.x + it.w, it.y], [it.x + it.w, it.y + it.d], [it.x, it.y + it.d]
-		];
+		const foot: Pt[] = itemCorners(it);
 		if (it.h > 5) {
 			const d = it.h * cot;
 			shadows.push(hull([...foot, ...foot.map((p) => [p[0] - s[0] * d, p[1] - s[1] * d] as Pt)]));
