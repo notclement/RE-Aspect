@@ -168,3 +168,5 @@ West-sun heat warning · air-con cost estimate · cross-ventilation · furniture
 - **Light stops at walls**: sun patches and window rays (top-down and 3D) are traced in 24 slices across each window and cut where an interior or exterior wall stands, so light never passes through walls.
 - Studio **Erase** tool: drag along an inside wall to erase only that part (tap = 90 cm gap), e.g. to open a kitchen entrance; the pieces either side stay. Outside walls can't be erased (use Door). Undoable.
 - Sun view: the **outside sun arrows run right up to the outer walls**, including notches of L-shaped units (shadow mask = outline + each outer wall swept away from the sun, not a convex hull).
+- Erase works **across junctions**: every inside wall on the same line loses the dragged stretch; gap ends snap onto a crossing wall within 30 cm; leftover stubs < 30 cm are removed; a crossing wall poking ≤ 45 cm past the erased stretch is trimmed back to the line.
+- Studio keyboard (PC): **Ctrl/⌘+Z** undo, **Ctrl+Y** or **Shift+Ctrl/⌘+Z** redo (ignored while typing in a field).

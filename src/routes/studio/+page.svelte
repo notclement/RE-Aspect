@@ -281,7 +281,7 @@
 		| { kind: 'item'; i: number; off: Pt; before: string }
 		| { kind: 'handle'; t: 'window' | 'door'; i: number; end: 'a' | 'b'; before: string }
 		| { kind: 'spin'; i: number; before: string }
-		| { kind: 'erase'; i: number; t0: number; t1: number }
+		| { kind: 'erase'; o: Pt; u: Pt; s0: number; s1: number }
 		| null = null;
 	let downAt = { x: 0, y: 0, moved: false };
 
@@ -335,9 +335,12 @@
 				if (d < bd) (bd = d), (best = i);
 			});
 			if (best >= 0) {
-				const t = wallT(best, p);
-				gesture = { kind: 'erase', i: best, t0: t, t1: t };
-				erasing = { i: best, t0: t, t1: t };
+				const w = plan.walls[best];
+				const len = Math.hypot(w.b[0] - w.a[0], w.b[1] - w.a[1]) || 1;
+				const u: Pt = [(w.b[0] - w.a[0]) / len, (w.b[1] - w.a[1]) / len];
+				const s0 = alongLine(w.a, u, p);
+				gesture = { kind: 'erase', o: w.a, u, s0, s1: s0 };
+				erasing = { o: w.a, u, s0, s1: s0 };
 				return;
 			}
 			if (plan.outline.length >= 3 && outlineEdges(plan.outline).some(([a, b]) => segDist(p, a, b) < tol)) {
@@ -349,34 +352,90 @@
 		gesture = { kind: 'pan', sx: e.clientX, sy: e.clientY, vb0: { ...vb } };
 	}
 
-	/** Position of p along interior wall i (0 = a, 1 = b). */
-	function wallT(i: number, p: Pt) {
-		const w = plan.walls[i];
-		const dx = w.b[0] - w.a[0];
-		const dy = w.b[1] - w.a[1];
-		return Math.max(0, Math.min(1, ((p[0] - w.a[0]) * dx + (p[1] - w.a[1]) * dy) / (dx * dx + dy * dy || 1)));
-	}
-	/** Remove the part of wall i between t0 and t1 (keeps the pieces either side). */
-	function eraseWall(i: number, t0: number, t1: number) {
-		const w = plan.walls[i];
-		const len = Math.hypot(w.b[0] - w.a[0], w.b[1] - w.a[1]) || 1;
-		let [lo, hi] = t0 < t1 ? [t0, t1] : [t1, t0];
-		if ((hi - lo) * len < 15) {
+	/** Distance of p along the line through o with direction u. */
+	const alongLine = (o: Pt, u: Pt, p: Pt) => (p[0] - o[0]) * u[0] + (p[1] - o[1]) * u[1];
+	const onLine = (o: Pt, u: Pt, k: number): Pt => [Math.round(o[0] + u[0] * k), Math.round(o[1] + u[1] * k)];
+
+	/**
+	 * Erase [s0, s1] along a wall line. Works across junctions: every inside wall lying on the same line loses
+	 * that stretch, gap ends snap onto a crossing wall when close, and leftover stubs (< 30 cm) are removed.
+	 */
+	function eraseLine(o: Pt, u: Pt, s0: number, s1: number) {
+		let [lo, hi] = s0 < s1 ? [s0, s1] : [s1, s0];
+		if (hi - lo < 15) {
 			// a tap: open a 90 cm gap centred on it
-			const half = Math.min(45, len / 2) / len;
 			const c = (lo + hi) / 2;
-			lo = Math.max(0, c - half);
-			hi = Math.min(1, c + half);
+			lo = c - 45;
+			hi = c + 45;
 		}
+		const cross = (v: Pt) => u[0] * v[1] - u[1] * v[0];
+		const isOnLine = (w: { a: Pt; b: Pt }) => {
+			const len = Math.hypot(w.b[0] - w.a[0], w.b[1] - w.a[1]) || 1;
+			return Math.abs(cross([w.b[0] - w.a[0], w.b[1] - w.a[1]])) / len < 0.035 && Math.abs(cross([w.a[0] - o[0], w.a[1] - o[1]])) < 4;
+		};
+		// Where other walls (and the outline) cross or meet this line → snap targets for the gap ends.
+		const junctions: number[] = [];
+		const others: [Pt, Pt][] = [...plan.walls.filter((w) => !isOnLine(w)).map((w) => [w.a, w.b] as [Pt, Pt]), ...outlineEdges(plan.outline)];
+		for (const [c, d] of others) {
+			const dc = cross([c[0] - o[0], c[1] - o[1]]);
+			const dd = cross([d[0] - o[0], d[1] - o[1]]);
+			if (Math.abs(dc - dd) < 1e-6) continue;
+			if ((dc > 4 && dd > 4) || (dc < -4 && dd < -4)) continue;
+			const t = Math.max(0, Math.min(1, dc / (dc - dd)));
+			junctions.push(alongLine(o, u, [c[0] + (d[0] - c[0]) * t, c[1] + (d[1] - c[1]) * t]));
+		}
+		const snapTo = (v: number) => {
+			let best = v;
+			let bd = 30; // snap when a crossing wall is within 30 cm
+			for (const j of junctions) if (Math.abs(j - v) < bd) (bd = Math.abs(j - v)), (best = j);
+			return best;
+		};
+		lo = snapTo(lo);
+		hi = snapTo(hi);
+		if (hi - lo < 5) return;
+
 		const before = snap();
-		const pieces: (typeof plan.walls)[number][] = [];
-		if (lo * len >= 10) pieces.push({ a: w.a, b: lerp(w.a, w.b, lo), t: w.t });
-		if ((1 - hi) * len >= 10) pieces.push({ a: lerp(w.a, w.b, hi), b: w.b, t: w.t });
-		plan.walls.splice(i, 1, ...pieces);
+		const next: typeof plan.walls = [];
+		for (const w of plan.walls) {
+			if (!isOnLine(w)) {
+				// A crossing wall that only pokes a little past the erased stretch (≤ 45 cm) is trimmed back to the line.
+				const da = cross([w.a[0] - o[0], w.a[1] - o[1]]);
+				const db = cross([w.b[0] - o[0], w.b[1] - o[1]]);
+				if (Math.sign(da) !== Math.sign(db) && Math.abs(da - db) > 1e-6) {
+					const t = da / (da - db);
+					const x: Pt = [Math.round(w.a[0] + (w.b[0] - w.a[0]) * t), Math.round(w.a[1] + (w.b[1] - w.a[1]) * t)];
+					const at = alongLine(o, u, x);
+					const len = Math.hypot(w.b[0] - w.a[0], w.b[1] - w.a[1]);
+					if (at >= lo - 1 && at <= hi + 1) {
+						if (Math.abs(da) / Math.abs(da - db) * len <= 45) {
+							next.push({ ...w, a: x });
+							continue;
+						}
+						if (Math.abs(db) / Math.abs(da - db) * len <= 45) {
+							next.push({ ...w, b: x });
+							continue;
+						}
+					}
+				}
+				next.push(w);
+				continue;
+			}
+			const sa = alongLine(o, u, w.a);
+			const sb = alongLine(o, u, w.b);
+			const [mn, mx] = sa < sb ? [sa, sb] : [sb, sa];
+			if (hi <= mn || lo >= mx) {
+				next.push(w); // untouched
+				continue;
+			}
+			if (lo - mn >= 30) next.push({ a: onLine(o, u, mn), b: onLine(o, u, lo), t: w.t });
+			if (mx - hi >= 30) next.push({ a: onLine(o, u, hi), b: onLine(o, u, mx), t: w.t });
+		}
+		plan.walls = next;
+		sel = null;
 		commit(before);
 	}
 	// Live preview of the part being erased (the gesture itself isn't reactive state).
-	let erasing = $state<{ i: number; t0: number; t1: number } | null>(null);
+	let erasing = $state<{ o: Pt; u: Pt; s0: number; s1: number } | null>(null);
 
 	function onMove(e: PointerEvent) {
 		if (pointers.has(e.pointerId)) pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -397,8 +456,8 @@
 			it.x = Math.round(p[0] - gesture.off[0]);
 			it.y = Math.round(p[1] - gesture.off[1]);
 		} else if (gesture.kind === 'erase') {
-			gesture = { ...gesture, t1: wallT(gesture.i, toCm(e.clientX, e.clientY)) };
-			erasing = { i: gesture.i, t0: gesture.t0, t1: gesture.t1 };
+			gesture = { ...gesture, s1: alongLine(gesture.o, gesture.u, toCm(e.clientX, e.clientY)) };
+			erasing = { o: gesture.o, u: gesture.u, s0: gesture.s0, s1: gesture.s1 };
 		} else if (gesture.kind === 'spin') {
 			const p = toCm(e.clientX, e.clientY);
 			const { c } = spinHandle(gesture.i);
@@ -433,7 +492,7 @@
 		if (g?.kind === 'item' || g?.kind === 'handle' || g?.kind === 'spin') return commit(g.before);
 		if (g?.kind === 'erase') {
 			erasing = null;
-			return eraseWall(g.i, g.t0, g.t1);
+			return eraseLine(g.o, g.u, g.s0, g.s1);
 		}
 		if (g?.kind === 'pinch' || downAt.moved) return;
 		tap(toCm(e.clientX, e.clientY));
@@ -652,6 +711,21 @@
 	const handleR = $derived(Math.max(8, vb.w / 70));
 	const stroke = $derived(Math.max(2, vb.w / 400));
 
+	// PC: Ctrl/⌘+Z undo · Ctrl+Y or Shift+Ctrl/⌘+Z redo (not while typing in a field).
+	function onKey(e: KeyboardEvent) {
+		const t = e.target as HTMLElement | null;
+		if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
+		if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+		const k = e.key.toLowerCase();
+		if (k === 'z' && !e.shiftKey) {
+			e.preventDefault();
+			undo();
+		} else if (k === 'y' || (k === 'z' && e.shiftKey)) {
+			e.preventDefault();
+			redo();
+		}
+	}
+
 	onMount(() => {
 		if (project) {
 			loadFloorPlan(project.id).then((b) => {
@@ -667,6 +741,7 @@
 </script>
 
 <svelte:head><title>Studio · RE:Aspect</title></svelte:head>
+<svelte:window onkeydown={onKey} />
 
 {#if !project}
 	<div class="card missing">
@@ -757,9 +832,10 @@
 					<circle cx={p[0]} cy={p[1]} r={k === 0 ? handleR * 1.3 : handleR * 0.7} class="vertex" class:first={k === 0} style:stroke-width={stroke} />
 				{/each}
 			{/if}
-			{#if erasing && plan.walls[erasing.i]}
-				{@const w = plan.walls[erasing.i]}
-				<line x1={lerp(w.a, w.b, erasing.t0)[0]} y1={lerp(w.a, w.b, erasing.t0)[1]} x2={lerp(w.a, w.b, erasing.t1)[0]} y2={lerp(w.a, w.b, erasing.t1)[1]} class="erase-mark" stroke-width={Math.max(w.t + 6, stroke * 6)} />
+			{#if erasing}
+				{@const e0 = onLine(erasing.o, erasing.u, erasing.s0)}
+				{@const e1 = onLine(erasing.o, erasing.u, erasing.s1)}
+				<line x1={e0[0]} y1={e0[1]} x2={e1[0]} y2={e1[1]} class="erase-mark" stroke-width={Math.max(18, stroke * 6)} />
 			{/if}
 			{#if wallStart}
 				<line x1={wallStart[0]} y1={wallStart[1]} x2={(hover ?? wallStart)[0]} y2={(hover ?? wallStart)[1]} class="draft" style:stroke-width={stroke * 2} />
@@ -833,8 +909,8 @@
 				<button class:on={mode === t.id} onclick={() => setMode(t.id)} aria-pressed={mode === t.id}><Icon name={t.icon} size={22} /><span>{t.label}</span></button>
 			{/each}
 			<button class:pulse={highlightFurniture} onclick={() => ((sheet = 'furniture'), (highlightFurniture = false))}><Icon name="sofa" size={22} /><span>Furniture</span></button>
-			<button onclick={undo} disabled={!canUndo} aria-label="Undo"><Icon name="undo" size={22} /><span>Undo</span></button>
-			<button onclick={redo} disabled={!canRedo} aria-label="Redo"><Icon name="redo" size={22} /><span>Redo</span></button>
+			<button onclick={undo} disabled={!canUndo} aria-label="Undo" title="Undo (Ctrl+Z)"><Icon name="undo" size={22} /><span>Undo</span></button>
+			<button onclick={redo} disabled={!canRedo} aria-label="Redo" title="Redo (Ctrl+Y)"><Icon name="redo" size={22} /><span>Redo</span></button>
 		</nav>
 		</div>
 	</div>
