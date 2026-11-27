@@ -6,6 +6,33 @@
 	import { PLANS, FREE_LAUNCH } from '#lib/config/plans.ts';
 	import { validateName } from '#lib/validate.ts';
 	import { SAMPLE_UNITS } from '#lib/sample-unit.ts';
+	import Avatar from '#lib/components/Avatar.svelte';
+	import { makeAvatar } from '#lib/image.ts';
+
+	let fileInput: HTMLInputElement;
+	let photoBusy = $state(false);
+	let photoError = $state<string | null>(null);
+	async function pickPhoto(e: Event) {
+		const file = (e.currentTarget as HTMLInputElement).files?.[0];
+		(e.currentTarget as HTMLInputElement).value = '';
+		if (!file) return;
+		photoBusy = true;
+		photoError = null;
+		try {
+			await auth.saveAvatar(await makeAvatar(file));
+		} catch (err) {
+			photoError = err instanceof Error ? err.message : 'Could not use that photo.';
+		}
+		photoBusy = false;
+	}
+	async function removePhoto() {
+		photoError = null;
+		try {
+			await auth.saveAvatar(null);
+		} catch (err) {
+			photoError = err instanceof Error ? err.message : 'Could not remove the photo.';
+		}
+	}
 
 	let name = $state(profile.data.name);
 	let error = $state<string | null>(null);
@@ -45,6 +72,17 @@
 <svelte:head><title>Profile · RE:Aspect</title></svelte:head>
 
 <h1>{profile.firstName}'s profile</h1>
+
+<div class="card photo">
+	<Avatar size={72} />
+	<div class="pbtns">
+		<button class="btn" onclick={() => fileInput.click()} disabled={photoBusy}>{photoBusy ? 'Saving…' : profile.data.avatar ? 'Change photo' : 'Add photo'}</button>
+		{#if profile.data.avatar}<button class="btn" onclick={removePhoto} disabled={photoBusy}>Remove</button>{/if}
+		<span class="muted small">Shrunk to a tiny 128 px thumbnail before upload.</span>
+		{#if photoError}<span class="error small">{photoError}</span>{/if}
+	</div>
+	<input bind:this={fileInput} type="file" accept="image/*" hidden onchange={pickPhoto} />
+</div>
 
 <form class="card" onsubmit={save} novalidate>
 	<div class="field">
@@ -110,6 +148,24 @@
 	}
 	.li:last-child {
 		border-bottom: 0;
+	}
+	.photo {
+		display: flex;
+		align-items: center;
+		gap: 16px;
+		margin-bottom: 14px;
+	}
+	.pbtns {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 8px;
+		align-items: center;
+	}
+	.pbtns .small {
+		flex-basis: 100%;
+	}
+	.error {
+		color: #b5483a;
 	}
 	h3 {
 		margin: 22px 0 8px;

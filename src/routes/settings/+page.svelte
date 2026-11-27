@@ -5,7 +5,7 @@
 	import InstallCard from '#lib/components/InstallCard.svelte';
 	import { theme, type ThemeChoice } from '#lib/stores/theme.svelte.ts';
 	import { THEMES, type ThemeId } from '#lib/config/themes.ts';
-	import { profile, ROLE_LABELS, NIGHT_SPEED_MIN, NIGHT_SPEED_MAX, type RoleView } from '#lib/stores/profile.svelte.ts';
+	import { profile, NIGHT_SPEED_MIN, NIGHT_SPEED_MAX } from '#lib/stores/profile.svelte.ts';
 	import { auth } from '#lib/stores/auth.svelte.ts';
 	import { BRAND } from '#lib/config/brand.ts';
 	import { validateBodyHeightCm } from '#lib/validate.ts';
@@ -15,7 +15,6 @@
 		...THEMES.map((t) => ({ id: t.id, label: t.label, tagline: t.tagline, preview: t.id, swatch: t.swatch }))
 	];
 
-	const roles = Object.entries(ROLE_LABELS) as [RoleView, string][];
 
 	let height = $state(String(profile.data.bodyHeightCm));
 	let heightError = $state<string | null>(null);
@@ -30,24 +29,6 @@
 
 <h1>Settings</h1>
 
-{#if profile.data.isAdmin}
-	<h3>Admin</h3>
-	<div class="card admin">
-		<p class="role"><Icon name="shield" size={18} /> You're an <strong>Admin</strong> <a class="btn adminlink" href="/admin">Admin panel</a></p>
-		<label class="muted small" for="viewas">View the app as</label>
-		<div class="roles" id="viewas" role="radiogroup" aria-label="View the app as">
-			{#each roles as [id, label] (id)}
-				<button
-					role="radio"
-					aria-checked={profile.role === id}
-					class:on={profile.role === id}
-					onclick={() => profile.setViewAs(id === 'admin' ? null : id)}>{label}</button
-				>
-			{/each}
-		</div>
-		<p class="muted note">Preview only — changes what you see (limits, menus, badges). Your real admin access stays on, and the server still enforces every permission.</p>
-	</div>
-{/if}
 
 <h3>Theme</h3>
 <div class="themes" role="radiogroup" aria-label="Theme">
@@ -312,43 +293,6 @@
 		font-weight: 600;
 		color: var(--sky);
 		text-decoration: none;
-	}
-	.adminlink {
-		margin-left: auto;
-		min-height: 40px;
-	}
-	.admin .role {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		margin: 0 0 12px;
-		color: var(--forest);
-	}
-	.small {
-		font-size: 12px;
-		font-weight: 600;
-		letter-spacing: 0.04em;
-		text-transform: uppercase;
-	}
-	.roles {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 8px;
-		margin-top: 8px;
-	}
-	.roles button {
-		min-height: 40px;
-		padding: 0 14px;
-		border-radius: 20px;
-		border: 1px solid var(--line);
-		background: var(--surface);
-		font-weight: 600;
-		cursor: pointer;
-	}
-	.roles button.on {
-		background: var(--forest);
-		border-color: var(--forest);
-		color: var(--on-primary);
 	}
 	.toggle {
 		gap: 12px;

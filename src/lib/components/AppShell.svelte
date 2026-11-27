@@ -7,6 +7,7 @@
 	import { page } from '$app/state';
 	import { afterNavigate, goto } from '$app/navigation';
 	import Icon, { type IconName } from './Icon.svelte';
+	import Avatar from './Avatar.svelte';
 	import { auth } from '#lib/stores/auth.svelte.ts';
 	import { nav } from '#lib/stores/nav.svelte.ts';
 	import { profile, ROLE_LABELS, type RoleView } from '#lib/stores/profile.svelte.ts';
@@ -32,6 +33,11 @@
 	];
 	// Account menu (tap the avatar): Profile, Settings, Sign out.
 	let acct = $state(false);
+	let acctEl = $state<HTMLElement>();
+	// Close the account menu on any tap/click outside it, or Escape.
+	function outside(e: PointerEvent) {
+		if (acct && acctEl && !acctEl.contains(e.target as Node)) acct = false;
+	}
 	const roleList = Object.entries(ROLE_LABELS) as [RoleView, string][];
 	const acctLinks: { href: string; label: string; icon: IconName }[] = [
 		{ href: '/profile', label: 'Profile', icon: 'user' },
@@ -45,6 +51,8 @@
 	});
 </script>
 
+<svelte:window onpointerdown={outside} onkeydown={(e) => e.key === 'Escape' && (acct = false)} />
+
 <header class="top">
 	{#if isSub}
 		<button class="iconbtn" onclick={back} aria-label="Back"><Icon name="back" size={22} /></button>
@@ -57,12 +65,11 @@
 			{#if c.href && i < nav.crumbs.length - 1}<a href={c.href}>{c.label}</a>{:else}<strong>{c.label}</strong>{/if}
 		{/each}
 	</nav>
-	<div class="acct">
+	<div class="acct" bind:this={acctEl}>
 		<button class="me" class:on={acct} onclick={() => (acct = !acct)} aria-label="Account menu" aria-expanded={acct}>
-			{profile.firstName.slice(0, 1).toUpperCase() || '?'}
+			<Avatar size={44} />
 		</button>
 		{#if acct}
-			<button class="acct-scrim" aria-label="Close account menu" onclick={() => (acct = false)}></button>
 			<div class="menu" role="menu">
 				<div class="who">
 					<strong>{profile.data.name || 'You'}</strong>
@@ -183,6 +190,7 @@
 	}
 	button.me {
 		background: var(--surface);
+		overflow: hidden;
 		cursor: pointer;
 		font-size: 16px;
 		padding: 0;
@@ -193,14 +201,6 @@
 	}
 	.acct {
 		position: relative;
-	}
-	.acct-scrim {
-		position: fixed;
-		inset: 0;
-		border: 0;
-		background: transparent;
-		z-index: 20;
-		cursor: default;
 	}
 	.menu {
 		position: absolute;

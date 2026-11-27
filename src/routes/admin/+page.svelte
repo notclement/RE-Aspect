@@ -13,6 +13,22 @@
 	import { getSupabase, supabaseConfigured } from '#lib/supabase.ts';
 	import { propertyTypeLabel } from '#lib/config/property-types.ts';
 	import { SAMPLE_UNITS } from '#lib/sample-unit.ts';
+	import Avatar from '#lib/components/Avatar.svelte';
+	import AdminAiKeys from '#lib/components/AdminAiKeys.svelte';
+	import { ROLE_LABELS, type RoleView } from '#lib/stores/profile.svelte.ts';
+
+	const roleList = Object.entries(ROLE_LABELS) as [RoleView, string][];
+	let tab = $state<'users' | 'ai'>('users');
+	type Filter = 'all' | 'pro' | 'free' | 'full' | 'disabled';
+	const FILTERS: { id: Filter; label: string }[] = [
+		{ id: 'all', label: 'All' },
+		{ id: 'pro', label: 'Pro' },
+		{ id: 'free', label: 'Free' },
+		{ id: 'full', label: 'Full' },
+		{ id: 'disabled', label: 'Disabled' }
+	];
+	let filter = $state<Filter>('all');
+	let me = $state<string | null>(null);
 
 	$effect(() => nav.set({ label: 'Admin' }));
 
@@ -20,6 +36,8 @@
 		id: string;
 		email: string;
 		name: string;
+		avatar: string | null;
+		disabled: boolean;
 		plan: 'free' | 'pro' | 'agency';
 		pro_until: string | null;
 		is_admin: boolean;
@@ -50,16 +68,27 @@
 	let open = $state<string | null>(null);
 	let projects = $state<Record<string, ProjectRow[] | 'loading' | { error: string }>>({});
 	let confirm = $state<{ id: string; grant: Grant } | null>(null);
+	let confirmDisable = $state<string | null>(null);
 	let busy = $state<string | null>(null);
 	let toast = $state<string | null>(null);
 
+	const inFilter = (u: UserRow, f: Filter) =>
+		f === 'full'
+			? true
+			: f === 'disabled'
+				? u.disabled
+				: !u.disabled && (f === 'all' || status(u).kind === f);
+	const counts = $derived(Object.fromEntries(FILTERS.map((f) => [f.id, users.filter((u) => inFilter(u, f.id)).length])) as Record<Filter, number>);
+	// Live search — filters as you type, no button needed.
 	const filtered = $derived.by(() => {
 		const t = q.trim().toLowerCase();
-		return t ? users.filter((u) => u.name.toLowerCase().includes(t) || u.email.toLowerCase().includes(t)) : users;
+		return users.filter(
+			(u) => inFilter(u, filter) && (!t || u.name.toLowerCase().includes(t) || u.email.toLowerCase().includes(t))
+		);
 	});
 	const stats = $derived({
-		users: users.length,
-		pro: users.filter((u) => status(u).kind === 'pro').length,
+		users: counts.all,
+		pro: users.filter((u) => !u.disabled && status(u).kind === 'pro').length,
 		projects: users.reduce((n, u) => n + Number(u.project_count), 0)
 	});
 
@@ -85,6 +114,8 @@
 			const { data, error: e } = await sb.rpc('admin_list_users');
 			if (e) throw e;
 			users = (data ?? []) as UserRow[];
+			const { data: s2 } = await sb.auth.getSession();
+			me = s2.session?.user.id ?? null;
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Could not load users.';
 		}
@@ -94,6 +125,7 @@
 	async function toggle(u: UserRow) {
 		open = open === u.id ? null : u.id;
 		confirm = null;
+		confirmDisable = null;
 		if (open && !Array.isArray(projects[u.id])) {
 			projects[u.id] = 'loading';
 			try {
@@ -125,6 +157,23 @@
 		busy = null;
 	}
 
+	async function setDisabled(u: UserRow, value: boolean) {
+		busy = u.id;
+		confirmDisable = null;
+		try {
+			const sb = await getSupabase();
+			const { error: e } = await sb.rpc('admin_set_disabled', { target: u.id, value });
+			if (e) throw e;
+			users = users.map((x) => (x.id === u.id ? { ...x, disabled: value } : x));
+			toast = `${u.name || u.email} ${value ? 'disabled' : 're-enabled'}`;
+			setTimeout(() => (toast = null), 2600);
+		} catch (e) {
+			toast = e instanceof Error ? e.message : 'Could not update.';
+			setTimeout(() => (toast = null), 3500);
+		}
+		busy = null;
+	}
+
 	const demoName = (k: string | null) => SAMPLE_UNITS.find((u) => u.id === k)?.name;
 
 	onMount(() => {
@@ -142,15 +191,35 @@
 {:else if !supabaseConfigured || auth.status === 'preview'}
 	<div class="card empty">The admin panel needs the backend — it isn't available in preview mode.</div>
 {:else}
+	<section class="card viewas">
+		<div class="va-head"><Icon name="shield" size={18} /><strong>View the app as</strong><span class="muted">now: {ROLE_LABELS[profile.role]}</span></div>
+		<div class="chips" role="radiogroup" aria-label="View the app as">
+			{#each roleList as [id, label] (id)}
+				<button role="radio" aria-checked={profile.role === id} class:on={profile.role === id} onclick={() => profile.setViewAs(id === 'admin' ? null : id)}>{label}</button>
+			{/each}
+		</div>
+		<p class="muted small">Preview only — changes what you see (limits, menus, badges). The server still enforces every permission.</p>
+	</section>
+
+	<div class="seg" role="tablist">
+		<button role="tab" aria-selected={tab === 'users'} class:on={tab === 'users'} onclick={() => (tab = 'users')}><Icon name="user" size={18} />Users</button>
+		<button role="tab" aria-selected={tab === 'ai'} class:on={tab === 'ai'} onclick={() => (tab = 'ai')}><Icon name="key" size={18} />AI keys</button>
+	</div>
+
+	{#if tab === 'ai'}
+		<AdminAiKeys />
+	{:else}
 	<div class="stats">
 		<div class="card"><span class="muted">Users</span><strong>{stats.users}</strong></div>
 		<div class="card"><span class="muted">On Pro</span><strong>{stats.pro}</strong></div>
-		<div class="card"><span class="muted">Projects</span><strong>{stats.projects}</strong></div>
+		<div class="card"><span class="muted">All projects</span><strong>{stats.projects}</strong></div>
 	</div>
 
-	<div class="tools">
-		<input class="search" type="search" placeholder="Search name or email" bind:value={q} aria-label="Search users" maxlength="80" />
-		<button class="btn" onclick={load} disabled={loading}>Refresh</button>
+	<input class="search" type="search" placeholder="Search name or email" bind:value={q} aria-label="Search users" maxlength="80" />
+	<div class="filters" role="radiogroup" aria-label="Filter users">
+		{#each FILTERS as f (f.id)}
+			<button role="radio" aria-checked={filter === f.id} class:on={filter === f.id} onclick={() => (filter = f.id)}>{f.label} <span>{counts[f.id]}</span></button>
+		{/each}
 	</div>
 
 	{#if loading}
@@ -166,13 +235,18 @@
 				{@const ps = projects[u.id]}
 				<li class="card user" class:open={open === u.id}>
 					<button class="row" onclick={() => toggle(u)} aria-expanded={open === u.id}>
-						<span class="av">{(u.name || u.email).slice(0, 1).toUpperCase()}</span>
+						<Avatar size={42} src={u.avatar} name={u.name || u.email} />
 						<span class="who">
 							<strong>{u.name || '(no name)'}</strong>
 							<span class="muted">{u.email}</span>
 							<span class="tags">
-								{#if u.is_admin}<span class="tag adm">Admin</span>{/if}
-								<span class="tag" class:pro={st.kind !== 'free'}>{st.label}</span>
+								{#if u.disabled}<span class="tag off">Disabled</span>{:else}<span class="tag on">Active</span>{/if}
+								{#if u.id === me}
+									<span class="tag adm">{ROLE_LABELS[profile.role]}{profile.viewAs ? ' · preview' : ''}</span>
+								{:else}
+									{#if u.is_admin}<span class="tag adm">Admin</span>{/if}
+									<span class="tag" class:pro={st.kind !== 'free'}>{st.label}</span>
+								{/if}
 								<span class="tag">{u.project_count} project{Number(u.project_count) === 1 ? '' : 's'}</span>
 							</span>
 						</span>
@@ -227,11 +301,27 @@
 								</div>
 								<p class="muted small">1 month adds to any time they already have. During the launch everyone gets Pro features anyway — grants decide who keeps Pro after launch.</p>
 							{/if}
+
+							<h4>Account</h4>
+							{#if u.id === me}
+								<p class="muted small">This is you.</p>
+							{:else if u.is_admin}
+								<p class="muted small">Admins can't be disabled.</p>
+							{:else if confirmDisable === u.id}
+								<div class="confirm">
+									<span>{u.disabled ? `Re-enable ${u.name || u.email}?` : `Disable ${u.name || u.email}? They'll be signed out and blocked until re-enabled.`}</span>
+									<button class="btn" onclick={() => (confirmDisable = null)}>Cancel</button>
+									<button class="btn" class:danger={!u.disabled} class:primary={u.disabled} onclick={() => setDisabled(u, !u.disabled)}>Confirm</button>
+								</div>
+							{:else}
+								<button class="btn" class:danger={!u.disabled} disabled={busy === u.id} onclick={() => (confirmDisable = u.id)}>{u.disabled ? 'Re-enable account' : 'Disable account'}</button>
+							{/if}
 						</div>
 					{/if}
 				</li>
 			{/each}
 		</ul>
+	{/if}
 	{/if}
 {/if}
 
@@ -266,19 +356,101 @@
 		font-family: var(--serif);
 		font-variant-numeric: tabular-nums;
 	}
-	.tools {
-		display: flex;
-		gap: 8px;
-		margin-bottom: 12px;
-	}
 	.search {
-		flex: 1;
+		width: 100%;
 		min-height: 44px;
 		padding: 0 12px;
 		border-radius: var(--radius-sm);
 		border: 1px solid var(--line);
 		background: var(--surface);
 		font-size: 16px;
+	}
+	.viewas {
+		margin-bottom: 14px;
+	}
+	.va-head {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		color: var(--forest);
+		margin-bottom: 10px;
+	}
+	.va-head strong {
+		color: var(--text);
+	}
+	.va-head .muted {
+		margin-left: auto;
+		font-size: 13px;
+	}
+	.chips,
+	.filters {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 8px;
+	}
+	.chips button,
+	.filters button {
+		min-height: 44px;
+		padding: 0 14px;
+		border-radius: 22px;
+		border: 1px solid var(--line);
+		background: var(--surface);
+		font-weight: 600;
+		cursor: pointer;
+	}
+	.chips button.on,
+	.filters button.on {
+		background: var(--forest);
+		border-color: var(--forest);
+		color: var(--on-primary);
+	}
+	.filters {
+		margin: 10px 0 14px;
+	}
+	.filters span {
+		opacity: 0.7;
+		font-weight: 500;
+		margin-left: 2px;
+	}
+	.seg {
+		display: flex;
+		gap: 4px;
+		padding: 4px;
+		background: var(--surface-2);
+		border-radius: calc(var(--radius-sm) + 4px);
+		margin-bottom: 14px;
+	}
+	.seg button {
+		flex: 1;
+		min-height: 44px;
+		border: 0;
+		border-radius: var(--radius-sm);
+		background: transparent;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 8px;
+		font-weight: 600;
+		color: var(--muted);
+		cursor: pointer;
+	}
+	.seg button.on {
+		background: var(--surface);
+		color: var(--text);
+		box-shadow: var(--shadow);
+	}
+	.tag.on {
+		background: color-mix(in srgb, #2f9e5b 16%, transparent);
+		color: #2a8a50;
+	}
+	.tag.off {
+		background: var(--surface-2);
+		color: var(--muted);
+		text-decoration: line-through;
+	}
+	:global(.btn.danger) {
+		color: #b5483a;
+		border-color: color-mix(in srgb, #b5483a 40%, var(--line));
 	}
 	.center {
 		display: grid;
@@ -308,17 +480,6 @@
 		text-align: left;
 		cursor: pointer;
 		min-height: 44px;
-	}
-	.av {
-		width: 42px;
-		height: 42px;
-		flex-shrink: 0;
-		border-radius: 50%;
-		display: grid;
-		place-items: center;
-		background: var(--ochre-soft);
-		color: var(--ochre);
-		font-weight: 700;
 	}
 	.who {
 		flex: 1;

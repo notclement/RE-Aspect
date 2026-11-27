@@ -40,6 +40,14 @@
 
 {#if auth.status === 'loading'}
 	<div class="boot"><Spinner size={22} /></div>
+{:else if auth.status === 'signed-in' && profile.data.disabled}
+	<div class="boot disabled">
+		<div>
+			<h1>Account disabled</h1>
+			<p class="muted">This account has been disabled by an administrator. If you think this is a mistake, please get in touch.</p>
+			<button class="btn" onclick={() => auth.signOut()}>Sign out</button>
+		</div>
+	</div>
 {:else if bare}
 	{@render children()}
 {:else}
@@ -51,5 +59,10 @@
 		min-height: 100dvh;
 		display: grid;
 		place-items: center;
+	}
+	.disabled > div {
+		max-width: 380px;
+		padding: 24px;
+		text-align: center;
 	}
 </style>

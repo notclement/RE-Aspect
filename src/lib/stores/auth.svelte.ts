@@ -2,6 +2,7 @@ import { getSupabase, supabaseConfigured } from '#lib/supabase.ts';
 import { profile, sanitizeSettings } from './profile.svelte';
 import { theme } from './theme.svelte.ts';
 import { syncProjects, signOutProjects } from './projects.svelte.ts';
+import { isAvatarDataUrl } from '#lib/image.ts';
 
 export type AuthStatus = 'loading' | 'signed-in' | 'signed-out' | 'preview';
 
@@ -60,7 +61,7 @@ class Auth {
 			const sb = await getSupabase();
 			const { data, error } = await sb
 				.from('profiles')
-				.select('name, plan, pro_until, is_admin, settings')
+				.select('name, plan, pro_until, is_admin, settings, avatar, disabled')
 				.eq('id', this.userId)
 				.maybeSingle();
 			if (error) throw error;
@@ -73,6 +74,8 @@ class Auth {
 					plan,
 					proUntil: plan === 'pro' ? until : null,
 					isAdmin: data.is_admin === true,
+					avatar: isAvatarDataUrl(data.avatar) ? data.avatar : null,
+					disabled: data.disabled === true,
 					...(data.name ? { name: data.name } : {})
 				});
 				if (!data.is_admin) profile.setViewAs(null);
@@ -104,6 +107,16 @@ class Auth {
 		}
 	}
 
+	/** Save (or with null, remove) the profile photo — already shrunk by makeAvatar(). */
+	async saveAvatar(avatar: string | null) {
+		if (avatar !== null && !isAvatarDataUrl(avatar)) throw new Error('Invalid image.');
+		profile.update({ avatar });
+		if (this.status !== 'signed-in' || !this.userId) return;
+		const sb = await getSupabase();
+		const { error } = await sb.from('profiles').update({ avatar }).eq('id', this.userId);
+		if (error) throw new Error(error.message);
+	}
+
 	/** Save an already-validated name locally and (when signed in) to the server. */
 	async saveName(name: string) {
 		profile.update({ name });
@@ -131,7 +144,7 @@ class Auth {
 		if (supabaseConfigured) {
 			// Forget this account's details in the browser so the next person to sign in doesn't inherit them.
 			profile.setViewAs(null);
-			profile.update({ name: '', plan: 'free', proUntil: null, isAdmin: false });
+			profile.update({ name: '', plan: 'free', proUntil: null, isAdmin: false, avatar: null, disabled: false });
 			signOutProjects();
 		}
 		this.status = supabaseConfigured ? 'signed-out' : 'preview';

@@ -23,6 +23,8 @@ export interface Profile {
 	name: string;
 	plan: PlanId;
 	proUntil: string | null; // granted Pro end date (ISO), 'infinity' = lifetime, null = none
+	avatar: string | null; // tiny square profile photo (data URL, ≤16 KB), synced via profiles.avatar
+	disabled: boolean; // set by an admin; the app shows a notice and stops working for this account
 	bodyHeightCm: number; // walkthrough eye level ≈ height − 12 cm
 	areaUnit: 'sqft' | 'sqm';
 	clock: '12h' | '24h';
@@ -38,6 +40,8 @@ const DEFAULTS: Profile = {
 	name: '',
 	plan: 'free',
 	proUntil: null,
+	avatar: null,
+	disabled: false,
 	bodyHeightCm: 170,
 	areaUnit: 'sqft',
 	clock: '12h',

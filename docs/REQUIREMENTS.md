@@ -35,7 +35,12 @@
 - **Account menu on the avatar** (top right): name, email, current role, Profile, Settings, Sign out; admins also get **View the app as** (Free / Pro / Agency member / Agency Lead / Admin). Settings has no profile card. The ☰ menu holds only Projects (+ signed-in name, Sign out).
 - **Profile → Usage**: projects used of included (bar), extra-project price, AI re-runs per function (0 used until the AI tools ship), plan + Pro expiry / lifetime.
 - **Project details**: Name, Unit, Type (dropdown: HDB, EC, Condo, Landed terrace/semi-D/bungalow, Cluster, Shophouse, Commercial, Other), Address, Description, Notes, Size. Saved to the `projects` table (migration 0003) so they follow the account.
-- **Admin panel** (`/admin`, avatar menu → Admin panel): all users with email, plan, Pro expiry, joined, last sign-in, project count; tap a user for their projects; grant **Pro 1 month** (adds to remaining time) / **Pro lifetime** / **Remove Pro**. All via admin-only server functions that check `is_admin`.
+- **Admin panel** (`/admin`, avatar menu → Admin panel): **View the app as** switcher (moved from Settings); tabs **Users** / **AI keys**.
+  - Users: stats (Users = all active, On Pro, All projects); live search (no button); filters **All** (everyone except disabled, default) · Pro · Free · **Full** (everyone) · Disabled; tags Active (green) / Disabled (grey); your own row shows the role you're currently viewing as. Tap a user for joined/last sign-in, projects, Pro grants (**1 month** adds to remaining time / **lifetime** / remove) and **Disable / Re-enable** (blocks sign-in too; admins and yourself can't be disabled).
+  - AI keys: add keys for OpenAI / Anthropic / Google / Other; stored encrypted in **Supabase Vault**, browser only sees the last 4 characters; choose the **active** key; delete. Edge functions read it via `active_ai_key()` (service role only).
+- **Profile photo**: Profile → Add/Change photo; centre-cropped and shrunk to a 128 px WebP (≈3–8 KB, max 16 KB) in the browser before upload; shown in the avatar circle and admin list.
+- Account menu closes on any tap outside it or Escape.
+- Phase 1 plan (New project wizard + Studio): see `docs/PHASE1.md`.
 - Demo 1 is **Dakota One** (Blk 88B Jalan Satu, HDB 3-room Type-2B, traced from HDB's plan; orientation assumed south-facing windows).
 - Projects page counts the open projects (demos included) and hides "Set up your first project" when any exist.
 - Project cards show a **thumbnail of the actual plan** with today's sunniest-hour light.
