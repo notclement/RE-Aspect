@@ -15,13 +15,14 @@ export function navigation(u: Unit, parts: Piece[], sun: Sun) {
 			c: Math.cos((it.rot ?? 0) * rad),
 			s: Math.sin((it.rot ?? 0) * rad),
 		}));
-	function clear(x: number, y: number) {
+	function clear(x: number, y: number, solidItems = true) {
 		if (!inside(x, y, u.outline)) return false;
 		for (let i = 0; i < u.outline.length; i++)
 			if (distance(x, y, u.outline[i], u.outline[(i + 1) % u.outline.length]) < radius)
 				return false;
 		for (const w of barriers) if (distance(x, y, w.a, w.b) < radius + w.t / 2) return false;
-		for (const it of items) {
+		// RE:Aspect: furniture only matters for choosing the start spot; you can walk through it (not walls).
+		if (solidItems) for (const it of items) {
 			const dx = x - it.x,
 				dy = y - it.y;
 			if (
@@ -94,7 +95,20 @@ export function navigation(u: Unit, parts: Piece[], sun: Sun) {
 			yaw = Math.atan2(x - spawn[0], spawn[1] - y);
 		}
 	}
-	return { x: spawn[0], y: spawn[1], yaw, clear };
+	// RE:Aspect: step back from that window (up to 4.5 m, staying clear of walls/furniture) so you start
+	// looking across the room at it, not with your nose on the glass.
+	let sx = spawn[0],
+		sy = spawn[1];
+	const bx = -Math.sin(yaw),
+		by = Math.cos(yaw);
+	for (let t = 15; t <= 450; t += 15) {
+		const x = spawn[0] + bx * t,
+			y = spawn[1] + by * t;
+		if (!inside(x, y, u.outline) || !clear(x, y)) break;
+		sx = x;
+		sy = y;
+	}
+	return { x: sx, y: sy, yaw, clear: (x: number, y: number) => clear(x, y, false) };
 }
 export function walkingInput(
 	canvas: HTMLCanvasElement,

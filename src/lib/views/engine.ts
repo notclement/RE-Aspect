@@ -28,7 +28,8 @@ export function create(
 	});
 	renderer.setClearColor(0, 0);
 	const scene = new T.Scene(),
-		camera = new T.PerspectiveCamera(walk ? 67 : 39, 1, walk ? 2 : 5, 20000);
+		// RE:Aspect: wider lens for the 3D plan (39° felt flat and cramped); Walk's lens is set from the aspect below.
+		camera = new T.PerspectiveCamera(walk ? 75 : 50, 1, walk ? 2 : 5, 20000);
 	camera.rotation.order = 'YXZ';
 	let model: ReturnType<typeof apartment> | undefined,
 		nav: ReturnType<typeof navigation> | undefined;
@@ -45,7 +46,7 @@ export function create(
 	let input: ReturnType<typeof walkingInput> | undefined;
 	function reset() {
 		az = (225 - (unit?.bearing ?? 0)) * rad;
-		tilt = 44 * rad;
+		tilt = 56 * rad;
 		stage.invalidate();
 	}
 	function draw(dt: number) {
@@ -57,7 +58,7 @@ export function create(
 			nav = walk ? navigation(unit, model.parts, s.sun) : undefined;
 			az = nav?.yaw ?? (225 - unit.bearing) * rad;
 			pitch = walk ? -0.1 : 0;
-			tilt = 44 * rad;
+			tilt = 56 * rad;
 			themed = dirty = true;
 		}
 		if (dirty || themed) {
@@ -87,9 +88,10 @@ export function create(
 			const b = model.b,
 				targetY = Math.min(100, s.unit.ceiling * 0.32);
 			// Enclose the complete footprint and wall tops, independent of orbit and aspect.
-			const radius = Math.hypot(b.w / 2, b.h / 2, Math.min(230, s.unit.ceiling) - targetY);
+			// RE:Aspect: fit the footprint more tightly so the unit fills the view (was a loose bounding sphere).
+			const radius = Math.hypot(b.w / 2, b.h / 2) * 0.82 + Math.min(230, s.unit.ceiling) * 0.15;
 			const fov = Math.atan(Math.tan((camera.fov * rad) / 2) * Math.min(1, camera.aspect));
-			const dist = (radius * 1.025) / (Math.sin(fov) * s.scale),
+			const dist = radius / (Math.sin(fov) * s.scale),
 				horizontal = dist * Math.cos(tilt);
 			camera.position.set(
 				b.cx + Math.sin(az) * horizontal,
@@ -106,6 +108,8 @@ export function create(
 		draw,
 		(w, h, dpr) => {
 			camera.aspect = w / h;
+			// RE:Aspect: Walk keeps a wide ~100° horizontal view whatever the screen shape (vertical 60–90°).
+			if (walk) camera.fov = clamp((2 * Math.atan(Math.tan(50 * rad) / camera.aspect)) / rad, 60, 90);
 			camera.updateProjectionMatrix();
 			if (ratio !== dpr || width !== w || height !== h) {
 				ratio = dpr;

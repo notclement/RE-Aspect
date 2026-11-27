@@ -39,6 +39,8 @@ const WORDS: Record<string, string> = {
 };
 
 const C16 = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+/** 16-point compass abbreviation, e.g. 234° → "SW". */
+export const compass16 = (deg: number) => C16[Math.round((((deg % 360) + 360) % 360) / 22.5) % 16];
 /** 16-point compass word, e.g. 234° → "southwest". */
 export const facingWords = (deg: number) => WORDS[C16[Math.round((((deg % 360) + 360) % 360) / 22.5) % 16]];
 

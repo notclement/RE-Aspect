@@ -1,3 +1,4 @@
+import { clamp } from './types.ts';
 const defaults = {
 	floor: '#e9dfcb',
 	'floor-line': '#cfc1a6',
@@ -186,10 +187,10 @@ export function planInput(
 		(e) => {
 			if (!e.ctrlKey && !wheelPan) return;
 			e.preventDefault();
-			if (!e.ctrlKey) {
-				const k = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1;
-				drag(-e.deltaX * k, -e.deltaY * k);
-			}
+			const k = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1;
+			// RE:Aspect: trackpad pinch / ctrl+scroll = gentle zoom (was ignored).
+			if (e.ctrlKey) zoom(Math.exp(-clamp(e.deltaY * k, -50, 50) * 0.0025));
+			else drag(-e.deltaX * k, -e.deltaY * k);
 		},
 		{ ...opts, passive: false },
 	);

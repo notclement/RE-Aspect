@@ -17,8 +17,8 @@
 <script lang="ts">
 	/**
 	 * The sun study: view tabs, the plan (Astra's Top down / 3D / Walk views), legend + gesture hints,
-	 * the live summary, Sun score, the DayTrace timeline, the Sun position + Unit details cards
-	 * (beside the plan on wide screens) and "How we worked this out".
+	 * the live summary + Sun score pill, the DayTrace timeline and "How we worked this out".
+	 * Full width on every screen so the plan stays as big as possible.
 	 * Shared by /unit and the public share page /s, so both look exactly the same.
 	 */
 	import { onMount } from 'svelte';
@@ -34,7 +34,7 @@
 	import { sunPosition, localDate, sunTimes, compass } from '#lib/sun.ts';
 	import { sunPatches, darkness, furnitureLight, indoorExposure, ITEM_LABELS } from '#lib/light.ts';
 	import { sunColor } from '#lib/sun-tint.ts';
-	import { sunScore, facingWords } from '#lib/sun-score.ts';
+	import { sunScore, compass16 } from '#lib/sun-score.ts';
 	import { parseViewHash, viewHash } from '#lib/share-state.ts';
 	import { profile } from '#lib/stores/profile.svelte.ts';
 
@@ -80,11 +80,12 @@
 	});
 
 	// ---- canvas height (drag the grip)
-	const H_KEY = 'rea.canvasH';
+	const H_KEY = 'rea.canvasH2'; // v2: bigger default on desktop
 	let canvasH = $state(320);
 	$effect(() => {
 		const saved = Number(localStorage.getItem(H_KEY));
-		canvasH = saved > 0 ? clampH(saved) : clampH(Math.round(innerHeight * 0.38));
+		// Default: a big plan on desktop/tablet, compact on phones so the timeline stays on screen.
+		canvasH = saved > 0 ? clampH(saved) : clampH(Math.round(innerHeight * (innerWidth >= 900 ? 0.6 : 0.38)));
 	});
 	function clampH(h: number) {
 		return Math.round(Math.min(innerHeight * 0.85, Math.max(220, h)));
@@ -145,6 +146,7 @@
 	);
 	let infoOpen = $state(false);
 	let howOpen = $state(false);
+	let howEl = $state<HTMLDivElement>();
 	function fmtMin(m: number | null) {
 		if (m === null) return '—';
 		m = ((Math.round(m) % 1440) + 1440) % 1440;
@@ -152,7 +154,6 @@
 		const mm = String(m % 60).padStart(2, '0');
 		return profile.data.clock === '24h' ? `${String(h).padStart(2, '0')}:${mm}` : `${((h + 11) % 12) + 1}:${mm} ${h < 12 ? 'AM' : 'PM'}`;
 	}
-	const dateLabel = $derived(new Date(vs.date + 'T00:00:00').toLocaleDateString('en-SG', { day: 'numeric', month: 'short', year: 'numeric' }));
 	const hint = $derived(
 		vs.view === 'top'
 			? 'Drag to pan · pinch or + / − to zoom'
@@ -244,55 +245,26 @@
 		>
 			<span></span>
 		</div>
-		<div class="legend">
-			<span class="key"><i class="am"></i>Pale yellow = morning sun</span>
-			<span class="key"><i class="pm"></i>Orange = afternoon sun</span>
-			<span class="hint">{hint}</span>
+		<div class="legend" title={hint}>
+			<span class="key"><i class="am"></i>Morning sun</span>
+			<span class="key"><i class="pm"></i>Afternoon sun</span>
 		</div>
 	</section>
 
 	<div class="below">
 		<p class="summary">{summary}</p>
 		{#if score}
-			<button class="score" onclick={() => (howOpen = true)} aria-label="Sun score {score.score} out of 10. How we worked this out">
-				<strong>{score.score.toFixed(1)}</strong><small>/10</small>
-				<span>
-					<b>Sun score · {score.verdict}</b>
-					<em>{score.room} faces {score.facingWords} ({score.facingDeg}°)</em>
-				</span>
+			<button class="score" onclick={() => { howOpen = true; requestAnimationFrame(() => howEl?.scrollIntoView({ behavior: 'smooth', block: 'start' })); }} title={score.verdict} aria-label="Sun score {score.score} out of 10, {score.room.toLowerCase()} faces {score.facingWords}. {score.verdict}. How we worked this out">
+				<Icon name="sun" size={14} /><strong>{score.score.toFixed(1)}</strong>/10 · faces {compass16(score.facingDeg)}
 			</button>
 		{/if}
 	</div>
-
-	<aside class="side">
-		<section class="card">
-			<h3><Icon name="sun" size={16} /> Sun position</h3>
-			<p class="big">{fmtMin(vs.minutes)} <span class="muted">· {dateLabel}</span></p>
-			{#if sun.altitude > 0}
-				<p>{Math.round(sun.altitude)}° up, in the {facingWords(sun.azimuth)} ({Math.round(sun.azimuth)}°)</p>
-			{:else}
-				<p class="muted">Below the horizon</p>
-			{/if}
-			<p class="muted small">Sunrise {fmtMin(times.sunrise)} · Sunset {fmtMin(times.sunset)}</p>
-			<button class="link" onclick={() => (infoOpen = true)}>More sun info</button>
-		</section>
-		<section class="card">
-			<h3><Icon name="home" size={16} /> Unit details</h3>
-			<dl>
-				<dt>Type</dt><dd>{info.typeLabel}</dd>
-				<dt>Unit</dt><dd>{[info.unitNo, info.level !== null ? `Level ${info.level}` : ''].filter(Boolean).join(' · ') || '—'}</dd>
-				<dt>Size</dt><dd>{info.sizeSqft ? `${info.sizeSqft.toLocaleString()} sq ft` : '—'}</dd>
-				<dt>Ceiling</dt><dd>{(info.ceilingCm / 100).toFixed(2)} m</dd>
-				{#if score}<dt>Facing</dt><dd>{score.facingWords} ({score.facingDeg}°)</dd>{/if}
-			</dl>
-		</section>
-	</aside>
 
 	<div class="timeline">
 		<SunTimeline bind:minutes={vs.minutes} bind:date={vs.date} sunrise={times.sunrise} sunset={times.sunset} lat={unit.lat} lon={unit.lon} {sun} {exposure} oninfo={() => (infoOpen = true)} />
 	</div>
 
-	<div class="how">
+	<div class="how" bind:this={howEl}>
 		<Collapse title="How we worked this out" bind:open={howOpen}>
 			<dl>
 				<dt>Floor plan</dt><dd>{traceSource}</dd>
@@ -306,7 +278,7 @@
 				<dt>Surroundings</dt><dd>Neighbouring buildings and trees are <strong>not</strong> included — the unit is treated as unobstructed</dd>
 				{#if score}
 					<dt>Sun score</dt>
-					<dd>Direct afternoon sun (after 1 pm) on the {score.room.toLowerCase()} windows, added up over a year. 10 = none, 1 = the hottest facing at this location.</dd>
+					<dd><strong>{score.score.toFixed(1)}/10 — {score.verdict}.</strong> {score.room} faces {score.facingWords} ({score.facingDeg}°). Measures direct afternoon sun (after 1 pm) on those windows, added up over a year: 10 = none, 1 = the hottest facing here.</dd>
 				{/if}
 			</dl>
 			<p class="muted small">Estimates for guidance only.</p>
@@ -320,8 +292,7 @@
 	.study {
 		display: grid;
 		grid-template-columns: minmax(0, 1fr);
-		grid-template-areas: 'viewer' 'below' 'timeline' 'side' 'how';
-		gap: 0 20px;
+		grid-template-areas: 'viewer' 'below' 'timeline' 'how';
 	}
 	.viewer {
 		grid-area: viewer;
@@ -336,25 +307,9 @@
 	.timeline {
 		grid-area: timeline;
 	}
-	.side {
-		grid-area: side;
-		display: grid;
-		gap: 12px;
-		margin-top: 12px;
-	}
 	.how {
 		grid-area: how;
 		margin-top: 10px;
-	}
-	@media (min-width: 1100px) {
-		.study {
-			grid-template-columns: minmax(0, 1fr) 300px;
-			grid-template-areas: 'viewer side' 'below side' 'timeline timeline' 'how how';
-		}
-		.side {
-			margin-top: 0;
-			align-content: start;
-		}
 	}
 	.seg {
 		display: flex;
@@ -444,15 +399,6 @@
 	.key .pm {
 		background: #f28c30;
 	}
-	.hint {
-		margin-left: auto;
-	}
-	@media (max-width: 560px) {
-		.hint {
-			margin-left: 0;
-			width: 100%;
-		}
-	}
 	.zoom {
 		position: absolute;
 		right: 12px;
@@ -489,84 +435,38 @@
 		font-variant-numeric: tabular-nums;
 		color: var(--muted);
 	}
+	.below {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		margin: 10px 4px;
+	}
 	.summary {
-		margin: 12px 4px 8px;
+		flex: 1;
+		margin: 0;
 		font-size: 14px;
 		color: var(--muted);
 	}
 	.score {
-		display: flex;
+		flex-shrink: 0;
+		display: inline-flex;
 		align-items: center;
-		gap: 10px;
-		width: 100%;
-		min-height: 52px;
-		margin: 0 0 4px;
-		padding: 8px 12px;
+		gap: 5px;
+		min-height: 44px;
+		padding: 0 12px;
 		border: 1px solid var(--line);
-		border-radius: var(--radius-sm);
+		border-radius: 999px;
 		background: var(--surface);
-		color: var(--text);
-		text-align: left;
+		color: var(--muted);
+		font-size: 13px;
 		cursor: pointer;
+	}
+	.score :global(svg) {
+		color: var(--ochre);
 	}
 	.score strong {
-		font-size: 24px;
-		font-family: var(--serif);
-		color: var(--forest);
-		line-height: 1;
-	}
-	.score small {
-		color: var(--muted);
-		margin-left: -8px;
-		align-self: flex-end;
-		margin-bottom: 4px;
-	}
-	.score span {
-		display: grid;
-		gap: 2px;
-		min-width: 0;
-	}
-	.score b {
+		color: var(--text);
 		font-size: 14px;
-	}
-	.score em {
-		font-style: normal;
-		font-size: 12px;
-		color: var(--muted);
-	}
-	.card {
-		padding: 14px 16px;
-	}
-	.card h3 {
-		display: flex;
-		align-items: center;
-		gap: 6px;
-		margin: 0 0 8px;
-		font-size: 12px;
-		text-transform: uppercase;
-		letter-spacing: 0.06em;
-		color: var(--muted);
-	}
-	.card p {
-		margin: 0 0 4px;
-		font-size: 14px;
-	}
-	.card .big {
-		font-size: 20px;
-		font-weight: 600;
-	}
-	.card .big .muted {
-		font-size: 14px;
-		font-weight: 400;
-	}
-	.link {
-		border: 0;
-		background: none;
-		padding: 10px 0 0;
-		min-height: 44px;
-		color: var(--forest);
-		font-weight: 600;
-		cursor: pointer;
 	}
 	dl {
 		display: grid;
