@@ -19,7 +19,7 @@
 		overflow: hidden;
 		flex-shrink: 0;
 		background: var(--ochre-soft);
-		color: var(--ochre);
+		color: var(--ochre-ink);
 		font-weight: 700;
 	}
 	img {

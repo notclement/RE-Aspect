@@ -134,7 +134,7 @@
 		background: var(--ochre);
 	}
 	.more {
-		color: var(--ochre);
+		color: var(--ochre-ink);
 		font-weight: 600;
 	}
 	.unit {

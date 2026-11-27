@@ -321,7 +321,7 @@
 		text-decoration: none;
 	}
 	.plans-link.hot {
-		color: var(--ochre);
+		color: var(--ochre-ink);
 	}
 	.plans-link :global(svg) {
 		transform: rotate(-90deg);

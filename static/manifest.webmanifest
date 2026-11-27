@@ -1,13 +1,13 @@
 {
 	"name": "RE:Aspect",
 	"short_name": "RE:Aspect",
-	"description": "See how sunlight moves through a home, room by room — featuring DayTrace.",
+	"description": "Show clients how sunlight moves through every room — featuring DayTrace.",
 	"start_url": "/",
 	"scope": "/",
 	"display": "standalone",
 	"orientation": "any",
-	"background_color": "#FBF8F3",
-	"theme_color": "#FBF8F3",
+	"background_color": "#F7F6F1",
+	"theme_color": "#F7F6F1",
 	"icons": [
 		{ "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
 		{ "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },

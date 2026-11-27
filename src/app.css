@@ -8,11 +8,12 @@
 	--canvas: #f0efe8;
 	--line: #e2e1d8;
 	--text: #24302a;
-	--muted: #7b8077;
+	--muted: #646a61;
 	--forest: #2f4a3b;
 	--forest-2: #3e5d4b;
 	--ochre: #b07a2a;
 	--ochre-soft: #f6ead2;
+	--ochre-ink: #8b6021;
 	--sun: #f2b84b;
 	--sky: #6c8ebf;
 	--gold: #c8963e;
@@ -29,7 +30,7 @@
 	--safe-t: env(safe-area-inset-top, 0px);
 
 	--font: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-	--serif: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif;
+	--serif: 'Source Serif 4', 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif;
 	color-scheme: light;
 }
 
@@ -162,7 +163,7 @@ textarea {
 	outline-offset: 1px;
 }
 .field .error {
-	color: var(--dusk);
+	color: var(--ochre-ink);
 	font-size: 13px;
 }
 
@@ -180,7 +181,7 @@ textarea {
 }
 .tag.pro {
 	background: var(--ochre-soft);
-	color: var(--ochre);
+	color: var(--ochre-ink);
 }
 .tag.lead {
 	background: #fbebc8;

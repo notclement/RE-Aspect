@@ -257,7 +257,7 @@
 		cursor: pointer;
 	}
 	.score :global(svg) {
-		color: var(--ochre);
+		color: var(--ochre-ink);
 	}
 	.score strong {
 		color: var(--text);
@@ -360,7 +360,7 @@
 	}
 	.pill {
 		background: var(--ochre-soft);
-		color: var(--ochre);
+		color: var(--ochre-ink);
 		font-weight: 700;
 		font-variant-numeric: tabular-nums;
 		padding: 8px 9px;

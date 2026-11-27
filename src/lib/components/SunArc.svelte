@@ -162,7 +162,7 @@
 		display: grid;
 		place-items: center;
 		background: var(--ochre-soft);
-		color: var(--ochre);
+		color: var(--ochre-ink);
 		flex-shrink: 0;
 		transition: background 0.4s, color 0.4s;
 	}

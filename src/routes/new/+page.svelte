@@ -717,7 +717,7 @@
 		color: #2a8a50;
 	}
 	.c-medium {
-		color: var(--ochre);
+		color: var(--ochre-ink);
 	}
 	.c-low {
 		color: #b5483a;
@@ -959,7 +959,7 @@
 	.tip :global(svg) {
 		flex-shrink: 0;
 		margin-top: 2px;
-		color: var(--ochre);
+		color: var(--ochre-ink);
 	}
 	.sizehead {
 		display: flex;

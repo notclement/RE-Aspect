@@ -240,7 +240,7 @@
 	}
 	.active .ic {
 		background: var(--ochre-soft);
-		color: var(--ochre);
+		color: var(--ochre-ink);
 	}
 	.info {
 		flex: 1;

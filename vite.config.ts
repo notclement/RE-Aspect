@@ -27,6 +27,8 @@ for (const key of process.env.REA_PREVIEW === '1' ? [] : (['SUPABASE_URL', 'SUPA
 		process.env[key] = process.env[`${key}_${env}`] || SUPABASE_PUBLIC[env][key];
 }
 process.env.APP_ENV ??= live ? 'live' : 'test';
+// Link previews (WhatsApp, Telegram…) need an absolute og:image URL, so the origin is baked in per branch.
+process.env.SITE_ORIGIN ??= live ? 'https://re-aspect.clement-392.workers.dev' : 'https://re-aspect-dev.clement-392.workers.dev';
 
 export default defineConfig({
 	plugins: [

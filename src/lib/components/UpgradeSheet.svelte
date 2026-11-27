@@ -75,7 +75,7 @@
 		display: grid;
 		place-items: center;
 		background: var(--ochre-soft);
-		color: var(--ochre);
+		color: var(--ochre-ink);
 	}
 	h2 {
 		margin: 6px 0 0;

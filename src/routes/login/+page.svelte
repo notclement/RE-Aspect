@@ -4,6 +4,7 @@
 	import Spinner from '#lib/components/Spinner.svelte';
 	import { auth } from '#lib/stores/auth.svelte.ts';
 	import { BRAND } from '#lib/config/brand.ts';
+	import Logo from '#lib/components/Logo.svelte';
 
 	let busy = $state(false);
 
@@ -24,10 +25,10 @@
 	<div class="sky" aria-hidden="true">
 		<svg viewBox="0 0 320 180" width="100%">
 			<path d="M10 178 Q160 -50 310 178" fill="none" stroke="currentColor" stroke-dasharray="1.5 8" stroke-linecap="round" />
-			<circle cx="225" cy="62" r="20" fill="var(--dusk)" />
+			<circle cx="225" cy="62" r="20" fill="var(--sun)" />
 		</svg>
 	</div>
-	<h1>{BRAND.name}</h1>
+	<h1 class="brandmark"><Logo height={52} label={BRAND.name} /></h1>
 	<p class="muted">{BRAND.tagline}</p>
 
 	<button class="btn wide" onclick={google} disabled={busy}>
@@ -59,8 +60,13 @@
 		font-size: 30px;
 		margin: 0;
 	}
+	.brandmark {
+		display: flex;
+		justify-content: center;
+		margin: 0 0 4px;
+	}
 	.err {
-		color: var(--dusk);
+		color: var(--ochre-ink);
 		font-size: 14px;
 	}
 	.fine {

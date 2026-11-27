@@ -317,12 +317,12 @@
 		display: grid;
 		place-items: center;
 		background: var(--ochre-soft);
-		color: var(--ochre);
+		color: var(--ochre-ink);
 	}
 	.note {
 		margin: 0 0 10px;
 		font-size: 13px;
-		color: var(--ochre);
+		color: var(--ochre-ink);
 	}
 	.head {
 		display: flex;

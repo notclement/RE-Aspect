@@ -131,7 +131,7 @@
 		display: grid;
 		place-items: center;
 		background: var(--ochre-soft);
-		color: var(--ochre);
+		color: var(--ochre-ink);
 	}
 	.row {
 		display: flex;

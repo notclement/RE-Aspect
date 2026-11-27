@@ -8,6 +8,7 @@
 	import { page } from '$app/state';
 	import Icon from '#lib/components/Icon.svelte';
 	import Spinner from '#lib/components/Spinner.svelte';
+	import Logo from '#lib/components/Logo.svelte';
 	import SunStudy, { type StudyInfo } from '#lib/components/SunStudy.svelte';
 	import { SAMPLE_UNITS, type Unit } from '#lib/sample-unit.ts';
 	import { sanitizePlan, planReady, planToUnit } from '#lib/plan.ts';
@@ -130,7 +131,7 @@
 </svelte:head>
 
 <div class="wrap">
-	<a class="logo" href="/" title="{BRAND.name} home" aria-label="{BRAND.name} home"><span class="dot"></span>{BRAND.name}</a>
+	<a class="logo" href="/" title="{BRAND.name} home" aria-label="{BRAND.name} home"><Logo height={30} label="{BRAND.name} home" /></a>
 
 	{#if state_ === 'loading'}
 		<div class="center"><Spinner size={22} /></div>
@@ -177,7 +178,8 @@
 			</div>
 		</section>
 
-		<p class="foot muted">Sunlight for this exact unit, worked out from its floor plan and Singapore's sun path through the year. Estimates for guidance; neighbouring buildings aren't included. Made with {BRAND.name} · <a href="/login">Agents: show your listings in sunlight</a></p>
+		<p class="foot muted">Sunlight for this exact unit, worked out from its floor plan and Singapore's sun path through the year. Estimates for guidance; neighbouring buildings aren't included. </p>
+		<p class="sign muted"><Logo kind="mark" height={20} label="" /><span><strong>{BRAND.name}</strong> · {BRAND.buyerLine}</span> <a href="/login">Agents &amp; designers: show your listings in sunlight</a></p>
 		<nav class="sticky" data-bottom-bar aria-label="Quick reply">
 			<a class="btn primary" href={waText('viewing')} target="_blank" rel="noopener noreferrer">Book a viewing</a>
 			<a class="btn" href={waText('interested')} target="_blank" rel="noopener noreferrer" aria-label="I'm interested" title="I'm interested">♥ Interested</a>
@@ -191,24 +193,27 @@
 		margin: 0 auto;
 		padding: 14px 16px calc(32px + var(--safe-b));
 	}
+	/* Brand stays visible (so buyers learn the name) but quiet, so the unit title leads. */
 	.logo {
 		display: inline-flex;
 		align-items: center;
-		gap: 8px;
 		min-height: 44px;
-		opacity: 0.55;
-		color: var(--text);
-		font-weight: 700;
+		opacity: 0.85;
 		text-decoration: none;
 	}
 	.logo:hover {
-		opacity: 0.9;
+		opacity: 1;
 	}
-	.dot {
-		width: 12px;
-		height: 12px;
-		border-radius: 50%;
-		background: var(--ochre);
+	.sign {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 6px 8px;
+		margin-top: 8px;
+		font-size: 12px;
+	}
+	.sign a {
+		color: var(--forest);
 	}
 	h1 {
 		margin: 6px 0 2px;
@@ -299,9 +304,6 @@
 		display: flex;
 		flex-wrap: wrap;
 		gap: 8px;
-	}
-	.foot a {
-		color: var(--forest);
 	}
 	/* Thumb-reach reply bar on phones (desktop has the contact card). */
 	.sticky {

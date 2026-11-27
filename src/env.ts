@@ -22,6 +22,12 @@ export const variables = defineEnvVars({
 		schema: optional,
 		description: 'Supabase publishable (sb_publishable_…) or legacy anon key. Safe for browsers.'
 	},
+	SITE_ORIGIN: {
+		public: true,
+		static: true,
+		schema: (value) => (value && /^https:\/\/[a-z0-9.-]+$/i.test(value.trim()) ? value.trim() : 'https://re-aspect-dev.clement-392.workers.dev'),
+		description: 'Absolute site origin for link previews (og:image), set per branch in vite.config.ts'
+	},
 	APP_ENV: {
 		public: true,
 		static: true,

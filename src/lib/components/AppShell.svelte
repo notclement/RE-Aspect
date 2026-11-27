@@ -8,6 +8,7 @@
 	import { afterNavigate, goto } from '$app/navigation';
 	import Icon, { type IconName } from './Icon.svelte';
 	import Avatar from './Avatar.svelte';
+	import Logo from './Logo.svelte';
 	import { auth } from '#lib/stores/auth.svelte.ts';
 	import { nav } from '#lib/stores/nav.svelte.ts';
 	import { profile, ROLE_LABELS } from '#lib/stores/profile.svelte.ts';
@@ -146,7 +147,7 @@
 {#if open}
 	<button class="scrim" title="Close menu" aria-label="Close menu" onclick={() => (open = false)}></button>
 	<aside class="drawer" aria-label="Menu">
-		<div class="brand"><span class="dot"></span><strong>{BRAND.name}</strong></div>
+		<div class="brand"><Logo height={30} label={BRAND.name} /></div>
 		{#each links as l (l.href)}
 			<a href={l.href} class:on={page.url.pathname === l.href}><Icon name={l.icon} />{l.label}</a>
 		{/each}
@@ -274,7 +275,7 @@
 		padding: 2px 8px;
 		border-radius: 6px;
 		background: var(--ochre-soft);
-		color: var(--ochre);
+		color: var(--ochre-ink);
 	}
 	.menu a,
 	.menu > button {
@@ -303,7 +304,7 @@
 		text-align: center;
 		padding: 5px;
 		background: var(--ochre-soft);
-		color: var(--ochre);
+		color: var(--ochre-ink);
 	}
 	.viewas {
 		background: color-mix(in srgb, var(--forest) 14%, var(--surface));
@@ -361,12 +362,6 @@
 		font-size: 18px;
 		padding: 6px 10px 16px;
 	}
-	.dot {
-		width: 24px;
-		height: 24px;
-		border-radius: 50%;
-		background: radial-gradient(circle at 40% 40%, #f8d98c, var(--ochre));
-	}
 	.drawer a {
 		display: flex;
 		align-items: center;
@@ -390,7 +385,7 @@
 		text-align: center;
 	}
 	.gift {
-		color: var(--ochre);
+		color: var(--ochre-ink);
 		width: 44px;
 		height: 44px;
 	}
@@ -406,7 +401,7 @@
 		border: 1px solid color-mix(in srgb, var(--ochre) 35%, transparent);
 	}
 	.pic {
-		color: var(--ochre);
+		color: var(--ochre-ink);
 		display: grid;
 		padding-top: 2px;
 	}

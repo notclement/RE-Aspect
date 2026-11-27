@@ -109,7 +109,7 @@
 		align-items: center;
 		gap: 10px;
 		margin-bottom: 12px;
-		color: var(--ochre);
+		color: var(--ochre-ink);
 	}
 	header h2 {
 		margin: 0;
