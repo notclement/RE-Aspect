@@ -2,7 +2,7 @@
  * Facing direction + Sun score.
  *
  * FACING: the main windows are the ones that light the living room (the room label matching /living/i —
- * windows within 7 m of that label, nearest first). If there's no living room label, every window counts.
+ * windows whose room outline contains that label, else windows within 7 m of it). If there's no living room label, every window counts.
  * Each window's outward normal is weighted by its glass area (width × glass height), the weighted vectors are
  * summed, and the direction of the sum is the facing (degrees clockwise from north; the plan is north-up).
  *
@@ -77,14 +77,24 @@ function exposure(s: Sample[], facingDeg: number): { am: number; pm: number } {
 	return { am, pm };
 }
 
+function inPoly(x: number, y: number, p: [number, number][]) {
+	let hit = false;
+	for (let i = 0, j = p.length - 1; i < p.length; j = i++)
+		if (p[i][1] > y !== p[j][1] > y && x < ((p[j][0] - p[i][0]) * (y - p[i][1])) / (p[j][1] - p[i][1]) + p[i][0]) hit = !hit;
+	return hit;
+}
+
 export function sunScore(unit: Unit): SunScore | null {
 	if (!unit.windows.length) return null;
 	const living = unit.rooms.find((r) => /living/i.test(r.name));
 	const mid = (w: Unit['windows'][number]) => [(w.a[0] + w.b[0]) / 2, (w.a[1] + w.b[1]) / 2];
 	let wins = unit.windows;
 	if (living) {
+		// Windows that light the living room: by their room outline when known, else within 7 m of the label.
+		const inRoom = wins.filter((w) => w.room && inPoly(living.x, living.y, w.room));
 		const near = wins.filter((w) => Math.hypot(mid(w)[0] - living.x, mid(w)[1] - living.y) < 700);
-		if (near.length) wins = near;
+		if (inRoom.length) wins = inRoom;
+		else if (near.length) wins = near;
 	}
 	let vx = 0;
 	let vy = 0;

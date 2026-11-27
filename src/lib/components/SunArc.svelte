@@ -104,15 +104,19 @@
 		{#if path}
 			<path d={area} class="fill" />
 			{#if inside}
-				<path d={inside.d} class="inside" />
-				<line x1={inside.px} y1={inside.py - 4} x2={inside.px} y2={BASE} class="peakline" />
+				<path d={inside.d} class="inside"><title>Sun inside the home through the day — the taller the band, the more floor gets direct sun</title></path>
+				<g class="peakhit">
+					<title>Most sun inside at {fmt(exposure!.peak!)} — the time the most direct sunlight lands on the floor indoors</title>
+					<line x1={inside.px} y1={inside.py - 4} x2={inside.px} y2={BASE} class="peakline" />
+					<line x1={inside.px} y1={inside.py - 8} x2={inside.px} y2={BASE} class="hit" />
+				</g>
 			{/if}
 			<path d={line} class="path" />
 		{/if}
 		<line x1="4" y1={BASE} x2={W - 4} y2={BASE} class="horizon" />
 		{#if up}
 			<line x1={sx} y1={sy} x2={sx} y2={BASE} class="drop" />
-			<circle cx={sx} cy={sy} r="10" class="halo" />
+			<circle cx={sx} cy={sy} r="10" class="halo"><title>The sun now: {altitude.toFixed(0)}° up</title></circle>
 			<circle cx={sx} cy={sy} r="5.5" class="disc" />
 		{/if}
 	</svg>
@@ -206,6 +210,11 @@
 	.inside {
 		fill: var(--ochre);
 		opacity: 0.45;
+	}
+	.hit {
+		stroke: transparent;
+		stroke-width: 14;
+		cursor: help;
 	}
 	.peakline {
 		stroke: var(--ochre);

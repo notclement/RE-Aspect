@@ -23,14 +23,14 @@ export interface ThemeDef {
 }
 
 export const THEMES: ThemeDef[] = [
-	{ id: 'light', label: 'Basic light', tagline: 'Warm paper, forest green', mode: 'light', swatch: ['#f7f6f1', '#2f4a3b', '#b07a2a', '#eeede6'] },
-	{ id: 'dark', label: 'Basic dark', tagline: 'Easy on the eyes at night', mode: 'dark', swatch: ['#141815', '#5f8a70', '#d39a45', '#262c27'] },
-	{ id: 'japandi', label: 'Japandi & Wabi-Sabi', tagline: 'Washi, charcoal, raw clay — calm and quiet', mode: 'light', swatch: ['#ece6dc', '#3b3631', '#9a6b47', '#ddd4c6'] },
-	{ id: 'scandi', label: 'Scandinavian', tagline: 'Airy whites, fjord blue, birch', mode: 'light', swatch: ['#f4f7f8', '#3d5a6c', '#c98a4b', '#e6ecef'] },
-	{ id: 'modern', label: 'Modern Contemporary', tagline: 'Crisp black & white, brass, sharp edges', mode: 'light', swatch: ['#fafafa', '#111111', '#b8913f', '#ececec'] },
-	{ id: 'industrial', label: 'Industrial', tagline: 'Concrete, steel and copper', mode: 'dark', swatch: ['#1b1c1d', '#c8693a', '#e0a458', '#2f3235'] },
-	{ id: 'peranakan', label: 'Eclectic & Peranakan', tagline: 'Jade, Nyonya pink, gold — retro heritage', mode: 'light', swatch: ['#fbf0ec', '#0f7f76', '#c38a22', '#f6d3db'] },
-	{ id: 'tropical', label: 'Resort / Tropical', tagline: 'Sand, ocean teal, sunset coral', mode: 'light', swatch: ['#f6efdf', '#0e7c86', '#e2703f', '#e6efe9'] }
+	{ id: 'light', label: 'Basic light', tagline: 'Warm paper, forest green', mode: 'light', swatch: ['#f5f3ec', '#2f4a3b', '#b07a2a', '#d6caae'] },
+	{ id: 'dark', label: 'Basic dark', tagline: 'Easy on the eyes at night', mode: 'dark', swatch: ['#101311', '#6f9c80', '#e2a64e', '#7d7566'] },
+	{ id: 'japandi', label: 'Japandi & Wabi-Sabi', tagline: 'Washi, charcoal, raw clay — calm and quiet', mode: 'light', swatch: ['#e7dfd1', '#2e2a27', '#a0643a', '#c6b597'] },
+	{ id: 'scandi', label: 'Scandinavian', tagline: 'Airy whites, fjord blue, birch', mode: 'light', swatch: ['#eef3f7', '#1f4a66', '#d9773a', '#c9d6de'] },
+	{ id: 'modern', label: 'Modern Contemporary', tagline: 'Crisp black & white, brass, sharp edges', mode: 'light', swatch: ['#ffffff', '#0a0a0a', '#b8913f', '#b9b9b6'] },
+	{ id: 'industrial', label: 'Industrial', tagline: 'Concrete, steel and copper', mode: 'dark', swatch: ['#17181a', '#d2703c', '#f0b35c', '#6b6761'] },
+	{ id: 'peranakan', label: 'Eclectic & Peranakan', tagline: 'Jade, Nyonya pink, gold — retro heritage', mode: 'light', swatch: ['#fdeee9', '#0b6e66', '#d1567a', '#b9d8d1'] },
+	{ id: 'tropical', label: 'Resort / Tropical', tagline: 'Sand, ocean teal, sunset coral', mode: 'light', swatch: ['#f3e6c8', '#0b6b74', '#ef6a3a', '#c4ad82'] }
 ];
 
 export const THEME_IDS = THEMES.map((t) => t.id);

@@ -203,8 +203,8 @@
 					sy = -Math.cos(az);
 				if (sun.altitude > 0 && dark < 1) {
 					const col = sunColor || p.ochre;
-					c.globalAlpha = 0.45 * (1 - dark);
-					c.lineWidth = 2.5;
+					c.globalAlpha = 0.8 * (1 - dark);
+					c.lineWidth = 3;
 					c.lineCap = 'round';
 					for (const q of beams)
 						if (q.nx * sx + q.ny * sy > 0.12) {

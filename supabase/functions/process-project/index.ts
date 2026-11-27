@@ -1,6 +1,7 @@
 // RE:Aspect · process-project
-// Traces a floor plan — outline, walls and room names only (fast) — with the admin's active AI key.
-// Windows and doors are added by the user in Studio (the app prompts them).
+// Traces a floor plan — outline, walls, room names, doors and a sensible furniture layout — with the admin's
+// active AI key. The furniture is then checked here like an interior designer would (realistic sizes, inside the
+// unit, off the walls, clear of every door swing, no overlaps). Windows are added by the user in Studio.
 // Photos arrive in the request body only — they are never written to storage, so nothing is left to delete.
 // Deploy: Supabase → Edge Functions → process-project (Verify JWT on).
 import { createClient } from 'jsr:@supabase/supabase-js@2';
@@ -39,15 +40,22 @@ function cors(req: Request) {
 const json = (req: Request, body: unknown, status = 200) =>
 	new Response(JSON.stringify(body), { status, headers: { ...cors(req), 'Content-Type': 'application/json' } });
 
-const PROMPT = (sizeSqft: number) => `Trace this apartment floor plan (north is up) for a sunlight simulator.
+const PROMPT = (sizeSqft: number) => `Trace this apartment floor plan (north is up) for a sunlight simulator, and furnish it like an experienced Singapore interior designer.
 The unit's total floor area is about ${sizeSqft} sq ft.
 Return ONLY a JSON object, no prose:
-{"outline": [[x,y], ...], "walls": [{"a":[x,y],"b":[x,y]}], "rooms": [{"name":"Living / Dining","x":x,"y":y}], "scale": {"a":[x,y],"b":[x,y],"mm":9550}}
+{"outline": [[x,y], ...], "walls": [{"a":[x,y],"b":[x,y]}], "rooms": [{"name":"Living / Dining","x":x,"y":y}],
+ "doors": [{"a":[x,y],"b":[x,y],"room":"Bath 1"}],
+ "items": [{"kind":"bed","cx":x,"cy":y,"w_cm":152,"d_cm":190,"h_cm":50,"rot":0}],
+ "scale": {"a":[x,y],"b":[x,y],"mm":9550}}
 - outline: the unit's external boundary, corners in order, excluding outside ledges / balconies.
 - walls: straight interior walls between rooms (one segment each).
-- rooms: room name at the room's centre.
+- rooms: every room's name at its centre (Living / Dining, Kitchen, Master Bedroom, Bedroom 2, Bath 1, Shelter, Yard …).
+- doors: EVERY room has a door — bedrooms, bathrooms/toilets, household shelter, kitchen, yard — plus the main entrance (room "Entrance"). Use the door openings drawn on the plan: the two ends of the opening on its wall, and the room it opens into. Usual widths: main 90–100 cm, rooms 80–90 cm, toilets 70–80 cm.
+- items: a practical, uncluttered furniture layout using what the plan shows (follow any furniture drawn on it). kind is one of ${KINDS.join(', ')}. cx, cy = item centre; w_cm along x and d_cm along y BEFORE rotation; rot = 0, 90, 180 or 270.
+  Real sizes (W×D×H cm): queen bed 152×190×50 (master), super single 107×190×50 (other bedrooms), wardrobe 120–200×60×215, desk 100–120×55×75, 3-seat sofa 210×90×80, TV console 160–180×40×48, coffee table 100×55×42 (kind "table"), dining table for 4 140×80×75 with 4 chairs 45×45×90, kitchen counter 60 deep ×90 high along the kitchen walls, shower/WC "bath" 90×100×60 in each bathroom, rug 170×240×1.
+  Rules: every item fully inside its room and against a wall where sensible; keep 75–90 cm walkways, 60 cm beside beds, 75 cm behind dining chairs; never place anything in a door's swing or in front of a doorway; don't block windows or balcony doors with tall items; nothing in the household shelter.
 - scale: the LONGEST dimension line printed on the plan that you can read clearly (or a drawn scale bar): its two end ticks and its value in millimetres. Use null if the plan shows no dimensions.
-Coordinates are 0–1000 relative to the image (0,0 top-left, 1000,1000 bottom-right). Follow the thick drawn walls, not dimension lines; ignore legends and text outside the unit. Do not include windows, doors or furniture.`;
+Coordinates (except the *_cm sizes) are 0–1000 relative to the image (0,0 top-left, 1000,1000 bottom-right). Follow the thick drawn walls, not dimension lines; ignore legends and text outside the unit. Do not include windows.`;
 
 function parseJson(text: string): Record<string, unknown> {
 	const s = text.indexOf('{');
@@ -171,6 +179,148 @@ function snapToOutline(q: Pt, outline: Pt[]): Pt {
 	return best;
 }
 
+
+// ───────────── interior-design checks on the AI's doors and furniture ─────────────
+type Item = { kind: string; x: number; y: number; w: number; d: number; h: number; color: string; r: number; rot?: number };
+type Seg = { a: Pt; b: Pt; t: number };
+type Box = [number, number, number, number];
+
+/** Realistic size ranges (cm) per kind: [min W, max W, min D, max D, min H, max H] in the item's own axes. */
+const SIZES: Record<string, [number, number, number, number, number, number]> = {
+	bed: [90, 200, 185, 215, 35, 60], wardrobe: [45, 300, 50, 65, 180, 240], desk: [80, 160, 45, 75, 70, 78],
+	sofa: [140, 260, 80, 100, 70, 90], table: [45, 200, 40, 110, 35, 78], chair: [40, 55, 40, 55, 80, 100],
+	console: [100, 220, 30, 50, 40, 60], counter: [60, 400, 55, 65, 85, 92], bath: [70, 170, 70, 120, 40, 75],
+	rug: [100, 300, 100, 300, 1, 2], plant: [25, 60, 25, 60, 40, 180]
+};
+const clampN = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+function itemBox(i: Item): Box {
+	const turned = i.rot === 90 || i.rot === 270;
+	const w = turned ? i.d : i.w;
+	const d = turned ? i.w : i.d;
+	const cx = i.x + i.w / 2;
+	const cy = i.y + i.d / 2;
+	return [cx - w / 2, cy - d / 2, cx + w / 2, cy + d / 2];
+}
+const overlap = (a: Box, b: Box, m = 0) => a[0] < b[2] - m && b[0] < a[2] - m && a[1] < b[3] - m && b[1] < a[3] - m;
+function segBox(w: Seg): Box {
+	const t = w.t / 2;
+	return [Math.min(w.a[0], w.b[0]) - t, Math.min(w.a[1], w.b[1]) - t, Math.max(w.a[0], w.b[0]) + t, Math.max(w.a[1], w.b[1]) + t];
+}
+function inPoly(x: number, y: number, p: Pt[]) {
+	let hit = false;
+	for (let i = 0, j = p.length - 1; i < p.length; j = i++)
+		if (p[i][1] > y !== p[j][1] > y && x < ((p[j][0] - p[i][0]) * (y - p[i][1])) / (p[j][1] - p[i][1]) + p[i][0]) hit = !hit;
+	return hit;
+}
+/** The square a door leaf sweeps (plus a 60 cm landing in front of the opening on both sides). */
+function doorZone(d: { a: Pt; b: Pt; flip: number }): Box {
+	const [h, e] = d.flip & 1 ? [d.b, d.a] : [d.a, d.b];
+	const dx = e[0] - h[0];
+	const dy = e[1] - h[1];
+	const L = Math.hypot(dx, dy) || 1;
+	const reach = Math.max(L, 60);
+	const nx = -dy / L;
+	const ny = dx / L;
+	const xs = [h[0], e[0], h[0] + nx * reach, e[0] + nx * reach, h[0] - nx * reach, e[0] - nx * reach];
+	const ys = [h[1], e[1], h[1] + ny * reach, e[1] + ny * reach, h[1] - ny * reach, e[1] - ny * reach];
+	return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
+}
+
+/** Snap each door onto its wall, give it a sensible width, and make it swing into its room. */
+function fixDoors(raw: unknown, toPx: (p: Pt) => Pt, cm: (p: Pt) => Pt, walls: Seg[], rooms: { name: string; x: number; y: number }[]) {
+	const out: { a: Pt; b: Pt; glass: boolean; flip: number }[] = [];
+	for (const r of (Array.isArray(raw) ? raw : []).slice(0, 40)) {
+		const o = (r ?? {}) as Record<string, unknown>;
+		const a0 = npt(o.a);
+		const b0 = npt(o.b);
+		if (!a0 || !b0) continue;
+		const a = cm(toPx(a0));
+		const b = cm(toPx(b0));
+		const mx = (a[0] + b[0]) / 2;
+		const my = (a[1] + b[1]) / 2;
+		// nearest wall to the door's middle (within 40 cm)
+		let best: { w: Seg; t: number; d: number } | null = null;
+		for (const w of walls) {
+			const dx = w.b[0] - w.a[0];
+			const dy = w.b[1] - w.a[1];
+			const L2 = dx * dx + dy * dy || 1;
+			const t = clampN(((mx - w.a[0]) * dx + (my - w.a[1]) * dy) / L2, 0, 1);
+			const d = Math.hypot(w.a[0] + dx * t - mx, w.a[1] + dy * t - my);
+			if (d < 40 && (!best || d < best.d)) best = { w, t, d };
+		}
+		if (!best) continue;
+		const { w } = best;
+		const len = Math.hypot(w.b[0] - w.a[0], w.b[1] - w.a[1]);
+		if (len < 75) continue;
+		const name = typeof o.room === 'string' ? o.room : '';
+		const main = /entr|main/i.test(name);
+		const wc = /bath|toilet|wc|shower/i.test(name);
+		const want = clampN(Math.hypot(b[0] - a[0], b[1] - a[1]), wc ? 70 : 80, main ? 100 : 90);
+		const ux = (w.b[0] - w.a[0]) / len;
+		const uy = (w.b[1] - w.a[1]) / len;
+		const c = clampN(best.t * len, want / 2 + 5, len - want / 2 - 5);
+		const A: Pt = [Math.round(w.a[0] + ux * (c - want / 2)), Math.round(w.a[1] + uy * (c - want / 2))];
+		const B: Pt = [Math.round(w.a[0] + ux * (c + want / 2)), Math.round(w.a[1] + uy * (c + want / 2))];
+		if (out.some((d) => Math.hypot((d.a[0] + d.b[0]) / 2 - (A[0] + B[0]) / 2, (d.a[1] + d.b[1]) / 2 - (A[1] + B[1]) / 2) < 50)) continue;
+		// Swing into the named room (the side its label is on); the main door swings inwards.
+		const room = rooms.find((q) => q.name.toLowerCase() === name.toLowerCase());
+		const nx = -uy;
+		const ny = ux; // default leaf side (flip 0)
+		let side = 1;
+		if (room) side = Math.sign((room.x - (A[0] + B[0]) / 2) * nx + (room.y - (A[1] + B[1]) / 2) * ny) || 1;
+		out.push({ a: A, b: B, glass: false, flip: side < 0 ? 2 : 0 });
+	}
+	return out;
+}
+
+/** Realistic sizes, inside the unit, pushed off walls, out of door swings and walkways, no overlaps. */
+function fixFurniture(items: Item[], outline: Pt[], walls: Seg[], doors: { a: Pt; b: Pt; flip: number }[]): Item[] {
+	const zones = doors.map(doorZone);
+	const kept: Item[] = [];
+	for (const it0 of items) {
+		const z = SIZES[it0.kind];
+		if (!z) continue;
+		const it: Item = { ...it0 };
+		const cx = it.x + it.w / 2;
+		const cy = it.y + it.d / 2;
+		// beds: keep the long side as the length; everything: clamp to real-world sizes
+		if (it.kind === 'bed' && it.w > it.d) [it.w, it.d, it.rot] = [it.d, it.w, ((it.rot ?? 0) + 90) % 360];
+		it.w = Math.round(clampN(it.w, z[0], z[1]));
+		it.d = Math.round(clampN(it.d, z[2], z[3]));
+		it.h = Math.round(clampN(it.h, z[4], z[5]));
+		it.x = Math.round(cx - it.w / 2);
+		it.y = Math.round(cy - it.d / 2);
+		if (!inPoly(cx, cy, outline)) continue;
+		if (it.kind !== 'rug') {
+			// slide it out of any wall it cuts into (up to 45 cm), like pushing it back against the wall
+			for (let pass = 0; pass < 6; pass++) {
+				let moved = false;
+				for (const w of walls) {
+					const b = itemBox(it);
+					const s = segBox(w);
+					if (!overlap(b, [s[0] - 2, s[1] - 2, s[2] + 2, s[3] + 2])) continue;
+					const pens: [number, number, number][] = [[s[2] + 2 - b[0], 1, 0], [b[2] - (s[0] - 2), -1, 0], [s[3] + 2 - b[1], 0, 1], [b[3] - (s[1] - 2), 0, -1]];
+					pens.sort((p, q) => p[0] - q[0]);
+					const [p, dx, dy] = pens[0];
+					if (p > 45) continue;
+					it.x += Math.round(dx * p);
+					it.y += Math.round(dy * p);
+					moved = true;
+				}
+				if (!moved) break;
+			}
+			const b = itemBox(it);
+			if (walls.some((w) => overlap(b, segBox(w), 1))) continue; // still through a wall → drop it
+			if (zones.some((zn) => overlap(b, zn, 1))) continue; // blocks a door → drop it
+			if (kept.some((k) => k.kind !== 'rug' && overlap(b, itemBox(k), 1))) continue; // overlaps → drop it
+			const corners: Pt[] = [[b[0], b[1]], [b[2], b[1]], [b[2], b[3]], [b[0], b[3]]];
+			if (!corners.every(([x, y]) => inPoly(x, y, outline))) continue;
+		}
+		kept.push(it);
+	}
+	return kept.slice(0, 80);
+}
+
 function buildPlan(ai: Record<string, unknown>, W: number, H: number, sizeSqft: number) {
 	const toPx = (p: Pt): Pt => [(p[0] / 1000) * W, (p[1] / 1000) * H];
 	const outlinePx = (Array.isArray(ai.outline) ? ai.outline : []).slice(0, 200).map(npt).filter((p): p is Pt => !!p).map(toPx);
@@ -242,10 +392,17 @@ function buildPlan(ai: Record<string, unknown>, W: number, H: number, sizeSqft: 
 			const h = Math.min(300, Math.max(1, Number(o.h_cm) || 75));
 			if (!kind || cx === null || cy === null || !w || !d) return null;
 			const [x, y] = cm(toPx([cx, cy]));
-			return { kind, x: Math.round(x - w / 2), y: Math.round(y - d / 2), w: Math.round(w), d: Math.round(d), h: Math.round(h), color: COLORS[kind], r: kind === 'plant' ? Math.round(w / 2) : 6 };
+			const rot = [0, 90, 180, 270].includes(Number(o.rot)) ? Number(o.rot) : 0;
+			return { kind, x: Math.round(x - w / 2), y: Math.round(y - d / 2), w: Math.round(w), d: Math.round(d), h: Math.round(h), color: COLORS[kind], r: kind === 'plant' ? Math.round(w / 2) : 6, ...(rot ? { rot } : {}) };
 		})
 		.filter((i) => !!i);
-	return { v: 1, outline, walls, windows: [], doors: [], items: [], rooms, imageScale: Math.round(s * 10000) / 10000, scaleSource, ...(scaleNote ? { scaleNote } : {}), source: 'ai' };
+	const allWalls: { a: Pt; b: Pt; t: number }[] = [
+		...outline.map((p, i) => ({ a: p, b: outline[(i + 1) % outline.length], t: 20 })),
+		...walls.map((w) => ({ a: w.a as Pt, b: w.b as Pt, t: 12 }))
+	];
+	const doors = fixDoors(ai.doors, toPx, cm, allWalls, rooms as { name: string; x: number; y: number }[]);
+	const furniture = fixFurniture(items as Item[], outline, allWalls, doors);
+	return { v: 1, outline, walls, windows: [], doors, items: furniture, rooms, imageScale: Math.round(s * 10000) / 10000, scaleSource, ...(scaleNote ? { scaleNote } : {}), source: 'ai' };
 }
 
 // Projects on the new API keys expose them as JSON maps, e.g. {"default":"sb_secret_…"}.

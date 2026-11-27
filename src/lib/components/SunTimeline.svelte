@@ -52,6 +52,10 @@
 	}
 
 	let playing = $state(false);
+	let scoreOpen = $state(false);
+	function closeScore(e: MouseEvent) {
+		if (scoreOpen && !(e.target as Element).closest?.('.scorewrap')) scoreOpen = false;
+	}
 	let raf = 0;
 	let last = 0;
 
@@ -117,15 +121,26 @@
 			/>
 		</label>
 		{#if score}
-			<button class="score" onclick={onscore} title={score.tip} aria-label={score.tip}>
-				<Icon name="sun" size={14} /><strong>{score.value.toFixed(1)}</strong><small>/10</small>
-			</button>
+			<span class="scorewrap">
+				<button class="score" onclick={() => (scoreOpen = !scoreOpen)} title={score.tip} aria-label={score.tip} aria-expanded={scoreOpen}>
+					<Icon name="sun" size={16} /><span class="stack"><span class="slbl">Sun score</span><span><strong>{score.value.toFixed(1)}</strong><small>/10</small></span></span>
+				</button>
+				{#if scoreOpen}
+					<span class="pop" role="tooltip">
+						<strong>Sun score {score.value.toFixed(1)} / 10</strong>
+						{score.tip}
+						{#if onscore}<button class="more" onclick={() => { scoreOpen = false; onscore?.(); }}>How we worked it out</button>{/if}
+					</span>
+				{/if}
+			</span>
 		{/if}
 		{#if oninfo}
 			<button class="info" onclick={oninfo} title="Sun info" aria-label="Sun info"><Icon name="info" size={18} /></button>
 		{/if}
 	</div>
 {/snippet}
+
+<svelte:window onclick={closeScore} />
 
 <section class="tl" class:first={sliderFirst}>
 	{#if withArc && sun && lat !== null && lon !== null}
@@ -193,6 +208,52 @@
 		color: var(--muted);
 		font: inherit;
 		font-size: 13px;
+		cursor: pointer;
+	}
+	.scorewrap {
+		position: relative;
+	}
+	.stack {
+		display: grid;
+		line-height: 1.05;
+		text-align: left;
+	}
+	.slbl {
+		font-size: 10px;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		color: var(--muted);
+	}
+	.pop {
+		position: absolute;
+		z-index: 20;
+		left: 0;
+		bottom: calc(100% + 6px);
+		width: min(300px, 80vw);
+		display: grid;
+		gap: 6px;
+		padding: 10px 12px;
+		border: 1px solid var(--line);
+		border-radius: 12px;
+		background: var(--surface);
+		box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+		color: var(--muted);
+		font-size: 13px;
+		line-height: 1.4;
+		text-align: left;
+	}
+	.pop strong {
+		color: var(--text);
+	}
+	.more {
+		justify-self: start;
+		min-height: 36px;
+		padding: 0;
+		border: 0;
+		background: none;
+		color: var(--forest);
+		font: inherit;
+		font-weight: 600;
 		cursor: pointer;
 	}
 	.score :global(svg) {

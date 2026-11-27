@@ -3,7 +3,7 @@
  * Kept in this browser for speed and synced to the Supabase `projects` table when signed in,
  * so they follow the user across devices and show up in the admin panel.
  */
-import { DAKOTA_UNIT, LOFT_UNIT, HDB_UNIT } from '#lib/sample-unit.ts';
+import { TAMPINES_4RM, PUNGGOL_3RM, BUKIT_BATOK_5RM } from '#lib/sample-unit.ts';
 import { isPropertyType, type PropertyType } from '#lib/config/property-types.ts';
 import { getSupabase } from '#lib/supabase.ts';
 import { sanitizePlan, type PlanData } from '#lib/plan.ts';
@@ -17,7 +17,7 @@ export interface ProjectDetails {
 	notes: string;
 }
 
-const KEY = 'rea.projects.v2'; // v2: demo 1 became Dakota One
+const KEY = 'rea.projects.v3'; // v3: demos are now HDB 3-, 4- and 5-room flats
 
 function load(): Record<string, Partial<ProjectDetails>> {
 	try {
@@ -30,28 +30,28 @@ function load(): Record<string, Partial<ProjectDetails>> {
 const overrides = $state<Record<string, Partial<ProjectDetails>>>(typeof localStorage === 'undefined' ? {} : load());
 
 const DEFAULTS: Record<string, ProjectDetails> = {
-	[DAKOTA_UNIT.id]: {
-		name: DAKOTA_UNIT.name,
-		unitNo: DAKOTA_UNIT.unitNo,
-		address: 'Blk 88B Jalan Satu, Singapore 392088',
-		propertyType: 'hdb',
-		description: 'HDB 3-room Type-2B (68 m²) next to Dakota MRT — bedrooms and living room face the same side.',
-		notes: ''
-	},
-	[LOFT_UNIT.id]: {
-		name: LOFT_UNIT.name,
-		unitNo: LOFT_UNIT.unitNo,
-		address: 'Tanjong Pagar, Singapore',
-		propertyType: 'condo',
-		description: 'West-facing studio loft — strong late-afternoon sun.',
-		notes: ''
-	},
-	[HDB_UNIT.id]: {
-		name: HDB_UNIT.name,
-		unitNo: HDB_UNIT.unitNo,
+	[TAMPINES_4RM.id]: {
+		name: TAMPINES_4RM.name,
+		unitNo: TAMPINES_4RM.unitNo,
 		address: 'Tampines, Singapore',
 		propertyType: 'hdb',
-		description: 'North–south HDB 4-room, turned 20° — gentle light, bedrooms on the north.',
+		description: 'HDB 4-room (93 m²), the most common flat type. Living room faces south — gentle light all day.',
+		notes: ''
+	},
+	[PUNGGOL_3RM.id]: {
+		name: PUNGGOL_3RM.name,
+		unitNo: PUNGGOL_3RM.unitNo,
+		address: 'Punggol, Singapore',
+		propertyType: 'hdb',
+		description: 'HDB 3-room (67 m²). Living room faces east — bright mornings, cool afternoons.',
+		notes: ''
+	},
+	[BUKIT_BATOK_5RM.id]: {
+		name: BUKIT_BATOK_5RM.name,
+		unitNo: BUKIT_BATOK_5RM.unitNo,
+		address: 'Bukit Batok, Singapore',
+		propertyType: 'hdb',
+		description: 'HDB 5-room (113 m²) with a study corner. Living room faces west — strong afternoon sun to plan for.',
 		notes: ''
 	}
 };

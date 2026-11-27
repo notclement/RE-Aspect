@@ -330,7 +330,7 @@ export function apartment(scene: T.Scene, u: Unit, walk: boolean) {
 			beam.visible = l.patches.length > 0 && alt > 0 && l.dark < 1;
 			beamMat.uniforms.dir.value.set(sx, sy);
 			beamMat.uniforms.slope.value = Math.tan(alt);
-			beamMat.uniforms.strength.value = 0.14 * (1 - l.dark) * Math.min(1, l.sun.altitude / 12);
+			beamMat.uniforms.strength.value = 0.26 * (1 - l.dark) * Math.min(1, l.sun.altitude / 12);
 			beamMat.uniforms.warm.value.set(l.sunColor || p.ochre);
 			marker.visible = showSun && alt > 0;
 			const r = 0.48 * Math.max(b.w, b.h);

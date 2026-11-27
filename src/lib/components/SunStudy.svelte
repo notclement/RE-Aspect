@@ -21,7 +21,7 @@
 	 * Full width on every screen so the plan stays as big as possible.
 	 * Shared by /unit and the public share page /s, so both look exactly the same.
 	 */
-	import { onMount } from 'svelte';
+	import { onMount, type Snippet } from 'svelte';
 	import { page } from '$app/state';
 	import { replaceState } from '$app/navigation';
 	import Icon from '#lib/components/Icon.svelte';
@@ -42,8 +42,9 @@
 		unit,
 		vs,
 		info,
-		views = ['top', '3d', 'walk']
-	}: { unit: Unit; vs: { view: View; date: string; minutes: number }; info: StudyInfo; views?: View[] } = $props();
+		views = ['top', '3d', 'walk'],
+		projectInfo
+	}: { unit: Unit; vs: { view: View; date: string; minutes: number }; info: StudyInfo; views?: View[]; projectInfo?: Snippet } = $props();
 
 	const LABELS: Record<View, string> = { top: 'Top down', '3d': '3D plan', walk: 'Walk' };
 
@@ -168,7 +169,7 @@
 		score
 			? {
 					value: score.score,
-					tip: `Sun score ${score.score.toFixed(1)}/10 — ${score.verdict}. Measures harsh afternoon sun on the ${score.room.toLowerCase()} windows over a year (10 = none, 1 = the hottest facing). ${score.room} faces ${score.facingWords} (${score.facingDeg}°). Tap for how we worked it out.`
+					tip: `How comfortable the main windows are: it adds up the direct afternoon sun (after 1 pm, the hot part of the day) on the ${score.room.toLowerCase()} windows over a whole year. 10 = no harsh afternoon sun, 1 = the hottest facing in Singapore. ${score.verdict} — ${score.room.toLowerCase()} faces ${score.facingWords} (${score.facingDeg}°).`
 				}
 			: null
 	);
@@ -289,6 +290,7 @@
 		<SunTimeline sliderFirst {note} score={scoreChip} onscore={openHow} bind:minutes={vs.minutes} bind:date={vs.date} sunrise={times.sunrise} sunset={times.sunset} lat={unit.lat} lon={unit.lon} {sun} {exposure} oninfo={() => (infoOpen = true)} />
 	</div>
 
+	{#if projectInfo}<div class="pd">{@render projectInfo()}</div>{/if}
 	<div class="how" bind:this={howEl}>
 		<Collapse title="How we worked this out" bind:open={howOpen}>
 			<dl>
@@ -317,7 +319,7 @@
 	.study {
 		display: grid;
 		grid-template-columns: minmax(0, 1fr);
-		grid-template-areas: 'viewer' 'timeline' 'how';
+		grid-template-areas: 'viewer' 'timeline' 'pd' 'how';
 	}
 	.viewer {
 		grid-area: viewer;
@@ -328,6 +330,10 @@
 	}
 	.timeline {
 		grid-area: timeline;
+		margin-top: 10px;
+	}
+	.pd {
+		grid-area: pd;
 		margin-top: 10px;
 	}
 	.how {
@@ -362,38 +368,10 @@
 		position: relative;
 		border-top: 1px solid var(--line);
 	}
-	/* Plan colours read by the views (the floor stays light in dark mode, so labels stay dark). */
+	/* Plan colours come from the theme (src/themes.css: --floor, --wall, --plan-text …); labels use --plan-text. */
 	.scene {
 		height: 100%;
-		--floor: #e9dfcb;
-		--floor-line: #dccfb6;
-		--wall: #3a4139;
-		--wall-top: #59625a;
-		--glass: #9fb8b9;
-		--balcony: #e4e2d8;
-		--ochre: #f6c453;
-		--forest: #476551;
-	}
-	:global([data-mode='dark']) .scene {
-		--floor: #cbbfa6;
-		--floor-line: #bcae93;
-		--balcony: #4a4a44;
-		--text: #24302a;
-		--surface: #1f2420;
-	}
-	.grip {
-		height: 22px;
-		display: grid;
-		place-items: center;
-		cursor: ns-resize;
-		touch-action: none;
-		border-top: 1px solid var(--line);
-	}
-	.grip span {
-		width: 44px;
-		height: 5px;
-		border-radius: 3px;
-		background: color-mix(in srgb, var(--muted) 55%, transparent);
+		--text: var(--plan-text);
 	}
 	.legend {
 		position: absolute;
@@ -422,10 +400,10 @@
 		border: 1px solid color-mix(in srgb, var(--text) 15%, transparent);
 	}
 	.key .am {
-		background: #f6e27a;
+		background: #f2d048;
 	}
 	.key .pm {
-		background: #f28c30;
+		background: #f08020;
 	}
 	.zoom {
 		position: absolute;

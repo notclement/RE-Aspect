@@ -5,8 +5,8 @@
  * Used for the floor glow, window beams and furniture tint in all three views. Works in light and dark mode
  * because it's drawn as a translucent overlay on top of the themed floor.
  */
-export const MORNING = [246, 226, 122] as const; // #F6E27A pale yellow
-export const AFTERNOON = [242, 140, 48] as const; // #F28C30 warm orange
+export const MORNING = [242, 208, 72] as const; // #F2D048 sunny yellow (strong enough on light floors)
+export const AFTERNOON = [240, 128, 32] as const; // #F08020 warm orange
 
 /** 0 = morning colour, 1 = afternoon colour, for local minutes since midnight. */
 export function afternoonMix(minutes: number): number {

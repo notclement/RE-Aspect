@@ -76,9 +76,10 @@ export function flooring(u: Unit, b: Bounds) {
 				trace(c, patch.clip);
 				c.clip();
 				trace(c, patch.points);
-				c.globalAlpha = 0.53 * patch.intensity * (1 - l.dark);
+				// RE:Aspect: stronger patches with a crisp edge so they stand out on light floors/themes.
+				c.globalAlpha = Math.min(0.92, 0.9 * (0.35 + 0.65 * patch.intensity)) * (1 - l.dark);
 				c.fill();
-				c.globalAlpha *= 0.2;
+				c.globalAlpha = Math.min(1, c.globalAlpha * 1.2);
 				c.lineWidth = 3;
 				c.stroke();
 				c.restore();

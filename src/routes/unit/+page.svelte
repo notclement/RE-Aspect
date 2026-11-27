@@ -143,11 +143,8 @@
 	</section>
 {:else}
 
-<SunStudy {unit} {vs} {info} />
-<ShareSheet bind:open={shareOpen} projectId={mine?.id ?? null} demoId={mine ? null : unit.id} title={details.name} hash={viewHash(vs)} />
-
-{/if}
-
+<SunStudy {unit} {vs} {info}>
+	{#snippet projectInfo()}
 <div class="details">
 	<Collapse title="Project details" bind:open={detailsOpen}>
 		{#if editing}
@@ -210,6 +207,13 @@
 		{/if}
 	</Collapse>
 </div>
+	{/snippet}
+</SunStudy>
+<ShareSheet bind:open={shareOpen} projectId={mine?.id ?? null} demoId={mine ? null : unit.id} title={details.name} hash={viewHash(vs)} />
+
+{/if}
+
+
 
 {#if confirmDelete && mine}
 	<ConfirmDelete id={mine.id} name={mine.name} onclose={() => (confirmDelete = false)} ondeleted={() => goto('/', { replaceState: true })} />
