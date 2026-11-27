@@ -17,7 +17,7 @@
 		}, 0)) / 2;
 
 	const xs = $derived(unit.outline.map((p) => p[0]));
-	const ys = $derived([...unit.outline.map((p) => p[1]), unit.balcony.y + unit.balcony.d]);
+	const ys = $derived([...unit.outline.map((p) => p[1]), ...(unit.balcony ? [unit.balcony.y + unit.balcony.d] : [])]);
 	const pad = 30;
 	const viewBox = $derived(
 		`${Math.min(...xs) - pad} ${Math.min(...ys) - pad} ${Math.max(...xs) - Math.min(...xs) + pad * 2} ${Math.max(...ys) - Math.min(...ys) + pad * 2}`
@@ -48,6 +48,7 @@
 			<clipPath id="{uid}-r{i}"><polygon points={pts(p.clip)} /></clipPath>
 		{/each}
 	</defs>
+	{#if unit.balcony}
 	<rect
 		x={unit.balcony.x}
 		y={unit.balcony.y}
@@ -58,6 +59,7 @@
 		stroke-width="8"
 		stroke-dasharray="18 12"
 	/>
+	{/if}
 	<polygon points={pts(unit.outline)} fill="var(--floor)" />
 	{#each patches as p, i (i)}
 		<polygon points={pts(p.points)} fill="#F4C252" opacity={p.intensity * 0.85} clip-path="url(#{uid}-r{i})" />

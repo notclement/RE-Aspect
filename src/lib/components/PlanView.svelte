@@ -34,7 +34,7 @@
 
 	// ---- geometry
 	const xs = $derived(unit.outline.map((p) => p[0]));
-	const ys = $derived([...unit.outline.map((p) => p[1]), unit.balcony.y + unit.balcony.d]);
+	const ys = $derived([...unit.outline.map((p) => p[1]), ...(unit.balcony ? [unit.balcony.y + unit.balcony.d] : [])]);
 	const pad = 60;
 	const vb = $derived({
 		x: Math.min(...xs) - pad,
@@ -200,6 +200,7 @@
 			{#each patches as p, i (i)}<polygon points={pts(p.points)} />{/each}
 		</clipPath>
 	</defs>
+	{#if unit.balcony}
 	<rect
 		x={unit.balcony.x}
 		y={unit.balcony.y}
@@ -210,6 +211,7 @@
 		stroke-width="6"
 		stroke-dasharray="14 10"
 	/>
+	{/if}
 	<polygon points={outline} fill="url(#planks)" />
 	{#each patches as p, i (i)}
 		<polygon points={pts(p.points)} fill="url(#sunfill)" opacity={p.intensity * 0.9} clip-path="url(#room{i})" />

@@ -41,7 +41,7 @@ export interface Unit {
 	windows: Opening[];
 	rooms: { name: string; x: number; y: number }[];
 	items: Item[];
-	balcony: { x: number; y: number; w: number; d: number };
+	balcony?: { x: number; y: number; w: number; d: number };
 }
 
 const S = 3.4; // design units → cm

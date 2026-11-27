@@ -29,3 +29,76 @@ export async function makeAvatar(file: File, px = AVATAR_PX): Promise<string> {
 	}
 	throw new Error('Could not make that image small enough — try another photo.');
 }
+
+export interface Shrunk {
+	dataUrl: string;
+	w: number;
+	h: number;
+}
+
+function encode(canvas: HTMLCanvasElement, q = 0.82): string {
+	const url = canvas.toDataURL('image/webp', q);
+	return url.startsWith('data:image/webp') ? url : canvas.toDataURL('image/jpeg', q);
+}
+
+/**
+ * Shrink a photo in the browser (long side ≤ maxSide). Re-encoding drops EXIF/GPS data.
+ * Typically 10× smaller than the camera original.
+ */
+export async function shrinkPhoto(src: Blob | string, maxSide = 2048, q = 0.82): Promise<Shrunk> {
+	const bmp = typeof src === 'string' ? await createImageBitmap(await (await fetch(src)).blob()) : await createImageBitmap(src);
+	const k = Math.min(1, maxSide / Math.max(bmp.width, bmp.height));
+	const w = Math.max(1, Math.round(bmp.width * k));
+	const h = Math.max(1, Math.round(bmp.height * k));
+	const c = document.createElement('canvas');
+	c.width = w;
+	c.height = h;
+	const ctx = c.getContext('2d')!;
+	ctx.imageSmoothingQuality = 'high';
+	ctx.drawImage(bmp, 0, 0, w, h);
+	bmp.close();
+	return { dataUrl: encode(c, q), w, h };
+}
+
+/** Rotate an image by any angle (degrees, clockwise) onto a white background that fits the result. */
+export async function rotateImage(dataUrl: string, deg: number, maxSide = 2048): Promise<Shrunk> {
+	const bmp = await createImageBitmap(await (await fetch(dataUrl)).blob());
+	const r = (deg * Math.PI) / 180;
+	const cos = Math.abs(Math.cos(r));
+	const sin = Math.abs(Math.sin(r));
+	let w = bmp.width * cos + bmp.height * sin;
+	let h = bmp.width * sin + bmp.height * cos;
+	const k = Math.min(1, maxSide / Math.max(w, h));
+	w = Math.round(w * k);
+	h = Math.round(h * k);
+	const c = document.createElement('canvas');
+	c.width = w;
+	c.height = h;
+	const ctx = c.getContext('2d')!;
+	ctx.fillStyle = '#fff';
+	ctx.fillRect(0, 0, w, h);
+	ctx.translate(w / 2, h / 2);
+	ctx.rotate(r);
+	ctx.scale(k, k);
+	ctx.imageSmoothingQuality = 'high';
+	ctx.drawImage(bmp, -bmp.width / 2, -bmp.height / 2);
+	bmp.close();
+	return { dataUrl: encode(c, 0.85), w, h };
+}
+
+/** Crop a square region (in source pixels) and make the tiny profile photo from it. */
+export async function makeAvatarFromRegion(file: Blob, sx: number, sy: number, side: number, px = AVATAR_PX): Promise<string> {
+	const bmp = await createImageBitmap(file);
+	const canvas = document.createElement('canvas');
+	canvas.width = canvas.height = px;
+	const ctx = canvas.getContext('2d')!;
+	ctx.imageSmoothingQuality = 'high';
+	ctx.drawImage(bmp, sx, sy, side, side, 0, 0, px, px);
+	bmp.close();
+	for (const q of [0.75, 0.6, 0.45, 0.3]) {
+		let url = canvas.toDataURL('image/webp', q);
+		if (!url.startsWith('data:image/webp')) url = canvas.toDataURL('image/jpeg', q);
+		if (isAvatarDataUrl(url)) return url;
+	}
+	throw new Error('Could not make that image small enough — try another photo.');
+}

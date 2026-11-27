@@ -12,7 +12,9 @@
 	import { PROPERTY_TYPES, isPropertyType, propertyTypeLabel } from '#lib/config/property-types.ts';
 	import Collapse from '#lib/components/Collapse.svelte';
 	import { sampleById } from '#lib/sample-unit.ts';
-	import { projectDetails, saveProjectDetails, type ProjectDetails } from '#lib/stores/projects.svelte.ts';
+	import { goto } from '$app/navigation';
+	import { planReady, planToUnit } from '#lib/plan.ts';
+	import { projectDetails, saveProjectDetails, getProject, deleteProject, type ProjectDetails } from '#lib/stores/projects.svelte.ts';
 	import { validateProjectName, validateUnitNumber, validateFreeText } from '#lib/validate.ts';
 	import { sunPosition, localDate, sunTimes, compass } from '#lib/sun.ts';
 	import { sunPatches, darkness, furnitureLight, ITEM_LABELS } from '#lib/light.ts';
@@ -26,9 +28,26 @@
 		{ id: 'walk', label: 'Walk' }
 	];
 
-	// Phase 1: load by id (page.url.searchParams.get('id')) from Supabase / local cache.
-	// For now only the built-in sample unit exists.
-	const unit = $derived(sampleById(page.url.searchParams.get('id')));
+	// A user's own project (traced in Studio), or one of the built-in demos.
+	const id = $derived(page.url.searchParams.get('id'));
+	const mine = $derived(getProject(id));
+	const needsTrace = $derived(!!mine && !planReady(mine.plan));
+	const unit = $derived(
+		mine && planReady(mine.plan)
+			? planToUnit(mine.plan, { id: mine.id, name: mine.name, unitNo: mine.unitNo, level: mine.level, sizeSqft: mine.sizeSqft, ceilingCm: mine.ceilingCm, lat: mine.lat, lon: mine.lon })
+			: sampleById(id)
+	);
+	let confirmDelete = $state(false);
+	async function removeProject() {
+		if (!mine) return;
+		try {
+			await deleteProject(mine.id);
+			goto('/', { replaceState: true });
+		} catch (e) {
+			alertMsg = e instanceof Error ? e.message : 'Could not delete.';
+		}
+	}
+	let alertMsg = $state<string | null>(null);
 	const details = $derived(projectDetails(unit.id));
 
 	// ---- edit project details
@@ -149,8 +168,29 @@
 
 <svelte:head><title>{details.name} · RE:Aspect</title></svelte:head>
 
-<h1>{details.name}</h1>
-<p class="sub muted">{[details.unitNo, `Level ${unit.level}`, `${unit.sizeSqft.toLocaleString()} sq ft`].filter(Boolean).join(' · ')} · Demo project</p>
+<div class="titlerow">
+	<h1>{details.name}</h1>
+	{#if mine}<a class="btn" href="/studio?id={mine.id}"><Icon name="plan" size={18} /> Edit in Studio</a>{/if}
+</div>
+<p class="sub muted">
+	{#if mine}
+		{[details.unitNo, mine.level !== null ? `Level ${mine.level}` : '', mine.sizeSqft ? `${mine.sizeSqft.toLocaleString()} sq ft` : ''].filter(Boolean).join(' · ')}
+	{:else}
+		{[details.unitNo, `Level ${unit.level}`, `${unit.sizeSqft.toLocaleString()} sq ft`].filter(Boolean).join(' · ')} · Demo project
+	{/if}
+</p>
+
+{#if needsTrace}
+	<section class="card trace">
+		<h2>{mine?.status === 'processing' ? 'Processing your floor plan…' : 'Next: trace the floor plan'}</h2>
+		<p class="muted">
+			{mine?.status === 'failed'
+				? "The AI couldn't read this floor plan. Trace it in Studio — tap the corners of the unit, then add windows and furniture."
+				: 'Open Studio to outline the unit, place the windows and add furniture. The sun view appears here as soon as the outline is done.'}
+		</p>
+		<a class="btn primary" href="/studio?id={mine?.id}"><Icon name="plan" size={18} /> Open Studio</a>
+	</section>
+{:else}
 
 <section class="viewer">
 	<div class="seg" role="tablist" aria-label="View">
@@ -205,6 +245,8 @@
 <SunTimeline bind:minutes={vs.minutes} bind:date={vs.date} sunrise={times.sunrise} sunset={times.sunset} lat={unit.lat} lon={unit.lon} {sun} oninfo={() => (infoOpen = true)} />
 <SunInfoSheet bind:open={infoOpen} {unit} {sun} date={vs.date} minutes={vs.minutes} sunrise={times.sunrise} sunset={times.sunset} fmt={fmtTime} />
 
+{/if}
+
 <div class="details">
 	<Collapse title="Project details" bind:open={detailsOpen}>
 		{#if editing}
@@ -256,7 +298,19 @@
 				<dt>Notes</dt><dd class="pre">{details.notes || '—'}</dd>
 				<dt>Size</dt><dd>{unit.sizeSqft.toLocaleString()} sq ft</dd>
 			</dl>
-			<button class="btn editbtn" onclick={startEdit}>Edit details</button>
+			<div class="editrow">
+				<button class="btn editbtn" onclick={startEdit}>Edit details</button>
+				{#if mine}
+					{#if confirmDelete}
+						<span class="muted small">Delete this project for good?</span>
+						<button class="btn" onclick={() => (confirmDelete = false)}>Keep</button>
+						<button class="btn danger" onclick={removeProject}>Delete</button>
+					{:else}
+						<button class="btn danger" onclick={() => (confirmDelete = true)}>Delete project</button>
+					{/if}
+				{/if}
+			</div>
+			{#if alertMsg}<p class="error">{alertMsg}</p>{/if}
 		{/if}
 	</Collapse>
 </div>
@@ -264,6 +318,41 @@
 <style>
 	h1 {
 		margin: 6px 0 2px;
+	}
+	.titlerow {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 12px;
+	}
+	.trace {
+		text-align: center;
+		padding: 28px 20px;
+		margin-bottom: 14px;
+	}
+	.trace h2 {
+		font-family: var(--serif);
+		font-weight: var(--heading-weight);
+	}
+	.trace p {
+		max-width: 440px;
+		margin: 0 auto 16px;
+	}
+	.editrow {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 8px;
+		margin-top: 14px;
+	}
+	.editrow .editbtn {
+		margin-top: 0;
+	}
+	.small {
+		font-size: 13px;
+	}
+	.error {
+		color: #b5483a;
 	}
 	.sub {
 		margin: 0 0 14px;

@@ -5,21 +5,27 @@
 	import { auth } from '#lib/stores/auth.svelte.ts';
 	import { PLANS, FREE_LAUNCH } from '#lib/config/plans.ts';
 	import { validateName } from '#lib/validate.ts';
-	import { SAMPLE_UNITS } from '#lib/sample-unit.ts';
+	import { myProjects } from '#lib/stores/projects.svelte.ts';
 	import Avatar from '#lib/components/Avatar.svelte';
-	import { makeAvatar } from '#lib/image.ts';
+	import CropSquare from '#lib/components/CropSquare.svelte';
 
-	let fileInput: HTMLInputElement;
+	let fileInput = $state<HTMLInputElement>();
 	let photoBusy = $state(false);
 	let photoError = $state<string | null>(null);
-	async function pickPhoto(e: Event) {
+	let cropFile = $state<File | null>(null);
+	function pickPhoto(e: Event) {
 		const file = (e.currentTarget as HTMLInputElement).files?.[0];
 		(e.currentTarget as HTMLInputElement).value = '';
-		if (!file) return;
-		photoBusy = true;
 		photoError = null;
+		if (!file) return;
+		if (!file.type.startsWith('image/') || file.size > 30 * 1024 * 1024) return void (photoError = 'Please choose an image under 30 MB.');
+		cropFile = file;
+	}
+	async function cropped(dataUrl: string) {
+		cropFile = null;
+		photoBusy = true;
 		try {
-			await auth.saveAvatar(await makeAvatar(file));
+			await auth.saveAvatar(dataUrl);
 		} catch (err) {
 			photoError = err instanceof Error ? err.message : 'Could not use that photo.';
 		}
@@ -39,11 +45,11 @@
 	let saved = $state(false);
 	const plan = $derived(PLANS[profile.planId]);
 
-	// Usage (projects: demo projects included for now; AI tools arrive with the Anchor wizard).
-	const used = SAMPLE_UNITS.length;
+	// Usage: own projects (demos are free); AI re-runs are counted per project on the server.
+	const used = $derived(myProjects.length);
 	const included = $derived(plan.includedUnits ?? 0);
 	const pct = $derived(included ? Math.min(100, Math.round((used / included) * 100)) : 0);
-	const aiFunctions = ['Floor-plan trace', 'Windows & doors', 'Furniture placement'];
+	const aiFunctions = ['Floor-plan trace', 'Furniture from photos'];
 	const until = $derived(profile.data.proUntil);
 	const planNote = $derived(
 		profile.viewAs
@@ -76,13 +82,14 @@
 <div class="card photo">
 	<Avatar size={72} />
 	<div class="pbtns">
-		<button class="btn" onclick={() => fileInput.click()} disabled={photoBusy}>{photoBusy ? 'Saving…' : profile.data.avatar ? 'Change photo' : 'Add photo'}</button>
+		<button class="btn" onclick={() => fileInput?.click()} disabled={photoBusy}>{photoBusy ? 'Saving…' : profile.data.avatar ? 'Change photo' : 'Add photo'}</button>
 		{#if profile.data.avatar}<button class="btn" onclick={removePhoto} disabled={photoBusy}>Remove</button>{/if}
-		<span class="muted small">Shrunk to a tiny 128 px thumbnail before upload.</span>
+		<span class="muted small">Pick the square you want — it's shrunk to a tiny 128 px thumbnail before upload.</span>
 		{#if photoError}<span class="error small">{photoError}</span>{/if}
 	</div>
 	<input bind:this={fileInput} type="file" accept="image/*" hidden onchange={pickPhoto} />
 </div>
+{#if cropFile}<CropSquare file={cropFile} ondone={cropped} oncancel={() => (cropFile = null)} />{/if}
 
 <form class="card" onsubmit={save} novalidate>
 	<div class="field">
@@ -117,7 +124,7 @@
 	<p class="muted small">
 		{included - used > 0 ? `${included - used} left` : 'Quota reached'}
 		{#if plan.extraUnitOneOffSgd} · extra projects S${plan.extraUnitOneOffSgd} each, one-off{/if}
-		· demo projects count for now
+		· demo projects don't count
 	</p>
 
 	<div class="u-head ai">
@@ -126,10 +133,10 @@
 	</div>
 	<ul class="ai-list">
 		{#each aiFunctions as f (f)}
-			<li><span>{f}</span><span class="muted">0 of {plan.aiRunsPerFunctionPerUnit} used</span></li>
+			<li><span>{f}</span><span class="muted">{plan.aiRunsPerFunctionPerUnit} per project</span></li>
 		{/each}
 	</ul>
-	<p class="muted small">AI tools arrive with the New project wizard — nothing has been used yet.</p>
+	<p class="muted small">Used when you create a project or re-run the AI from Studio. The count is kept per project.</p>
 </div>
 {#if FREE_LAUNCH}<p class="muted fine">Launch period: everyone gets Pro features free while we test.</p>{/if}
 

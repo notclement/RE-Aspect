@@ -40,7 +40,8 @@
   - AI keys: add keys for OpenAI / Anthropic / Google / Other; stored encrypted in **Supabase Vault**, browser only sees the last 4 characters; choose the **active** key; delete. Edge functions read it via `active_ai_key()` (service role only).
 - **Profile photo**: Profile → Add/Change photo; centre-cropped and shrunk to a 128 px WebP (≈3–8 KB, max 16 KB) in the browser before upload; shown in the avatar circle and admin list.
 - Account menu closes on any tap outside it or Escape.
-- Phase 1 plan (New project wizard + Studio): see `docs/PHASE1.md`.
+- Phase 1 (New project wizard + Studio): see `docs/PHASE1.md`. Studio has **no sun preview**; keep everything lightweight and snappy on phones and desktops.
+- Profile photo: after choosing a photo the user drags/pinches a **square** to pick the part to use; only that square is shrunk and uploaded.
 - Demo 1 is **Dakota One** (Blk 88B Jalan Satu, HDB 3-room Type-2B, traced from HDB's plan; orientation assumed south-facing windows).
 - Projects page counts the open projects (demos included) and hides "Set up your first project" when any exist.
 - Project cards show a **thumbnail of the actual plan** with today's sunniest-hour light.

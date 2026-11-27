@@ -10,6 +10,10 @@ Full requirements: `docs/REQUIREMENTS.md` (read it before changing behaviour).
 - `ssr = false`, `prerender = true` (root `+layout.ts`): every route is a static client-side shell for Cloudflare Pages.
 - Supabase (auth, Postgres, edge functions) is loaded lazily (`src/lib/supabase.ts`). Without env vars the app runs in **preview mode** (local data, no sign-in).
 
+## Backend files
+- `supabase/migrations/*.sql` — run in order in the Supabase SQL editor (test first, live on promotion).
+- `supabase/functions/process-project` — AI tracing edge function (deployed via the dashboard editor; Verify JWT with legacy secret OFF — it checks the user itself).
+
 ## Rules
 - Keep the first load tiny (< 120 KB gz). Lazy-load heavy things (Supabase, maps, 3D, modules) with `Spinner`.
 - Every user input goes through `src/lib/validate.ts`; repeat the checks server-side.

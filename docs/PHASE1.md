@@ -1,4 +1,6 @@
-# Phase 1 — New project + Studio (build plan)
+# Phase 1 — New project + Studio
+
+> **Status (27 Nov 2026):** first version built and on `dev`: wizard, Studio, real projects, AI function deployed on the test project, migration 0005. Decisions from review: **no live sun preview in Studio** (sun view stays on the project page); speed first on phones and desktops; OneMap for addresses; manual trace fallback; new windows default ⅔ glass; floor plan rotated so the unit's north points up.
 
 Goal: a user goes from a handful of photos to an accurate, editable DayTrace sun view of their own unit, fast, on a phone.
 
@@ -26,6 +28,7 @@ Then the user lands in **Studio** to check and fix the result.
 
 ## 2. Processing (Supabase edge function `process-project`)
 
+0. Photos are sent **in the request body only** (never written to storage), so there is nothing left to delete afterwards.
 1. Reads the admin's **active AI key** (`active_ai_key()`, service role only — Admin → AI keys).
 2. **Trace** the rotated floor plan → walls, windows, doors, rooms, in cm (scale from size in sq ft + plan dimensions when printed).
 3. **Furnish** from interior shots (if any) → furniture list with approximate sizes, assigned to rooms. No interior shots → a sensible default layout per room type.
@@ -43,7 +46,6 @@ Mobile-first: one plan canvas, a slim tool bar at the bottom, big touch targets,
 | **Windows** | Tap a wall to add a window; drag its two end handles to size it. **Glass height: ⅓ · ½ · ⅔** (three chips only — the rest of the wall below is solid). Delete from the selection bar. |
 | **Furniture** | Palette with presets (bed single/queen/king, sofa 2/3-seat, dining table, desk, wardrobe, TV console, counter, plant, rug). Drag to place, rotate 90°, exact size in cm and height via a small sheet. Custom sizes allowed. |
 | **Rooms** | Rename room labels (Living, Bedroom 2…). |
-| **Sun preview** | Toggle to see live sunlight while editing — same timeline, so window changes show their effect instantly. |
 | **Undo / redo · autosave** | Every change autosaves (debounced) to the project; no Save button needed. |
 
 Later in Studio (not Phase 1 unless trivial): wall nudging, doors, balcony/ledge depth, ceiling height per room.
