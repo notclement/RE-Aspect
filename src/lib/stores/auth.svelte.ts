@@ -17,14 +17,22 @@ class Auth {
 			const sb = await getSupabase();
 			const { data } = await sb.auth.getSession();
 			this.setSession(data.session?.user ?? null);
-			sb.auth.onAuthStateChange((_event, session) => this.setSession(session?.user ?? null));
+			sb.auth.onAuthStateChange((_event, session) => {
+				// Defer: Supabase recommends not awaiting other calls inside this callback.
+				setTimeout(() => this.setSession(session?.user ?? null), 0);
+			});
 		} catch (e) {
 			this.error = e instanceof Error ? e.message : String(e);
 			this.status = 'signed-out';
 		}
 	}
 
-	private setSession(user: { email?: string; user_metadata?: Record<string, unknown> } | null) {
+	private userId: string | null = null;
+
+	private async setSession(
+		user: { id: string; email?: string; user_metadata?: Record<string, unknown> } | null
+	) {
+		this.userId = user?.id ?? null;
 		if (!user) {
 			this.status = 'signed-out';
 			this.email = null;
@@ -36,7 +44,37 @@ class Auth {
 		if (!profile.data.name && typeof googleName === 'string') {
 			profile.update({ name: googleName.slice(0, 40) });
 		}
+		await this.loadProfile();
 		this.status = 'signed-in';
+	}
+
+	/** Pull name + plan from the `profiles` table (server is the source of truth for the plan). */
+	private async loadProfile() {
+		if (!this.userId) return;
+		try {
+			const sb = await getSupabase();
+			const { data, error } = await sb
+				.from('profiles')
+				.select('name, plan')
+				.eq('id', this.userId)
+				.maybeSingle();
+			if (error) throw error;
+			if (data) {
+				const plan = data.plan === 'pro' || data.plan === 'agency' ? data.plan : 'free';
+				profile.update({ plan, ...(data.name ? { name: data.name } : {}) });
+			}
+		} catch (e) {
+			console.warn('[auth] could not load profile', e);
+		}
+	}
+
+	/** Save an already-validated name locally and (when signed in) to the server. */
+	async saveName(name: string) {
+		profile.update({ name });
+		if (this.status !== 'signed-in' || !this.userId) return;
+		const sb = await getSupabase();
+		const { error } = await sb.from('profiles').update({ name }).eq('id', this.userId);
+		if (error) console.warn('[auth] could not save name', error.message);
 	}
 
 	async signInWithGoogle() {

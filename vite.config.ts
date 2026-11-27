@@ -8,8 +8,22 @@ import process from 'node:process';
 // In Cloudflare, set SUPABASE_URL_TEST / _LIVE and SUPABASE_PUBLISHABLE_KEY_TEST / _LIVE once as build variables.
 const branch = process.env.WORKERS_CI_BRANCH ?? process.env.CF_PAGES_BRANCH ?? '';
 const live = branch === 'main';
-for (const key of ['SUPABASE_URL', 'SUPABASE_PUBLISHABLE_KEY']) {
-	if (!process.env[key]) process.env[key] = process.env[`${key}_${live ? 'LIVE' : 'TEST'}`] ?? '';
+// Publishable keys are designed to be public (data is protected by Row Level Security), so they can live here.
+// Cloudflare build variables with the same names override these if ever needed.
+const SUPABASE_PUBLIC = {
+	TEST: {
+		SUPABASE_URL: 'https://kyupdztsvwegaelrkyfd.supabase.co',
+		SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_dyGHYJ-xqOkuEMaD6ZYCKw_-j4ZDmJy'
+	},
+	LIVE: {
+		SUPABASE_URL: 'https://juyjbwdmmntoqegzhkyi.supabase.co',
+		SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_loOMCARkP8_ehJ98SDXV3w_xIyIZQVY'
+	}
+} as const;
+for (const key of ['SUPABASE_URL', 'SUPABASE_PUBLISHABLE_KEY'] as const) {
+	const env = live ? 'LIVE' : 'TEST';
+	if (!process.env[key])
+		process.env[key] = process.env[`${key}_${env}`] || SUPABASE_PUBLIC[env][key];
 }
 process.env.APP_ENV ??= live ? 'live' : 'test';
 

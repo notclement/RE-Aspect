@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { profile } from '#lib/stores/profile.svelte.ts';
+	import { auth } from '#lib/stores/auth.svelte.ts';
 	import { validateName } from '#lib/validate.ts';
 	import { BRAND } from '#lib/config/brand.ts';
 
@@ -14,7 +15,7 @@
 			error = r.error;
 			return;
 		}
-		profile.update({ name: r.value });
+		auth.saveName(r.value);
 		goto('/', { replaceState: true });
 	}
 </script>

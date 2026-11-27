@@ -14,7 +14,7 @@
 		const r = validateName(name);
 		error = r.ok ? null : r.error;
 		if (r.ok) {
-			profile.update({ name: r.value });
+			auth.saveName(r.value);
 			saved = true;
 			setTimeout(() => (saved = false), 1500);
 		}

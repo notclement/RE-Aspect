@@ -14,24 +14,18 @@ npm run dev             # http://localhost:5173
 Without Supabase values the app runs in **preview mode**: there's no sign-in and data stays in your browser.
 
 ## Environments
-| | Branch | URL | Supabase project |
-|---|---|---|---|
-| **Test** | any branch except `main` (e.g. `dev`) | `https://<branch>.re-aspect.pages.dev` | `re-aspect-test` |
-| **Live** | `main` | `https://re-aspect.pages.dev` | `re-aspect-live` |
-
-Cloudflare Pages builds every push. Set the variables below separately for **Production** and **Preview** in
-Cloudflare → *Workers & Pages → re-aspect → Settings → Variables and Secrets*:
-
-| Variable | Test (Preview) | Live (Production) |
+| | Branch | Supabase project |
 |---|---|---|
-| `SUPABASE_URL` | test project URL | live project URL |
-| `SUPABASE_PUBLISHABLE_KEY` | test publishable key | live publishable key |
-| `APP_ENV` | `test` | `live` |
-| `NODE_VERSION` | `22.17.0` | `22.17.0` |
+| **Test** | any branch except `main` (e.g. `dev`) | `re-aspect-test` |
+| **Live** | `main` | `re-aspect-live` |
 
-Cloudflare build settings: **Framework** SvelteKit · **Build command** `npm run build` · **Output** `build`.
+Hosted on **Cloudflare Workers (static assets)** — see `wrangler.jsonc`. Every push builds; non-`main` branches get a preview URL.
+The Supabase URL + *publishable* keys are in `vite.config.ts` (they're public by design; data is protected by Row Level Security).
+The build picks test vs live from the branch name (`WORKERS_CI_BRANCH`).
 
-⚠️ Never put the Supabase **secret / service_role** key or any AI key in these variables. They go in Supabase → Edge Functions → Secrets.
+Database changes live in `supabase/migrations/` — run each new file in **Supabase → SQL Editor** on test first, then live.
+
+⚠️ Never put the Supabase **secret / service_role** key or any AI key in the repo or build variables — they go in Supabase → Edge Functions → Secrets.
 
 ## Workflow
 1. Work on the `dev` branch → push → test at the preview URL.
