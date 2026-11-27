@@ -21,11 +21,32 @@
 	// Settings / Profile / New unit get a back button that returns to wherever you came from.
 	const SUB_PAGES = ['/settings', '/profile', '/agency', '/upgrade', '/join', '/new', '/studio', '/rotate', '/admin'];
 	const isSub = $derived(SUB_PAGES.includes(page.url.pathname));
+	// Pages opened from the photo menu: Back returns to the page you were on before the menu (a project, Studio, …),
+	// skipping any other menu pages in between, and it still works after a reload (kept for this tab).
+	const MENU_PAGES = ['/settings', '/profile', '/agency', '/upgrade', '/admin', '/join'];
+	const RETURN_KEY = 'rea.returnTo';
 	let inAppSteps = 0;
 	afterNavigate((n) => {
 		if (n.type !== 'enter') inAppSteps++;
+		const path = page.url.pathname;
+		if (!MENU_PAGES.includes(path)) {
+			try {
+				sessionStorage.setItem(RETURN_KEY, path + page.url.search);
+			} catch {
+				/* ignore */
+			}
+		}
 	});
 	function back() {
+		if (MENU_PAGES.includes(page.url.pathname)) {
+			let to = '/';
+			try {
+				to = sessionStorage.getItem(RETURN_KEY) || '/';
+			} catch {
+				/* ignore */
+			}
+			return void goto(to.startsWith('/') && !to.startsWith('//') ? to : '/');
+		}
 		if (inAppSteps > 0 && history.length > 1) history.back();
 		else goto('/');
 	}
