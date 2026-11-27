@@ -13,7 +13,8 @@
 
 	$effect(() => nav.set({ label: 'Projects' }));
 	const plan = $derived(PLANS[profile.planId]);
-	// The user's own projects first, then the demos. The quota counts own projects only (demos are free).
+	// The user's own projects first, then the demos in their own section. Demos are read-only for everyone
+	// (admins included) and never count toward any quota.
 	const projects = SAMPLE_UNITS;
 	const STATUS: Record<string, string> = { draft: 'Needs tracing', processing: 'Processing…', failed: 'Needs tracing', ready: '' };
 </script>
@@ -57,7 +58,8 @@
 	</a>
 {/if}
 
-{#if myProjects.length}<h3 class="demos">Demo projects</h3>{/if}
+<h3 class="demos">Demo projects</h3>
+<p class="muted demo-note">Read-only examples — they don't count toward your projects.</p>
 {#each projects as u (u.id)}
 	{@const d = projectDetails(u.id)}
 	<a class="unit card" href="/unit?id={u.id}">
@@ -159,6 +161,10 @@
 		color: var(--forest);
 	}
 	.first .muted {
+		font-size: 13px;
+	}
+	.demo-note {
+		margin: -4px 0 10px;
 		font-size: 13px;
 	}
 	.demos {

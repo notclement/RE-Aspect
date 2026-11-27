@@ -1,7 +1,7 @@
 <script lang="ts">
 	/**
 	 * Top-down and "3D plan" views of a unit with live sun patches.
-	 * 3D plan = stacked SVG layers in CSS 3D (cheap, no WebGL). The full 3D / walkthrough module
+	 * 3D plan = CSS 3D (cheap, no WebGL): floor + furniture as SVG layers, walls as solid upright faces with SVG tops. The full 3D / walkthrough module
 	 * (built with Astra) will replace the 3D layer later — it receives the same Unit data.
 	 *
 	 * Gestures (natural, never inverted): drag = pan (top down) / orbit (3D: drag left → model turns left),
@@ -149,7 +149,77 @@
 	// Performance: few, static layers. Only the floor layer changes as the sun moves.
 	const STEP = 4;
 	const WALL_H = 230;
-	const wallLayers = $derived(Array.from({ length: Math.round((WALL_H * PX_PER_CM) / STEP) }, (_, i) => (i + 1) * STEP));
+	const WALL_PX = WALL_H * PX_PER_CM;
+
+	// Solid 3D walls: each wall is two upright faces (one per side) plus its top, instead of stacked slices
+	// (slices showed gaps at steep angles). Windows = solid sill + glass above; doors = opening + lintel.
+	let modelW = $state(0);
+	let modelH = $state(0);
+	type Face = { style: string; glass: boolean };
+	const faces3d = $derived.by((): Face[] => {
+		if (mode !== '3d' || !modelW || !modelH) return [];
+		const k = Math.min(modelW / vb.w, modelH / vb.h); // px per cm (the SVG layers use preserveAspectRatio meet)
+		const ox = (modelW - vb.w * k) / 2;
+		const oy = (modelH - vb.h * k) / 2;
+		const zk = (WALL_H / (unit.ceiling || 260)) * PX_PER_CM; // cm of real height → px
+		const DOOR_H = 210;
+		const out: Face[] = [];
+		const near = (p: [number, number], a: [number, number], b: [number, number]) => {
+			const dx = b[0] - a[0];
+			const dy = b[1] - a[1];
+			const L2 = dx * dx + dy * dy || 1;
+			const t = Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / L2));
+			return Math.hypot(p[0] - (a[0] + dx * t), p[1] - (a[1] + dy * t)) < 4;
+		};
+		for (const w of unit.walls) {
+			const len = Math.hypot(w.b[0] - w.a[0], w.b[1] - w.a[1]);
+			if (len < 1) continue;
+			const u = [(w.b[0] - w.a[0]) / len, (w.b[1] - w.a[1]) / len];
+			const along = (p: [number, number]) => (p[0] - w.a[0]) * u[0] + (p[1] - w.a[1]) * u[1];
+			// openings on this wall (windows, doors): along-wall range + what fills it at which height (cm)
+			type Gap = { s0: number; s1: number; parts: { z0: number; z1: number; glass: boolean }[] };
+			const gaps: Gap[] = [];
+			for (const o of unit.windows) {
+				if (!near(o.a, w.a, w.b) || !near(o.b, w.a, w.b)) continue;
+				const [s0, s1] = [along(o.a), along(o.b)].sort((x, y) => x - y);
+				gaps.push({ s0, s1, parts: [{ z0: 0, z1: o.sill, glass: false }, { z0: o.sill, z1: o.head, glass: true }, { z0: o.head, z1: Infinity, glass: false }] });
+			}
+			for (const d of unit.doors ?? []) {
+				if (!near(d.a, w.a, w.b) || !near(d.b, w.a, w.b)) continue;
+				const [s0, s1] = [along(d.a), along(d.b)].sort((x, y) => x - y);
+				gaps.push({ s0, s1, parts: d.glass ? [{ z0: 0, z1: DOOR_H, glass: true }, { z0: DOOR_H, z1: Infinity, glass: false }] : [{ z0: DOOR_H, z1: Infinity, glass: false }] });
+			}
+			gaps.sort((g1, g2) => g1.s0 - g2.s0);
+			// solid stretches between gaps, full height
+			const pieces: { s0: number; s1: number; z0: number; z1: number; glass: boolean }[] = [];
+			let at = 0;
+			for (const g of gaps) {
+				if (g.s0 > at + 0.5) pieces.push({ s0: at, s1: g.s0, z0: 0, z1: Infinity, glass: false });
+				for (const pt of g.parts) pieces.push({ s0: Math.max(at, g.s0), s1: g.s1, ...pt });
+				at = Math.max(at, g.s1);
+			}
+			if (len > at + 0.5) pieces.push({ s0: at, s1: len, z0: 0, z1: Infinity, glass: false });
+			const ang = (Math.atan2(u[1], u[0]) * 180) / Math.PI;
+			const n = [-u[1], u[0]];
+			const half = (w.t / 2) * k;
+			for (const pc of pieces) {
+				const z0 = pc.z0 * zk;
+				const z1 = Math.min(WALL_PX, pc.z1 === Infinity ? WALL_PX : pc.z1 * zk);
+				if (z1 - z0 < 0.3 || pc.s1 - pc.s0 < 0.5) continue;
+				const sx = ox + (w.a[0] + u[0] * pc.s0 - vb.x) * k;
+				const sy = oy + (w.a[1] + u[1] * pc.s0 - vb.y) * k;
+				for (const side of pc.glass ? [0] : [-1, 1]) {
+					const left = sx + n[0] * half * side;
+					const top = sy + n[1] * half * side;
+					out.push({
+						glass: pc.glass,
+						style: `left:${left.toFixed(1)}px;top:${top.toFixed(1)}px;width:${((pc.s1 - pc.s0) * k).toFixed(1)}px;height:${(z1 - z0).toFixed(1)}px;transform:translateZ(${z0.toFixed(1)}px) rotateZ(${ang.toFixed(2)}deg) rotateX(90deg)`
+					});
+				}
+			}
+		}
+		return out;
+	});
 	const itemTop = (i: Item) => Math.min(20, Math.max(2, i.h * PX_PER_CM));
 	const itemLayers = $derived(Array.from({ length: 5 }, (_, i) => (i + 1) * STEP));
 
@@ -333,14 +403,16 @@
 			</svg>
 		</div>
 	{:else}
-		<div class="model" style:transform="translate({panX}px,{panY}px) scale({scale * 0.92}) rotateX({tilt}deg) rotateZ({rot}deg)">
+		<div class="model" bind:clientWidth={modelW} bind:clientHeight={modelH} style:transform="translate({panX}px,{panY}px) scale({scale * 0.92}) rotateX({tilt}deg) rotateZ({rot}deg)">
 			<svg {viewBox}>{@render floor()}</svg>
 			{#each itemLayers as z (z)}
 				<svg {viewBox} style:transform="translateZ({z}px)">{@render items(z)}</svg>
 			{/each}
-			{#each wallLayers as z, k (z)}
-				<svg {viewBox} style:transform="translateZ({z}px)">{@render walls(k === wallLayers.length - 1)}</svg>
+			{#each faces3d as f, i (i)}
+				<div class="face" class:glass={f.glass} style={f.style}></div>
 			{/each}
+			<!-- wall tops -->
+			<svg {viewBox} style:transform="translateZ({WALL_PX}px)">{@render walls(true)}</svg>
 			<!-- one cheap night-time tint over everything, instead of a filter on every layer -->
 			<svg {viewBox} style:transform="translateZ({WALL_H * PX_PER_CM + 1}px)" style:opacity={dark * 0.32} class="night">
 				<polygon points={outline} fill="#16213A" />
@@ -398,6 +470,16 @@
 	.model {
 		transform-style: preserve-3d;
 		will-change: transform;
+	}
+	.face {
+		position: absolute;
+		transform-origin: 0 0;
+		background: var(--wall);
+		pointer-events: none;
+	}
+	.face.glass {
+		background: var(--glass);
+		opacity: 0.55;
 	}
 	.night {
 		pointer-events: none;

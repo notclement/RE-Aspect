@@ -47,6 +47,7 @@
 	let errors = $state<Partial<Record<keyof ProjectDetails, string>>>({});
 	let detailsOpen = $state(false);
 	function startEdit() {
+		if (!mine) return; // demo projects are read-only
 		form = { ...details };
 		errors = {};
 		editing = true;
@@ -294,10 +295,14 @@
 				<dt>Notes</dt><dd class="pre">{details.notes || '—'}</dd>
 				<dt>Size</dt><dd>{(mine ? mine.sizeSqft : unit.sizeSqft)?.toLocaleString() ?? '—'} sq ft</dd>
 			</dl>
-			<div class="editrow">
-				<button class="btn editbtn" onclick={startEdit}>Edit details</button>
-				{#if mine}<button class="btn danger" onclick={() => (confirmDelete = true)}><Icon name="trash" size={18} />Delete project</button>{/if}
-			</div>
+			{#if mine}
+				<div class="editrow">
+					<button class="btn editbtn" onclick={startEdit}>Edit details</button>
+					<button class="btn danger" onclick={() => (confirmDelete = true)}><Icon name="trash" size={18} />Delete project</button>
+				</div>
+			{:else}
+				<p class="muted small">Demo project · read-only. It doesn't count toward your projects.</p>
+			{/if}
 		{/if}
 	</Collapse>
 </div>
@@ -500,5 +505,9 @@
 		display: flex;
 		justify-content: flex-end;
 		gap: 8px;
+	}
+	.small {
+		font-size: 13px;
+		margin: 10px 0 0;
 	}
 </style>

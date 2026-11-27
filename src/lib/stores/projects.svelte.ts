@@ -3,7 +3,7 @@
  * Kept in this browser for speed and synced to the Supabase `projects` table when signed in,
  * so they follow the user across devices and show up in the admin panel.
  */
-import { DAKOTA_UNIT, LOFT_UNIT, HDB_UNIT, SAMPLE_UNITS } from '#lib/sample-unit.ts';
+import { DAKOTA_UNIT, LOFT_UNIT, HDB_UNIT } from '#lib/sample-unit.ts';
 import { isPropertyType, type PropertyType } from '#lib/config/property-types.ts';
 import { getSupabase } from '#lib/supabase.ts';
 import { sanitizePlan, type PlanData } from '#lib/plan.ts';
@@ -59,10 +59,8 @@ const DEFAULTS: Record<string, ProjectDetails> = {
 export function projectDetails(id: string): ProjectDetails {
 	const mine = getProject(id);
 	if (mine) return { name: mine.name, unitNo: mine.unitNo, address: mine.address, propertyType: mine.propertyType, description: mine.description, notes: mine.notes };
-	const base = DEFAULTS[id] ?? { name: 'Untitled project', unitNo: '', address: '', propertyType: 'other', description: '', notes: '' };
-	const merged = { ...base, ...overrides[id] };
-	if (!isPropertyType(merged.propertyType)) merged.propertyType = base.propertyType;
-	return merged;
+	// Demo projects are read-only for everyone: always their built-in details.
+	return DEFAULTS[id] ?? { name: 'Untitled project', unitNo: '', address: '', propertyType: 'other', description: '', notes: '' };
 }
 
 function persist() {
@@ -74,58 +72,25 @@ function persist() {
 }
 
 type Row = { demo_key: string | null; name: string; unit_no: string; address: string; property_type: string; description: string; notes: string };
-const toRow = (key: string, d: ProjectDetails): Row => ({
-	demo_key: key,
-	name: d.name,
-	unit_no: d.unitNo,
-	address: d.address,
-	property_type: d.propertyType,
-	description: d.description,
-	notes: d.notes
-});
 
 let signedIn = false;
 
 export async function saveProjectDetails(id: string, details: ProjectDetails) {
 	if (getProject(id)) return updateProject(id, details);
-	overrides[id] = details;
-	persist();
-	if (!signedIn) return;
-	try {
-		const sb = await getSupabase();
-		const { error } = await sb.from('projects').upsert(toRow(id, details), { onConflict: 'owner,demo_key' });
-		if (error) throw error;
-	} catch (e) {
-		console.warn('[projects] could not save to the cloud', e);
-	}
+	// Demo projects are read-only — nothing to save.
 }
 
-/** On sign-in: pull this user's saved project details, and make sure their demo projects exist on the server. */
+/** On sign-in: pull this user's own projects (demos are built in and read-only, nothing to sync). */
 export async function syncProjects() {
 	signedIn = true;
 	try {
 		const sb = await getSupabase();
 		const { data, error } = await sb.from('projects').select(COLS);
 		if (error) throw error;
-		const have = new Set<string>();
 		const mine: MyProject[] = [];
 		for (const r of (data ?? []) as (Row & CloudRow)[]) {
-			if (!r.demo_key) {
-				mine.push(fromCloud(r));
-				continue;
-			}
-			if (!DEFAULTS[r.demo_key]) continue;
-			have.add(r.demo_key);
-			overrides[r.demo_key] = {
-				name: r.name,
-				unitNo: r.unit_no,
-				address: r.address,
-				propertyType: isPropertyType(r.property_type) ? r.property_type : DEFAULTS[r.demo_key].propertyType,
-				description: r.description,
-				notes: r.notes
-			};
+			if (!r.demo_key) mine.push(fromCloud(r));
 		}
-		persist();
 		// Keep local edits that haven't reached the server yet (newer updatedAt wins).
 		const local = new Map(myProjects.map((p) => [p.id, p]));
 		myProjects.splice(0, myProjects.length, ...mine.map((p) => {
@@ -133,11 +98,6 @@ export async function syncProjects() {
 			return l && l.updatedAt > p.updatedAt ? l : p;
 		}).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)));
 		cacheMine();
-		const missing = SAMPLE_UNITS.filter((u) => !have.has(u.id)).map((u) => toRow(u.id, projectDetails(u.id)));
-		if (missing.length) {
-			const { error: e2 } = await sb.from('projects').upsert(missing, { onConflict: 'owner,demo_key', ignoreDuplicates: true });
-			if (e2) throw e2;
-		}
 	} catch (e) {
 		console.warn('[projects] could not sync', e);
 	}
