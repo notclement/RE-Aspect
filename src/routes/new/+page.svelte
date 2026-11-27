@@ -18,7 +18,7 @@
 	import { shrinkPhoto, rotateImage, type Shrunk } from '#lib/image.ts';
 	import { saveFloorPlan } from '#lib/floorplan-store.ts';
 	import { searchAddress, type Place } from '#lib/onemap.ts';
-	import { validateProjectName, validateUnitNumber, validateFreeText, validateFloorLevel, validateSizeSqft, validateCeilingHeightM } from '#lib/validate.ts';
+	import { validateProjectName, validateUnitNumber, validateFreeText, validateFloorLevel, validateSizeSqft, validateSizeSqm, validateCeilingHeightM } from '#lib/validate.ts';
 	import { getSupabase, supabaseConfigured } from '#lib/supabase.ts';
 	import { sanitizePlan } from '#lib/plan.ts';
 	import UpgradeSheet from '#lib/components/UpgradeSheet.svelte';
@@ -86,6 +86,8 @@
 	let propertyType = $state<PropertyType>('hdb');
 	let level = $state('');
 	let size = $state('');
+	let sizeUnit = $state<'sqft' | 'sqm'>('sqft'); // sq ft by default
+	const SQFT_PER_SQM = 10.7639;
 	let ceiling = $state('2.6');
 	let addrQuery = $state('');
 	let address = $state('');
@@ -142,7 +144,8 @@
 		const u = validateUnitNumber(unitNo, l.ok ? l.value : null);
 		const a0 = validateFreeText(address, { max: 120, label: 'Address' });
 		const a = a0.ok && !a0.value ? ({ ok: false, error: 'Please enter the address or postal code.' } as const) : a0;
-		const s = validateSizeSqft(size);
+		const sm = sizeUnit === 'sqm' ? validateSizeSqm(size) : null;
+		const s = sm ? (sm.ok ? validateSizeSqft(Math.round(sm.value * SQFT_PER_SQM)) : sm) : validateSizeSqft(size);
 		const c = validateCeilingHeightM(ceiling);
 		errors = {
 			name: n.ok ? undefined : n.error,
@@ -197,10 +200,10 @@
 		if (!supabaseConfigured || auth.status !== 'signed-in') return void (north = { ...north, state: 'off', forPlan: pid });
 		north = { state: 'checking', angle: 0, confidence: '', evidence: '', forPlan: pid };
 		try {
-			const floorPlan = (await shrinkPhoto(planPhoto.img.dataUrl, 1536, 0.8)).dataUrl;
+			const floorPlan = (await shrinkPhoto(planPhoto.img.dataUrl, 1536, 0.8, true)).dataUrl;
 			// Every other photo (up to 14), smaller, so the AI can combine all the clues.
 			const others = await Promise.all(
-				photos.filter((p) => p.id !== pid).map(async (p) => (await shrinkPhoto(p.img.dataUrl, 900, 0.7)).dataUrl)
+				photos.filter((p) => p.id !== pid).map(async (p) => (await shrinkPhoto(p.img.dataUrl, 1400, 0.75, true)).dataUrl)
 			);
 			const l = level.trim() ? validateFloorLevel(level) : null;
 			const context = {
@@ -408,8 +411,14 @@
 			</div>
 			<div class="row2">
 				<div class="field">
-					<label for="size">Size (sq ft)</label>
-					<input id="size" inputmode="numeric" maxlength="6" placeholder="Type here…" bind:value={size} />
+					<div class="sizehead">
+						<label for="size">Size</label>
+						<div class="unit" role="group" aria-label="Size unit">
+							<button type="button" class:on={sizeUnit === 'sqft'} aria-pressed={sizeUnit === 'sqft'} title="Square feet" onclick={() => (sizeUnit = 'sqft')}>sq ft</button>
+							<button type="button" class:on={sizeUnit === 'sqm'} aria-pressed={sizeUnit === 'sqm'} title="Square metres" onclick={() => (sizeUnit = 'sqm')}>m²</button>
+						</div>
+					</div>
+					<input id="size" inputmode="numeric" maxlength="6" placeholder={sizeUnit === 'sqm' ? 'e.g. 93' : 'e.g. 1001'} bind:value={size} />
 					{#if errors.size}<span class="error">{errors.size}</span>{:else}<span class="muted small">Sets the plan's scale</span>{/if}
 				</div>
 				<div class="field">
@@ -474,7 +483,7 @@
 					<dt>Address</dt><dd>{address || '—'}{#if place}<span class="ok small"> · location found</span>{/if}</dd>
 					<dt>Unit</dt><dd>{[unitNo, level ? `Level ${level}` : ''].filter(Boolean).join(' · ') || '—'}</dd>
 					<dt>Type</dt><dd>{PROPERTY_TYPES.find((t) => t.id === propertyType)?.label}</dd>
-					<dt>Size</dt><dd>{size ? `${size} sq ft` : '—'} · ceiling {ceiling} m</dd>
+					<dt>Size</dt><dd>{size ? `${size} ${sizeUnit === 'sqm' ? 'm²' : 'sq ft'}` : '—'} · ceiling {ceiling} m</dd>
 					<dt>Photos</dt><dd>{photos.length} (floor plan + {photos.length - 1} more)</dd>
 					<dt>North</dt><dd>Plan turned {((angle % 360) + 360) % 360}° clockwise{north.state === 'found' && suggestionApplied ? ' (AI suggestion)' : ''}</dd>
 				</dl>
@@ -951,5 +960,35 @@
 		flex-shrink: 0;
 		margin-top: 2px;
 		color: var(--ochre);
+	}
+	.sizehead {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 8px;
+	}
+	.unit {
+		display: inline-flex;
+		padding: 2px;
+		border-radius: 10px;
+		background: var(--surface-2);
+	}
+	.unit button {
+		min-height: 44px;
+		min-width: 44px;
+		padding: 0 8px;
+		border: 0;
+		border-radius: 8px;
+		background: none;
+		color: var(--muted);
+		font: inherit;
+		font-size: 13px;
+		font-weight: 600;
+		cursor: pointer;
+	}
+	.unit button.on {
+		background: var(--surface);
+		color: var(--forest);
+		box-shadow: var(--shadow);
 	}
 </style>

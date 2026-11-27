@@ -76,6 +76,8 @@ export const validateCeilingHeightM = (v: string | number) =>
 	validateNumber(v, { min: 2.2, max: 6, label: 'Ceiling height (m)' });
 export const validateSizeSqft = (v: string | number) =>
 	validateNumber(v, { min: 150, max: 20000, label: 'Size (sq ft)', decimals: 0 });
+export const validateSizeSqm = (v: string | number) =>
+	validateNumber(v, { min: 14, max: 1860, label: 'Size (m²)', decimals: 0 });
 export const validateBodyHeightCm = (v: string | number) =>
 	validateNumber(v, { min: 100, max: 230, label: 'Height (cm)', decimals: 0 });
 

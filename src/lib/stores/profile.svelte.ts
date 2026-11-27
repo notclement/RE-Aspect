@@ -33,7 +33,7 @@ export interface Profile {
 	walkSpeed: number; // m/s
 	lookSensitivity: number; // 1 = default
 	isAdmin: boolean; // mirrored from the server on sign-in
-	nightSpeed: number; // Auto sun: how much faster night plays than daytime (1–5×)
+	nightSpeed: number; // Auto sun: how much faster night plays than daytime (1–10×, default 5×)
 }
 
 const KEY = 'rea.profile';
@@ -43,16 +43,16 @@ const DEFAULTS: Profile = {
 	proUntil: null,
 	avatar: null,
 	disabled: false,
-	bodyHeightCm: 170,
+	bodyHeightCm: 175,
 	areaUnit: 'sqft',
 	clock: '12h',
-	walkSpeed: 1.3,
-	lookSensitivity: 1,
+	walkSpeed: 1.8,
+	lookSensitivity: 1.5,
 	isAdmin: false,
-	nightSpeed: 2.5
+	nightSpeed: 5
 };
 export const NIGHT_SPEED_MIN = 1;
-export const NIGHT_SPEED_MAX = 5;
+export const NIGHT_SPEED_MAX = 10; // default 5×, ± 5 (1 is the slowest that still moves)
 
 /** Personal settings that sync to the account (profiles.settings) so they follow the user across devices. */
 const SETTING_KEYS = ['bodyHeightCm', 'areaUnit', 'clock', 'walkSpeed', 'lookSensitivity', 'nightSpeed'] as const;

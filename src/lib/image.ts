@@ -45,7 +45,8 @@ function encode(canvas: HTMLCanvasElement, q = 0.82): string {
  * Shrink a photo in the browser (long side ≤ maxSide). Re-encoding drops EXIF/GPS data.
  * Typically 10× smaller than the camera original.
  */
-export async function shrinkPhoto(src: Blob | string, maxSide = 2048, q = 0.82): Promise<Shrunk> {
+/** `jpeg` = always JPEG (for server-side image tools that can't read WebP). */
+export async function shrinkPhoto(src: Blob | string, maxSide = 2048, q = 0.82, jpeg = false): Promise<Shrunk> {
 	const bmp = typeof src === 'string' ? await createImageBitmap(await (await fetch(src)).blob()) : await createImageBitmap(src);
 	const k = Math.min(1, maxSide / Math.max(bmp.width, bmp.height));
 	const w = Math.max(1, Math.round(bmp.width * k));
@@ -57,7 +58,7 @@ export async function shrinkPhoto(src: Blob | string, maxSide = 2048, q = 0.82):
 	ctx.imageSmoothingQuality = 'high';
 	ctx.drawImage(bmp, 0, 0, w, h);
 	bmp.close();
-	return { dataUrl: encode(c, q), w, h };
+	return { dataUrl: jpeg ? c.toDataURL('image/jpeg', q) : encode(c, q), w, h };
 }
 
 /** Rotate an image by any angle (degrees, clockwise) onto a white background that fits the result. */

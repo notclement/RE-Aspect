@@ -98,7 +98,7 @@
 			<h2 id="share-title">Share this unit</h2>
 			<button class="x" onclick={() => (open = false)} title="Close" aria-label="Close"><Icon name="close" size={20} /></button>
 		</header>
-		<p class="muted">Anyone with the link can view the sun study — no account needed. It opens on the view, date and time you're looking at now. Notes stay private.</p>
+		<p class="muted">Anyone with the link can view the sun study — no account needed. It opens on the view, date and time you're looking at now. Your name and profile photo are shown so they can reply to you; notes stay private.</p>
 
 		{#if busy && !url}
 			<div class="center"><Spinner size={20} /></div>

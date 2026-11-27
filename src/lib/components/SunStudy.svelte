@@ -96,7 +96,10 @@
 		const c = canvasEl.getBoundingClientRect();
 		const below = slider.getBoundingClientRect().bottom + 30 - c.bottom; // + the hour labels under it
 		const top = c.top + scrollY;
-		canvasH = clampH(innerHeight - top - below - 8);
+		// Leave room for a fixed bar at the bottom of the screen (e.g. the reply bar on the shared page).
+		const bar = document.querySelector<HTMLElement>('[data-bottom-bar]');
+		const barH = bar && getComputedStyle(bar).display !== 'none' ? bar.offsetHeight : 0;
+		canvasH = clampH(innerHeight - top - below - 8 - barH);
 	}
 	onMount(() => {
 		// Twice: once now, once after fonts/the timeline have settled.
