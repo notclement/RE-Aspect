@@ -11,6 +11,12 @@ export interface Patch {
 }
 
 const RAD = Math.PI / 180;
+/**
+ * Near sunrise/sunset the projected light length (height ÷ tan(altitude)) shoots towards infinity,
+ * which made patches and beams jump around. Cap it (≈ sun at 9.5°): below that the light already
+ * reaches across the room, and we simply fade it in/out with altitude instead.
+ */
+const LOW_SUN_COT = 6;
 
 /** Room polygon a window lights (falls back to the unit outline). */
 export function roomFor(unit: Unit, win: Opening): [number, number][] {
@@ -34,7 +40,7 @@ export function sunPatches(unit: Unit, azimuth: number, altitude: number): Patch
 	if (altitude <= 0.3) return [];
 	const az = (azimuth - unit.bearing) * RAD;
 	const s: [number, number] = [Math.sin(az), -Math.cos(az)]; // towards the sun, plan coords (+y = south)
-	const cot = Math.min(1 / Math.tan(altitude * RAD), 40);
+	const cot = Math.min(1 / Math.tan(altitude * RAD), LOW_SUN_COT);
 	const out: Patch[] = [];
 	for (const w of unit.windows) {
 		const facing = s[0] * w.normal[0] + s[1] * w.normal[1];
@@ -44,7 +50,7 @@ export function sunPatches(unit: Unit, azimuth: number, altitude: number): Patch
 		const at = (p: [number, number], d: number): [number, number] => [p[0] - s[0] * d, p[1] - s[1] * d];
 		out.push({
 			points: [at(w.a, dS), at(w.b, dS), at(w.b, dH), at(w.a, dH)],
-			intensity: Math.min(1, facing * 1.5) * Math.min(1, altitude / 12),
+			intensity: Math.min(1, facing * 1.5) * smooth(altitude / 10),
 			clip: roomFor(unit, w)
 		});
 	}
@@ -100,7 +106,7 @@ export function furnitureLight(unit: Unit, azimuth: number, altitude: number, pa
 	if (altitude <= 0.3 || patches.length === 0) return { shadows, lit };
 	const az = ((azimuth - unit.bearing) * Math.PI) / 180;
 	const s: Pt = [Math.sin(az), -Math.cos(az)];
-	const cot = Math.min(1 / Math.tan((altitude * Math.PI) / 180), 8);
+	const cot = Math.min(1 / Math.tan((altitude * Math.PI) / 180), LOW_SUN_COT);
 	unit.items.forEach((it, i) => {
 		const foot: Pt[] = [
 			[it.x, it.y], [it.x + it.w, it.y], [it.x + it.w, it.y + it.d], [it.x, it.y + it.d]
@@ -110,7 +116,7 @@ export function furnitureLight(unit: Unit, azimuth: number, altitude: number, pa
 			shadows.push(hull([...foot, ...foot.map((p) => [p[0] - s[0] * d, p[1] - s[1] * d] as Pt)]));
 		}
 		const samples: Pt[] = [...foot, [it.x + it.w / 2, it.y + it.d / 2]];
-		if (patches.some((p) => samples.some((q) => inside(q, p.points) && inside(q, p.clip)))) lit.add(i);
+		if (altitude > 2 && patches.some((p) => samples.some((q) => inside(q, p.points) && inside(q, p.clip)))) lit.add(i);
 	});
 	return { shadows, lit };
 }
@@ -151,7 +157,7 @@ export function lightRays(unit: Unit, azimuth: number, altitude: number, spacing
 	const ys = unit.outline.map((p) => p[1]);
 	const c: Pt = [(Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...ys) + Math.max(...ys)) / 2];
 	const R = Math.hypot(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)) / 2;
-	const cot = Math.min(1 / Math.tan((altitude * Math.PI) / 180), 40);
+	const cot = Math.min(1 / Math.tan((altitude * Math.PI) / 180), LOW_SUN_COT);
 	const edges = unit.outline.map((p, i) => [p, unit.outline[(i + 1) % unit.outline.length]] as [Pt, Pt]);
 	const rays: Ray[] = [];
 	for (let t = -R; t <= R; t += spacing) {
@@ -185,4 +191,10 @@ export function lightRays(unit: Unit, azimuth: number, altitude: number, spacing
 		rays.push({ outside, inside: [at, [at[0] + d[0] * reach, at[1] + d[1] * reach]], blocked: false });
 	}
 	return rays;
+}
+
+/** Smoothstep 0..1 — soft fade for low sun. */
+function smooth(x: number): number {
+	const t = Math.max(0, Math.min(1, x));
+	return t * t * (3 - 2 * t);
 }

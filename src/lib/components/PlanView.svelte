@@ -162,8 +162,8 @@
 			<path d="M0 21.5H120M60 0V22" stroke="var(--floor-line)" stroke-width="1.5" />
 		</pattern>
 		<linearGradient id="sunfill" x1="0" y1="0" x2="0" y2="1">
-			<stop offset="0" stop-color="#F4C252" stop-opacity=".95" />
-			<stop offset="1" stop-color="#F8D98C" stop-opacity=".55" />
+			<stop offset="0" stop-color="#F4C252" stop-opacity=".85" />
+			<stop offset="1" stop-color="#F6CF72" stop-opacity=".7" />
 		</linearGradient>
 		{#each patches as p, i (i)}
 			<clipPath id="room{i}"><polygon points={pts(p.clip)} /></clipPath>
@@ -175,6 +175,7 @@
 		<mask id="raymask" maskUnits="userSpaceOnUse" x={vb.x - 3000} y={vb.y - 3000} width={vb.w + 6000} height={vb.h + 6000}>
 			<rect x={vb.x - 3000} y={vb.y - 3000} width={vb.w + 6000} height={vb.h + 6000} fill="url(#rayfade)" />
 		</mask>
+		<clipPath id="unitclip"><polygon points={outline} /></clipPath>
 		<clipPath id="litarea">
 			{#each patches as p, i (i)}<polygon points={pts(p.points)} />{/each}
 		</clipPath>
@@ -191,17 +192,19 @@
 	/>
 	<polygon points={outline} fill="url(#planks)" />
 	{#each patches as p, i (i)}
-		<polygon points={pts(p.points)} fill="url(#sunfill)" opacity={0.25 + p.intensity * 0.65} clip-path="url(#room{i})" />
+		<polygon points={pts(p.points)} fill="url(#sunfill)" opacity={p.intensity * 0.9} clip-path="url(#room{i})" />
 	{/each}
 	<!-- furniture blocks the sun: shadows only show where sunlight would have landed -->
-	<g clip-path="url(#litarea)">
-		{#each furniture.shadows as sh, i (i)}
-			<polygon points={pts(sh)} fill="url(#planks)" opacity=".88" />
-		{/each}
+	<g clip-path="url(#unitclip)">
+		<g clip-path="url(#litarea)" opacity={Math.min(1, sun.altitude / 6)}>
+			{#each furniture.shadows as sh, i (i)}
+				<polygon points={pts(sh)} fill="url(#planks)" opacity=".88" />
+			{/each}
+		</g>
 	</g>
 	<polygon points={outline} fill="#1A2740" opacity={dark * 0.28} />
 	{#if sunUp}
-		<g class="rays" opacity={Math.min(1, sun.altitude / 6)} mask="url(#raymask)">
+		<g class="rays" opacity={Math.min(1, sun.altitude / 8)} mask="url(#raymask)">
 			{#each rays as r, k (k)}
 				<line class="out" class:blocked={r.blocked} x1={r.outside[0][0]} y1={r.outside[0][1]} x2={r.outside[1][0]} y2={r.outside[1][1]} />
 				{#if r.blocked}
