@@ -119,3 +119,70 @@ export const ITEM_LABELS: Record<string, string> = {
 	sofa: 'Sofa', bed: 'Bed', table: 'Table', chair: 'Chair', counter: 'Counter', console: 'TV console',
 	wardrobe: 'Wardrobe', rug: 'Rug', plant: 'Plant', desk: 'Desk', bath: 'Bath'
 };
+
+// ---------------------------------------------------------------- light rays from outside
+
+export interface Ray {
+	outside: [Pt, Pt]; // from beyond the unit to where it meets the façade
+	inside: [Pt, Pt] | null; // continues through a window into the room
+	blocked: boolean; // stopped by a wall
+}
+
+function hit(p: Pt, d: Pt, a: Pt, b: Pt): number | null {
+	const ex = b[0] - a[0];
+	const ey = b[1] - a[1];
+	const den = d[0] * ey - d[1] * ex;
+	if (Math.abs(den) < 1e-9) return null;
+	const u = ((a[0] - p[0]) * ey - (a[1] - p[1]) * ex) / den;
+	const v = ((a[0] - p[0]) * d[1] - (a[1] - p[1]) * d[0]) / den;
+	return u > 1e-6 && v >= -1e-6 && v <= 1 + 1e-6 ? u : null;
+}
+
+/**
+ * Parallel sunbeams travelling toward the unit. Beams that reach a window carry on into the room
+ * (as far as the light lands on the floor); beams that reach a wall stop there.
+ */
+export function lightRays(unit: Unit, azimuth: number, altitude: number, spacing = 70): Ray[] {
+	if (altitude <= 0.3) return [];
+	const az = ((azimuth - unit.bearing) * Math.PI) / 180;
+	const d: Pt = [-Math.sin(az), Math.cos(az)]; // direction the light travels
+	const perp: Pt = [-d[1], d[0]];
+	const xs = unit.outline.map((p) => p[0]);
+	const ys = unit.outline.map((p) => p[1]);
+	const c: Pt = [(Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...ys) + Math.max(...ys)) / 2];
+	const R = Math.hypot(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)) / 2;
+	const cot = Math.min(1 / Math.tan((altitude * Math.PI) / 180), 40);
+	const edges = unit.outline.map((p, i) => [p, unit.outline[(i + 1) % unit.outline.length]] as [Pt, Pt]);
+	const rays: Ray[] = [];
+	for (let t = -R; t <= R; t += spacing) {
+		const start: Pt = [c[0] - d[0] * (R + 460) + perp[0] * t, c[1] - d[1] * (R + 460) + perp[1] * t];
+		let best: number | null = null;
+		for (const [a, b] of edges) {
+			const u = hit(start, d, a, b);
+			if (u !== null && (best === null || u < best)) best = u;
+		}
+		if (best === null) continue; // misses the unit
+		const at: Pt = [start[0] + d[0] * best, start[1] + d[1] * best];
+		const win = unit.windows.find((w) => {
+			const facing = -(d[0] * w.normal[0] + d[1] * w.normal[1]);
+			if (facing <= 0.03) return false;
+			const len = Math.hypot(w.b[0] - w.a[0], w.b[1] - w.a[1]);
+			const da = Math.hypot(at[0] - w.a[0], at[1] - w.a[1]);
+			const db = Math.hypot(at[0] - w.b[0], at[1] - w.b[1]);
+			return Math.abs(da + db - len) < 2;
+		});
+		const outside: [Pt, Pt] = [[start[0] + d[0] * (best - 420), start[1] + d[1] * (best - 420)], at];
+		if (!win) {
+			rays.push({ outside, inside: null, blocked: true });
+			continue;
+		}
+		// Inside: travel to where the top of the window's light lands, unless an interior wall comes first.
+		let reach = win.head * cot;
+		for (const w of unit.walls) {
+			const u = hit([at[0] + d[0] * 2, at[1] + d[1] * 2], d, w.a, w.b);
+			if (u !== null && u + 2 < reach) reach = u + 2;
+		}
+		rays.push({ outside, inside: [at, [at[0] + d[0] * reach, at[1] + d[1] * reach]], blocked: false });
+	}
+	return rays;
+}

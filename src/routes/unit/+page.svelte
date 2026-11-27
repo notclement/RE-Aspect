@@ -11,7 +11,7 @@
 	import Collapse from '#lib/components/Collapse.svelte';
 	import { SAMPLE_UNIT } from '#lib/sample-unit.ts';
 	import { sunPosition, localDate, sunTimes, compass } from '#lib/sun.ts';
-	import { sunPatches, darkness, furnitureLight, ITEM_LABELS } from '#lib/light.ts';
+	import { sunPatches, darkness, furnitureLight, lightRays, ITEM_LABELS } from '#lib/light.ts';
 	import { nav } from '#lib/stores/nav.svelte.ts';
 	import { profile } from '#lib/stores/profile.svelte.ts';
 
@@ -69,6 +69,7 @@
 	const patches = $derived(sunPatches(unit, sun.azimuth, sun.altitude));
 	const dark = $derived(darkness(sun.altitude));
 	const furniture = $derived(furnitureLight(unit, sun.azimuth, sun.altitude, patches));
+	const rays = $derived(lightRays(unit, sun.azimuth, sun.altitude));
 	const sunnyItems = $derived(
 		[...new Set([...furniture.lit].map((i) => ITEM_LABELS[unit.items[i].kind]).filter((n) => n !== 'Rug'))]
 	);
@@ -122,7 +123,7 @@
 			</div>
 		{:else}
 			{#key vs.view}
-				<PlanView bind:this={planView} {unit} mode={vs.view} {patches} {dark} {sun} {furniture} {grid} />
+				<PlanView bind:this={planView} {unit} mode={vs.view} {patches} {dark} {sun} {furniture} {rays} showSun={profile.data.showSunMarker} {grid} />
 			{/key}
 			<div class="zoom">
 				<button onclick={() => zoom(1 / 1.2)} aria-label="Zoom out"><Icon name="minus" size={18} /></button>

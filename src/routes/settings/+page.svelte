@@ -65,6 +65,18 @@
 </div>
 <p class="muted note">Remembered on this browser.</p>
 
+<h3>Sun view</h3>
+<div class="card list">
+	<label class="li toggle">
+		<span>Show the sun's position<br /><span class="muted note">A sun marker in the sky above the plan</span></span>
+		<input
+			type="checkbox"
+			checked={profile.data.showSunMarker}
+			onchange={(e) => profile.update({ showSunMarker: e.currentTarget.checked })}
+		/>
+	</label>
+</div>
+
 <h3>Units &amp; time</h3>
 <div class="card list">
 	<div class="li">
@@ -234,6 +246,40 @@
 		background: var(--forest);
 		border-color: var(--forest);
 		color: #fff;
+	}
+	.toggle {
+		gap: 12px;
+		cursor: pointer;
+	}
+	.toggle input {
+		appearance: none;
+		width: 48px;
+		height: 28px;
+		border-radius: 14px;
+		background: var(--surface-2);
+		border: 1px solid var(--line);
+		position: relative;
+		flex-shrink: 0;
+		cursor: pointer;
+		transition: background 0.15s;
+	}
+	.toggle input::after {
+		content: '';
+		position: absolute;
+		top: 2px;
+		left: 2px;
+		width: 22px;
+		height: 22px;
+		border-radius: 50%;
+		background: #fff;
+		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+		transition: transform 0.15s;
+	}
+	.toggle input:checked {
+		background: var(--forest);
+	}
+	.toggle input:checked::after {
+		transform: translateX(20px);
 	}
 	.signout {
 		margin-top: 24px;

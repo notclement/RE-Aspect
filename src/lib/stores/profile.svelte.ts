@@ -27,6 +27,7 @@ export interface Profile {
 	walkSpeed: number; // m/s
 	lookSensitivity: number; // 1 = default
 	isAdmin: boolean; // mirrored from the server on sign-in
+	showSunMarker: boolean; // show the sun disc (position in the sky) on the plan
 }
 
 const KEY = 'rea.profile';
@@ -38,7 +39,8 @@ const DEFAULTS: Profile = {
 	clock: '12h',
 	walkSpeed: 1.3,
 	lookSensitivity: 1,
-	isAdmin: false
+	isAdmin: false,
+	showSunMarker: false
 };
 const VIEW_KEY = 'rea.viewAs';
 

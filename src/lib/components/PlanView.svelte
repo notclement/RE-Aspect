@@ -8,7 +8,7 @@
 	 * pinch or wheel = zoom.
 	 */
 	import type { Unit, Item } from '#lib/sample-unit.ts';
-	import type { Patch, FurnitureLight } from '#lib/light.ts';
+	import type { Patch, FurnitureLight, Ray } from '#lib/light.ts';
 
 	let {
 		unit,
@@ -17,6 +17,8 @@
 		dark,
 		sun,
 		furniture,
+		rays,
+		showSun = false,
 		grid = $bindable(true)
 	}: {
 		unit: Unit;
@@ -25,6 +27,8 @@
 		dark: number;
 		sun: { azimuth: number; altitude: number };
 		furniture: FurnitureLight;
+		rays: Ray[];
+		showSun?: boolean;
 		grid?: boolean;
 	} = $props();
 
@@ -188,12 +192,15 @@
 	</g>
 	<polygon points={outline} fill="#1A2740" opacity={dark * 0.28} />
 	{#if sunUp}
-		<g class="ray" opacity={Math.min(1, sun.altitude / 8)}>
-			<line x1={horizon[0]} y1={horizon[1]} x2={cx + sdir[0] * R * 0.55} y2={cy + sdir[1] * R * 0.55} />
-			<path
-				d="M0 -22 L40 0 L0 22 Z"
-				transform="translate({cx + sdir[0] * R * 0.55} {cy + sdir[1] * R * 0.55}) rotate({(Math.atan2(-sdir[1], -sdir[0]) * 180) / Math.PI})"
-			/>
+		<g class="rays" opacity={Math.min(1, sun.altitude / 6)}>
+			{#each rays as r, k (k)}
+				<line class="out" class:blocked={r.blocked} x1={r.outside[0][0]} y1={r.outside[0][1]} x2={r.outside[1][0]} y2={r.outside[1][1]} />
+				{#if r.blocked}
+					<circle cx={r.outside[1][0]} cy={r.outside[1][1]} r="9" class="stop" />
+				{:else if r.inside}
+					<line class="in" x1={r.inside[0][0]} y1={r.inside[0][1]} x2={r.inside[1][0]} y2={r.inside[1][1]} />
+				{/if}
+			{/each}
 		</g>
 	{/if}
 {/snippet}
@@ -280,7 +287,7 @@
 				{#each unit.rooms as r (r.name)}
 					<text x={r.x} y={r.y} class="label" text-anchor="middle">{r.name.toUpperCase()}</text>
 				{/each}
-				{@render sunDisc(sunUp ? topSun[0] : horizon[0], sunUp ? topSun[1] : horizon[1], 46)}
+				{#if showSun}{@render sunDisc(sunUp ? topSun[0] : horizon[0], sunUp ? topSun[1] : horizon[1], 46)}{/if}
 			</svg>
 		</div>
 	{:else}
@@ -292,7 +299,7 @@
 			{#each wallLayers as z, k (z)}
 				<svg {viewBox} style:transform="translateZ({z}px)" style:filter={dim}>{@render walls(k === wallLayers.length - 1)}</svg>
 			{/each}
-			{#if sunUp}
+			{#if sunUp && showSun}
 			<div
 				class="sky"
 				style:left="{sky3d.gx}%"
@@ -357,14 +364,25 @@
 		letter-spacing: 2px;
 		fill: #7b8077;
 	}
-.ray line {
-		stroke: var(--ochre);
-		stroke-width: 7;
-		stroke-dasharray: 18 14;
+.rays line {
 		stroke-linecap: round;
 	}
-	.ray path {
-		fill: var(--ochre);
+	.rays .out {
+		stroke: #e39a1e;
+		stroke-width: 6;
+		opacity: 0.8;
+	}
+	.rays .out.blocked {
+		opacity: 0.35;
+	}
+	.rays .in {
+		stroke: #d98c12;
+		stroke-width: 6;
+		stroke-dasharray: 16 12;
+	}
+	.rays .stop {
+		fill: #a6762a;
+		opacity: 0.6;
 	}
 	.sundisc text {
 		font: 700 40px var(--font);
