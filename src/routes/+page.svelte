@@ -8,6 +8,8 @@
 	import { projectDetails, myProjects } from '#lib/stores/projects.svelte.ts';
 	import { planReady, planToUnit } from '#lib/plan.ts';
 	import { propertyTypeLabel } from '#lib/config/property-types.ts';
+	import ConfirmDelete from '#lib/components/ConfirmDelete.svelte';
+	let toDelete = $state<{ id: string; name: string } | null>(null);
 
 	$effect(() => nav.set({ label: 'Projects' }));
 	const plan = $derived(PLANS[profile.planId]);
@@ -26,6 +28,7 @@
 <p class="muted meta">{myProjects.length} of {plan.includedUnits ?? '—'} projects used · <span class="tag pro">{plan.label}</span></p>
 
 {#each myProjects as p (p.id)}
+	<div class="own">
 	<a class="unit card" href="/unit?id={p.id}">
 		<div class="thumb">
 			{#if planReady(p.plan)}
@@ -42,7 +45,10 @@
 		</div>
 		<Icon name="chevron" />
 	</a>
+	<button class="del" onclick={() => (toDelete = { id: p.id, name: p.name })} aria-label="Delete {p.name}"><Icon name="trash" size={18} /></button>
+	</div>
 {/each}
+{#if toDelete}<ConfirmDelete id={toDelete.id} name={toDelete.name} onclose={() => (toDelete = null)} />{/if}
 
 {#if myProjects.length === 0}
 	<a class="first card" href="/new">
@@ -111,6 +117,31 @@
 	.info strong {
 		font-family: var(--serif);
 		font-size: 20px;
+	}
+	.own {
+		position: relative;
+		margin-bottom: 10px;
+	}
+	.own .unit {
+		padding-right: 56px;
+	}
+	.del {
+		position: absolute;
+		top: 8px;
+		right: 8px;
+		width: 44px;
+		height: 44px;
+		display: grid;
+		place-items: center;
+		border: 0;
+		border-radius: var(--radius-sm);
+		background: none;
+		color: var(--muted);
+		cursor: pointer;
+	}
+	.del:hover {
+		color: #b5483a;
+		background: color-mix(in srgb, #b5483a 10%, transparent);
 	}
 	.ph {
 		display: grid;

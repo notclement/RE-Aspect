@@ -290,11 +290,15 @@ if (typeof window !== 'undefined') {
 }
 
 export async function deleteProject(id: string) {
+	if (signedIn) {
+		// Server first, so a failed delete doesn't make the project vanish only on this device.
+		const sb = await getSupabase();
+		const { error } = await sb.from('projects').delete().eq('id', id);
+		if (error) throw new Error('Could not delete the project. Please try again.');
+	}
+	pending.delete(id);
+	void import('#lib/floorplan-store.ts').then((m) => m.deleteFloorPlan(id));
 	const i = myProjects.findIndex((p) => p.id === id);
 	if (i >= 0) myProjects.splice(i, 1);
 	cacheMine();
-	if (!signedIn) return;
-	const sb = await getSupabase();
-	const { error } = await sb.from('projects').delete().eq('id', id);
-	if (error) throw new Error('Could not delete the project.');
 }

@@ -13,8 +13,9 @@
 	import Collapse from '#lib/components/Collapse.svelte';
 	import { sampleById } from '#lib/sample-unit.ts';
 	import { goto } from '$app/navigation';
+	import ConfirmDelete from '#lib/components/ConfirmDelete.svelte';
 	import { planReady, planToUnit } from '#lib/plan.ts';
-	import { projectDetails, saveProjectDetails, getProject, deleteProject, type ProjectDetails } from '#lib/stores/projects.svelte.ts';
+	import { projectDetails, saveProjectDetails, getProject, type ProjectDetails } from '#lib/stores/projects.svelte.ts';
 	import { validateProjectName, validateUnitNumber, validateFreeText } from '#lib/validate.ts';
 	import { sunPosition, localDate, sunTimes, compass } from '#lib/sun.ts';
 	import { sunPatches, darkness, furnitureLight, ITEM_LABELS } from '#lib/light.ts';
@@ -38,17 +39,7 @@
 			: sampleById(id)
 	);
 	let confirmDelete = $state(false);
-	async function removeProject() {
-		if (!mine) return;
-		try {
-			await deleteProject(mine.id);
-			goto('/', { replaceState: true });
-		} catch (e) {
-			alertMsg = e instanceof Error ? e.message : 'Could not delete.';
-		}
-	}
-	let alertMsg = $state<string | null>(null);
-	const details = $derived(projectDetails(unit.id));
+	const details = $derived(projectDetails(mine ? mine.id : unit.id));
 
 	// ---- edit project details
 	let editing = $state(false);
@@ -170,7 +161,12 @@
 
 <div class="titlerow">
 	<h1>{details.name}</h1>
-	{#if mine}<a class="btn" href="/studio?id={mine.id}"><Icon name="plan" size={18} /> Edit in Studio</a>{/if}
+	{#if mine}
+		<div class="hactions">
+			<a class="btn" href="/studio?id={mine.id}"><Icon name="plan" size={18} /> Edit in Studio</a>
+			<button class="btn trash" onclick={() => (confirmDelete = true)} aria-label="Delete project"><Icon name="trash" size={18} /></button>
+		</div>
+	{/if}
 </div>
 <p class="sub muted">
 	{#if mine}
@@ -291,29 +287,24 @@
 		{:else}
 			<dl>
 				<dt>Name</dt><dd>{details.name}</dd>
-				<dt>Unit</dt><dd>{details.unitNo || '—'}, Level {unit.level}</dd>
+				<dt>Unit</dt><dd>{[details.unitNo, (mine ? mine.level : unit.level) != null ? `Level ${mine ? mine.level : unit.level}` : ''].filter(Boolean).join(', ') || '—'}</dd>
 				<dt>Type</dt><dd>{propertyTypeLabel(details.propertyType)}</dd>
 				<dt>Address</dt><dd>{details.address || '—'}</dd>
 				<dt>Description</dt><dd class="pre">{details.description || '—'}</dd>
 				<dt>Notes</dt><dd class="pre">{details.notes || '—'}</dd>
-				<dt>Size</dt><dd>{unit.sizeSqft.toLocaleString()} sq ft</dd>
+				<dt>Size</dt><dd>{(mine ? mine.sizeSqft : unit.sizeSqft)?.toLocaleString() ?? '—'} sq ft</dd>
 			</dl>
 			<div class="editrow">
 				<button class="btn editbtn" onclick={startEdit}>Edit details</button>
-				{#if mine}
-					{#if confirmDelete}
-						<span class="muted small">Delete this project for good?</span>
-						<button class="btn" onclick={() => (confirmDelete = false)}>Keep</button>
-						<button class="btn danger" onclick={removeProject}>Delete</button>
-					{:else}
-						<button class="btn danger" onclick={() => (confirmDelete = true)}>Delete project</button>
-					{/if}
-				{/if}
+				{#if mine}<button class="btn danger" onclick={() => (confirmDelete = true)}><Icon name="trash" size={18} />Delete project</button>{/if}
 			</div>
-			{#if alertMsg}<p class="error">{alertMsg}</p>{/if}
 		{/if}
 	</Collapse>
 </div>
+
+{#if confirmDelete && mine}
+	<ConfirmDelete id={mine.id} name={mine.name} onclose={() => (confirmDelete = false)} ondeleted={() => goto('/', { replaceState: true })} />
+{/if}
 
 <style>
 	h1 {
@@ -324,6 +315,16 @@
 		align-items: center;
 		justify-content: space-between;
 		gap: 12px;
+	}
+	.hactions {
+		display: flex;
+		gap: 8px;
+		flex-shrink: 0;
+	}
+	.btn.trash {
+		width: 44px;
+		padding: 0;
+		color: #b5483a;
 	}
 	.trace {
 		text-align: center;
@@ -347,9 +348,6 @@
 	}
 	.editrow .editbtn {
 		margin-top: 0;
-	}
-	.small {
-		font-size: 13px;
 	}
 	.error {
 		color: #b5483a;

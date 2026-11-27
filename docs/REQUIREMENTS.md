@@ -45,6 +45,7 @@
 - Address search goes through the `geocode` edge function: OneMap when `ONEMAP_EMAIL`/`ONEMAP_PASSWORD` secrets are set (OneMap now requires a login token), otherwise OpenStreetMap searched from the user's browser (Nominatim blocks cloud servers). Searches on a full postal code, Enter or the Search button (no search-as-you-type).
 - Studio: **Rotate plan** goes back to re-rotate the floor plan (from the original photo kept on the device; clears a traced outline/walls/windows, keeps furniture). **Done** with no furniture asks "Add furniture?" and highlights the Furniture tool.
 - Profile: one header card (photo with camera badge, **Display name** with ✏️ inline edit — no permanent Save button, email, role and plan badges) and one compact **Usage** card.
+- **Deleting projects**: owners can delete their own projects from the trash button on each project card or next to Edit in Studio on the project page (confirmation; deleted on the server first, then the device's floor-plan photo). Demo projects can't be deleted.
 - Sun view: **no two-finger / pinch / wheel zoom** — zoom only with the + / − buttons (70–250%). Studio keeps pinch zoom (damped) for tracing.
 - Profile photo: after choosing a photo the user drags/pinches a **square** to pick the part to use; only that square is shrunk and uploaded.
 - Demo 1 is **Dakota One** (Blk 88B Jalan Satu, HDB 3-room Type-2B, traced from HDB's plan; orientation assumed south-facing windows).
