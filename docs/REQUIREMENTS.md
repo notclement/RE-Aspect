@@ -166,3 +166,5 @@ West-sun heat warning · air-con cost estimate · cross-ventilation · furniture
 - **New project: every field is required** (address, name, unit, floor, type, size, ceiling).
 - **Placeholders**: "Type here…" everywhere (search boxes say "Search…"), faded (muted at 45% opacity) so they never look like real values.
 - **Light stops at walls**: sun patches and window rays (top-down and 3D) are traced in 24 slices across each window and cut where an interior or exterior wall stands, so light never passes through walls.
+- Studio **Erase** tool: drag along an inside wall to erase only that part (tap = 90 cm gap), e.g. to open a kitchen entrance; the pieces either side stay. Outside walls can't be erased (use Door). Undoable.
+- Sun view: the **outside sun arrows run right up to the outer walls**, including notches of L-shaped units (shadow mask = outline + each outer wall swept away from the sun, not a convex hull).

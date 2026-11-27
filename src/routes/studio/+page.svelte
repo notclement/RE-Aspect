@@ -5,6 +5,7 @@
 	 *   Outline  · tap the unit's corners on the floor plan, tap the first corner to close (scale comes from sq ft)
 	 *   Wall     · tap start, tap end (snaps to straight lines)
 	 *   Window   · tap an outside wall to add a window; glass ⅓ · ½ · ⅔
+	 *   Erase    · drag along an inside wall to erase just that part (tap = 90 cm gap), e.g. to open up an entrance
 	 *   Door     · tap any wall to add a door (hinged, or full-height sliding glass); flip the swing
 	 *   Furniture· pick from presets; move, rotate to any angle (drag the round handle, ±15°, or type it), exact size
 	 * Every change autosaves; undo/redo. No sun preview here — that's on the project page.
@@ -111,7 +112,7 @@
 	}
 
 	// ── tools ────────────────────────────────────────────────────────────────
-	type Mode = 'move' | 'outline' | 'wall' | 'window' | 'door';
+	type Mode = 'move' | 'outline' | 'wall' | 'window' | 'door' | 'erase';
 	let mode = $state<Mode>(aiState === 'ok' ? 'window' : (project?.plan?.outline.length ?? 0) >= 3 ? 'move' : 'outline');
 	let draft = $state<Pt[]>([]); // outline in progress
 	let wallStart = $state<Pt | null>(null);
@@ -133,7 +134,8 @@
 		outline: 'Tap each corner of the unit · tap the first corner to finish',
 		wall: 'Tap where the wall starts, then where it ends',
 		window: 'Tap an outside wall to add a window',
-		door: 'Tap any wall to add a door'
+		door: 'Tap any wall to add a door',
+		erase: 'Drag along an inside wall to erase part of it · tap for a 90 cm gap'
 	};
 
 	function snapPt(p: Pt, from: Pt | null): Pt {
@@ -279,6 +281,7 @@
 		| { kind: 'item'; i: number; off: Pt; before: string }
 		| { kind: 'handle'; t: 'window' | 'door'; i: number; end: 'a' | 'b'; before: string }
 		| { kind: 'spin'; i: number; before: string }
+		| { kind: 'erase'; i: number; t0: number; t1: number }
 		| null = null;
 	let downAt = { x: 0, y: 0, moved: false };
 
@@ -288,6 +291,7 @@
 		if (pointers.size === 2) {
 			const [a, b] = [...pointers.values()];
 			// Two fingers: no pinch-zoom (zoom is on the + / − buttons). Just ignore the gesture.
+			erasing = null;
 			gesture = { kind: 'pinch', d0: Math.hypot(a.x - b.x, a.y - b.y), vb0: { ...vb }, mid: toCm((a.x + b.x) / 2, (a.y + b.y) / 2) };
 			downAt.moved = true;
 			return;
@@ -322,8 +326,57 @@
 				return;
 			}
 		}
+		if (mode === 'erase') {
+			const tol = 22 * pxToCm();
+			let best = -1;
+			let bd = tol;
+			plan.walls.forEach((w, i) => {
+				const d = segDist(p, w.a, w.b);
+				if (d < bd) (bd = d), (best = i);
+			});
+			if (best >= 0) {
+				const t = wallT(best, p);
+				gesture = { kind: 'erase', i: best, t0: t, t1: t };
+				erasing = { i: best, t0: t, t1: t };
+				return;
+			}
+			if (plan.outline.length >= 3 && outlineEdges(plan.outline).some(([a, b]) => segDist(p, a, b) < tol)) {
+				toast = "Outside walls can't be erased — add a Door there instead.";
+				setTimeout(() => (toast = null), 3000);
+				downAt.moved = true;
+			}
+		}
 		gesture = { kind: 'pan', sx: e.clientX, sy: e.clientY, vb0: { ...vb } };
 	}
+
+	/** Position of p along interior wall i (0 = a, 1 = b). */
+	function wallT(i: number, p: Pt) {
+		const w = plan.walls[i];
+		const dx = w.b[0] - w.a[0];
+		const dy = w.b[1] - w.a[1];
+		return Math.max(0, Math.min(1, ((p[0] - w.a[0]) * dx + (p[1] - w.a[1]) * dy) / (dx * dx + dy * dy || 1)));
+	}
+	/** Remove the part of wall i between t0 and t1 (keeps the pieces either side). */
+	function eraseWall(i: number, t0: number, t1: number) {
+		const w = plan.walls[i];
+		const len = Math.hypot(w.b[0] - w.a[0], w.b[1] - w.a[1]) || 1;
+		let [lo, hi] = t0 < t1 ? [t0, t1] : [t1, t0];
+		if ((hi - lo) * len < 15) {
+			// a tap: open a 90 cm gap centred on it
+			const half = Math.min(45, len / 2) / len;
+			const c = (lo + hi) / 2;
+			lo = Math.max(0, c - half);
+			hi = Math.min(1, c + half);
+		}
+		const before = snap();
+		const pieces: (typeof plan.walls)[number][] = [];
+		if (lo * len >= 10) pieces.push({ a: w.a, b: lerp(w.a, w.b, lo), t: w.t });
+		if ((1 - hi) * len >= 10) pieces.push({ a: lerp(w.a, w.b, hi), b: w.b, t: w.t });
+		plan.walls.splice(i, 1, ...pieces);
+		commit(before);
+	}
+	// Live preview of the part being erased (the gesture itself isn't reactive state).
+	let erasing = $state<{ i: number; t0: number; t1: number } | null>(null);
 
 	function onMove(e: PointerEvent) {
 		if (pointers.has(e.pointerId)) pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -343,6 +396,9 @@
 			const it = plan.items[gesture.i];
 			it.x = Math.round(p[0] - gesture.off[0]);
 			it.y = Math.round(p[1] - gesture.off[1]);
+		} else if (gesture.kind === 'erase') {
+			gesture = { ...gesture, t1: wallT(gesture.i, toCm(e.clientX, e.clientY)) };
+			erasing = { i: gesture.i, t0: gesture.t0, t1: gesture.t1 };
 		} else if (gesture.kind === 'spin') {
 			const p = toCm(e.clientX, e.clientY);
 			const { c } = spinHandle(gesture.i);
@@ -375,6 +431,10 @@
 		}
 		gesture = null;
 		if (g?.kind === 'item' || g?.kind === 'handle' || g?.kind === 'spin') return commit(g.before);
+		if (g?.kind === 'erase') {
+			erasing = null;
+			return eraseWall(g.i, g.t0, g.t1);
+		}
 		if (g?.kind === 'pinch' || downAt.moved) return;
 		tap(toCm(e.clientX, e.clientY));
 	}
@@ -584,7 +644,8 @@
 		{ id: 'outline', label: 'Outline', icon: 'outline' },
 		{ id: 'wall', label: 'Wall', icon: 'wall' },
 		{ id: 'window', label: 'Window', icon: 'window' },
-		{ id: 'door', label: 'Door', icon: 'door' }
+		{ id: 'door', label: 'Door', icon: 'door' },
+		{ id: 'erase', label: 'Erase', icon: 'eraser' }
 	];
 
 	const pts = (p: Pt[]) => p.map((q) => q.join(',')).join(' ');
@@ -695,6 +756,10 @@
 				{#each draft as p, k (k)}
 					<circle cx={p[0]} cy={p[1]} r={k === 0 ? handleR * 1.3 : handleR * 0.7} class="vertex" class:first={k === 0} style:stroke-width={stroke} />
 				{/each}
+			{/if}
+			{#if erasing && plan.walls[erasing.i]}
+				{@const w = plan.walls[erasing.i]}
+				<line x1={lerp(w.a, w.b, erasing.t0)[0]} y1={lerp(w.a, w.b, erasing.t0)[1]} x2={lerp(w.a, w.b, erasing.t1)[0]} y2={lerp(w.a, w.b, erasing.t1)[1]} class="erase-mark" stroke-width={Math.max(w.t + 6, stroke * 6)} />
 			{/if}
 			{#if wallStart}
 				<line x1={wallStart[0]} y1={wallStart[1]} x2={(hover ?? wallStart)[0]} y2={(hover ?? wallStart)[1]} class="draft" style:stroke-width={stroke * 2} />
@@ -963,8 +1028,16 @@
 	}
 	.canvas.mode-outline,
 	.canvas.mode-wall,
-	.canvas.mode-window {
+	.canvas.mode-window,
+	.canvas.mode-door,
+	.canvas.mode-erase {
 		cursor: crosshair;
+	}
+	.erase-mark {
+		stroke: #d9534f;
+		stroke-opacity: 0.75;
+		stroke-linecap: butt;
+		pointer-events: none;
 	}
 	.floor {
 		fill: #e9dfcb;
@@ -1148,7 +1221,7 @@
 	}
 	.tools button {
 		flex: 1 1 0;
-		min-width: 0;
+		min-width: 44px;
 		min-height: 54px;
 		display: flex;
 		flex-direction: column;

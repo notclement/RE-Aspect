@@ -66,11 +66,19 @@
 	// Outside: masked by a soft radial fade and by the unit's own shadow. Inside: only where light lands.
 	const beamAngle = $derived((Math.atan2(-sdir[1], -sdir[0]) * 180) / Math.PI);
 	const beamFade = $derived(smooth(sun.altitude / 15));
-	const buildingShadow = $derived(
-		hull([...unit.outline, ...unit.outline.map((p) => [p[0] - sdir[0] * 4000, p[1] - sdir[1] * 4000] as [number, number])])
-			.map((p) => p.join(','))
-			.join(' ')
-	);
+	// The unit's exact shadow on the ground: the outline plus every outer wall swept away from the sun.
+	// (A convex hull also filled the unit's notches, so beams stopped short of the walls there.)
+	const buildingShadow = $derived.by(() => {
+		const o = unit.outline;
+		const far = (p: [number, number]) => `${p[0] - sdir[0] * 4000},${p[1] - sdir[1] * 4000}`;
+		return [
+			o.map((p) => p.join(',')).join(' '),
+			...o.map((a, i) => {
+				const b = o[(i + 1) % o.length];
+				return `${a.join(',')} ${b.join(',')} ${far(b)} ${far(a)}`;
+			})
+		];
+	});
 	let stageW = $state(600);
 	// 3D plan: sun placed on a dome around the unit (horizon distance shrinks, height grows with altitude).
 	const sky3d = $derived.by(() => {
@@ -173,7 +181,7 @@
 		</radialGradient>
 		<mask id="raymask" maskUnits="userSpaceOnUse" x={vb.x - 1600} y={vb.y - 1600} width={vb.w + 3200} height={vb.h + 3200}>
 			<rect x={vb.x - 1600} y={vb.y - 1600} width={vb.w + 3200} height={vb.h + 3200} fill="url(#rayfade)" />
-			<polygon points={buildingShadow} fill="#000" />
+			{#each buildingShadow as sh, i (i)}<polygon points={sh} fill="#000" />{/each}
 		</mask>
 		<pattern id="beams" width="160" height="70" patternUnits="userSpaceOnUse" patternTransform="rotate({beamAngle})">
 			<line x1="0" y1="35" x2="160" y2="35" stroke="#E39A1E" stroke-width="5" stroke-opacity=".7" />
