@@ -67,8 +67,15 @@
 		else cancelAnimationFrame(raf);
 	}
 	$effect(() => () => cancelAnimationFrame(raf));
+	/** The user took the slider (drag, tap, keys or a jump): stop Auto sun until they press it again. */
+	function manual() {
+		if (!playing) return;
+		playing = false;
+		cancelAnimationFrame(raf);
+	}
 
 	function onKey(e: KeyboardEvent) {
+		manual();
 		const step = e.shiftKey ? 60 : 10;
 		if (e.key === 'ArrowRight') minutes = Math.min(1440, minutes + step);
 		else if (e.key === 'ArrowLeft') minutes = Math.max(0, minutes - step);
@@ -106,7 +113,7 @@
 		{/if}
 	</div>
 	{#if withArc && sun && lat !== null && lon !== null}
-		<SunArc {date} {minutes} {lat} {lon} {sunrise} {sunset} altitude={sun.altitude} azimuth={sun.azimuth} {fmt} {exposure} onpick={(m) => ((playing = false), (minutes = Math.round(m)))} />
+		<SunArc {date} {minutes} {lat} {lon} {sunrise} {sunset} altitude={sun.altitude} azimuth={sun.azimuth} {fmt} {exposure} onpick={(m) => (manual(), (minutes = Math.round(m)))} />
 	{/if}
 	<div class="row">
 		<button class="auto" class:on={playing} onclick={toggle} aria-pressed={playing} aria-label={playing ? 'Pause auto sun' : 'Auto sun'}>
@@ -120,6 +127,8 @@
 				max="1440"
 				step="1"
 				bind:value={minutes}
+				onpointerdown={manual}
+				oninput={manual}
 				onkeydown={onKey}
 				aria-label="Time of day"
 				aria-valuetext={fmt(minutes)}
