@@ -1,6 +1,8 @@
 /**
- * Singapore address search → coordinates, via our `geocode` edge function
- * (OneMap with a server-held login; OpenStreetMap as a fallback). Needs a signed-in user.
+ * Singapore address search → coordinates.
+ * 1. Our `geocode` edge function (OneMap, using a server-held login — OneMap needs a token now).
+ * 2. If OneMap isn't set up (or fails), OpenStreetMap Nominatim straight from the browser
+ *    (Nominatim blocks cloud servers; it allows light use from browsers — we only search on demand).
  */
 import { getSupabase, supabaseConfigured } from './supabase.ts';
 
@@ -11,21 +13,45 @@ export interface Place {
 	lon: number;
 }
 
+const inSG = (p: Place) => !!p.label && p.lat > 1.1 && p.lat < 1.5 && p.lon > 103.5 && p.lon < 104.1;
+
+async function viaServer(q: string): Promise<Place[] | null> {
+	if (!supabaseConfigured) return null;
+	try {
+		const sb = await getSupabase();
+		const { data: s } = await sb.auth.getSession();
+		if (!s.session) return null;
+		const { data, error } = await sb.functions.invoke('geocode', { body: { q } });
+		if (error) return null;
+		const d = data as { results?: Place[]; fallback?: boolean };
+		if (d?.fallback) return null;
+		return d?.results ?? [];
+	} catch {
+		return null;
+	}
+}
+
+async function viaBrowser(q: string, signal?: AbortSignal): Promise<Place[]> {
+	const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&countrycodes=sg&addressdetails=1&limit=6&q=${encodeURIComponent(q)}`;
+	const r = await fetch(url, { signal, headers: { 'Accept-Language': 'en' } });
+	if (!r.ok) throw new Error('Address search is unavailable right now.');
+	const d = (await r.json()) as { display_name: string; lat: string; lon: string; address?: { postcode?: string } }[];
+	return d.map((x) => ({
+		label: x.display_name.replace(/,?\s*(Central|East|North|North-East|West) Region/i, '').replace(/,\s*Singapore$/i, '').toUpperCase(),
+		postal: x.address?.postcode ?? '',
+		lat: Number(x.lat),
+		lon: Number(x.lon)
+	}));
+}
+
 export async function searchAddress(q: string, signal?: AbortSignal): Promise<Place[]> {
-	const v = q.trim();
+	const v = q.trim().replace(/[<>{}\\]/g, '').slice(0, 80);
 	if (v.length < 3) return [];
-	if (!supabaseConfigured) throw new Error('Address search needs sign-in (not available in preview mode).');
-	const sb = await getSupabase();
-	const { data: s } = await sb.auth.getSession();
-	const { data, error } = await sb.functions.invoke('geocode', {
-		body: { q: v },
-		headers: s.session ? { Authorization: `Bearer ${s.session.access_token}` } : undefined
-	});
+	const server = await viaServer(v);
 	if (signal?.aborted) throw new DOMException('aborted', 'AbortError');
-	if (error) throw new Error('Address search is unavailable right now.');
-	const list = (data as { results?: Place[] })?.results ?? [];
+	const list = server ?? (await viaBrowser(v, signal));
 	return list
-		.filter((p) => typeof p.label === 'string' && Number.isFinite(p.lat) && Number.isFinite(p.lon))
-		.map((p) => ({ label: p.label.slice(0, 120), postal: String(p.postal ?? '').slice(0, 6), lat: p.lat, lon: p.lon }))
+		.map((p) => ({ label: String(p.label).slice(0, 120), postal: String(p.postal ?? '').slice(0, 6), lat: Number(p.lat), lon: Number(p.lon) }))
+		.filter(inSG)
 		.slice(0, 6);
 }

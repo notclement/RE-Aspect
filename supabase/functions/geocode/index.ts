@@ -1,6 +1,7 @@
 // RE:Aspect · geocode — Singapore address / postal code → coordinates, for signed-in users.
 // Uses OneMap (SLA) when ONEMAP_EMAIL + ONEMAP_PASSWORD secrets are set (token refreshed here, never in the browser);
-// otherwise falls back to OpenStreetMap Nominatim (Singapore only, low volume, identified User-Agent).
+// Without OneMap secrets it answers {fallback:true} and the app searches OpenStreetMap from the user's browser
+// (Nominatim blocks requests from cloud servers).
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
 const ALLOWED_ORIGINS = [
@@ -73,22 +74,6 @@ async function oneMap(q: string, t: string): Promise<Place[]> {
 	}));
 }
 
-async function nominatim(q: string): Promise<Place[]> {
-	const u = `https://nominatim.openstreetmap.org/search?format=jsonv2&countrycodes=sg&addressdetails=1&limit=6&q=${encodeURIComponent(q)}`;
-	const r = await fetch(u, {
-		headers: { 'User-Agent': 'RE-Aspect/1.0 (https://re-aspect.clement-392.workers.dev)', 'Accept-Language': 'en' },
-		signal: AbortSignal.timeout(8000)
-	});
-	if (!r.ok) throw new Error(`Nominatim ${r.status}`);
-	const d = await r.json();
-	return (d ?? []).map((x: { display_name: string; lat: string; lon: string; address?: { postcode?: string } }) => ({
-		label: x.display_name.replace(/, Singapore$/, '').toUpperCase(),
-		postal: x.address?.postcode ?? '',
-		lat: Number(x.lat),
-		lon: Number(x.lon)
-	}));
-}
-
 Deno.serve(async (req) => {
 	if (req.method === 'OPTIONS') return new Response('ok', { headers: cors(req) });
 	if (req.method !== 'POST') return json(req, { error: 'POST only' }, 405);
@@ -110,8 +95,9 @@ Deno.serve(async (req) => {
 
 	try {
 		const t = await oneMapToken();
-		const results = (t ? await oneMap(q, t) : await nominatim(q)).filter(inSG);
-		return json(req, { results, source: t ? 'onemap' : 'openstreetmap' });
+		if (!t) return json(req, { results: [], fallback: true });
+		const results = (await oneMap(q, t)).filter(inSG);
+		return json(req, { results, source: 'onemap' });
 	} catch (e) {
 		console.error('[geocode]', e instanceof Error ? e.message : e);
 		return json(req, { error: 'Address search is unavailable right now.' }, 502);

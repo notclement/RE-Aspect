@@ -42,7 +42,7 @@
 - Account menu closes on any tap outside it or Escape.
 - Phase 1 (New project wizard + Studio): see `docs/PHASE1.md`. Studio has **no sun preview**; keep everything lightweight and snappy on phones and desktops.
 - New project photos: one big drag-and-drop area (tap to choose on phones). Placeholders are generic (never a real project). Unit number can be just "125" — combined with the floor level as #05-125.
-- Address search goes through the `geocode` edge function: OneMap when `ONEMAP_EMAIL`/`ONEMAP_PASSWORD` secrets are set (OneMap now requires a login token), otherwise OpenStreetMap. Searches on a full postal code, Enter or the Search button (no search-as-you-type).
+- Address search goes through the `geocode` edge function: OneMap when `ONEMAP_EMAIL`/`ONEMAP_PASSWORD` secrets are set (OneMap now requires a login token), otherwise OpenStreetMap searched from the user's browser (Nominatim blocks cloud servers). Searches on a full postal code, Enter or the Search button (no search-as-you-type).
 - Studio: **Rotate plan** goes back to re-rotate the floor plan (from the original photo kept on the device; clears a traced outline/walls/windows, keeps furniture). **Done** with no furniture asks "Add furniture?" and highlights the Furniture tool.
 - Profile: one header card (photo with camera badge, **Display name** with ✏️ inline edit — no permanent Save button, email, role and plan badges) and one compact **Usage** card.
 - Pinch/trackpad zoom is damped and proportional (no big jumps).
