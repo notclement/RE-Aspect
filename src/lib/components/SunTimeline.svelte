@@ -27,9 +27,9 @@
 		sun?: { altitude: number; azimuth: number } | null;
 	} = $props();
 
-	/** Night passes 1.5× faster than daytime; the speed eases across sunrise/sunset so there's no jolt. */
-	const NIGHT_SPEED = 1.5;
+	/** Night passes faster than daytime (Settings → Sun view, default 2.5×); the speed eases across sunrise/sunset so there's no jolt. */
 	function speedAt(m: number) {
+		const NIGHT_SPEED = profile.data.nightSpeed;
 		if (sunrise === null || sunset === null) return 1;
 		const ease = 30; // minutes over which speed blends
 		const day = Math.min(1, Math.max(0, Math.min(m - sunrise, sunset - m) / ease + 0.5));

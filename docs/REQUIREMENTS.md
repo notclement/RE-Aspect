@@ -29,7 +29,11 @@
 - Palette: warm paper `#F7F6F1`, forest green `#2F4A3B` (primary), ochre `#B07A2A` (sun/time), serif titles.
 - Very clean; everything secondary is tucked behind tabs.
 - The **time slider is always visible** in Sun View, 3D and Walkthrough.
-- **Auto-play** runs through the full day in ~25 s, with the unit going dark → light as time passes.
+- **Auto-play** runs through the full day in ~25 s, with the unit going dark → light as time passes. Night plays faster (Settings → Sun view, 1–5×, default **2.5×**), eased across sunrise/sunset.
+- The Sun timeline card includes a **sun position** panel: big time + "Morning/Afternoon sunlight", the day's sun-path arc (sunrise → sunset) with the sun marked, altitude, azimuth, rise/set.
+- **Account menu on the avatar** (top right): Profile, Settings, Sign out. The ☰ menu holds only Projects (+ signed-in name, Sign out).
+- Project cards show a **thumbnail of the actual plan** with today's sunniest-hour light.
+- Display name is asked only once (first sign-in with no name); returning sign-ins go straight to Projects.
 - **Light and dark mode**, remembered in the browser.
 - Hidden **"Sun Info"** tab for technical data (azimuth, altitude, …), showing live data only when opened. The main screen focuses on which walls get sun and how the sun falls on furniture.
 - Settings explains **Add to Home Screen**: one-tap install on Android/desktop, a short guide on iPhone (Share → Add to Home Screen).

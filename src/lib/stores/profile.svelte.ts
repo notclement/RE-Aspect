@@ -28,6 +28,7 @@ export interface Profile {
 	lookSensitivity: number; // 1 = default
 	isAdmin: boolean; // mirrored from the server on sign-in
 	showSunMarker: boolean; // show the sun disc (position in the sky) on the plan
+	nightSpeed: number; // Auto sun: how much faster night plays than daytime (1–5×)
 }
 
 const KEY = 'rea.profile';
@@ -40,8 +41,11 @@ const DEFAULTS: Profile = {
 	walkSpeed: 1.3,
 	lookSensitivity: 1,
 	isAdmin: false,
-	showSunMarker: false
+	showSunMarker: false,
+	nightSpeed: 2.5
 };
+export const NIGHT_SPEED_MIN = 1;
+export const NIGHT_SPEED_MAX = 5;
 const VIEW_KEY = 'rea.viewAs';
 
 class ProfileStore {
@@ -54,6 +58,8 @@ class ProfileStore {
 		try {
 			const raw = localStorage.getItem(KEY);
 			if (raw) this.data = { ...DEFAULTS, ...JSON.parse(raw) };
+			const ns = Number(this.data.nightSpeed);
+			this.data.nightSpeed = Number.isFinite(ns) ? Math.min(NIGHT_SPEED_MAX, Math.max(NIGHT_SPEED_MIN, ns)) : DEFAULTS.nightSpeed;
 			const v = localStorage.getItem(VIEW_KEY) as RoleView | null;
 			this.viewAs = this.data.isAdmin && v && v in ROLE_LABELS ? v : null;
 		} catch {

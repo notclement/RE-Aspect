@@ -4,7 +4,7 @@
 	import Icon, { type IconName } from '#lib/components/Icon.svelte';
 	import InstallCard from '#lib/components/InstallCard.svelte';
 	import { theme, type ThemeChoice } from '#lib/stores/theme.svelte.ts';
-	import { profile, ROLE_LABELS, type RoleView } from '#lib/stores/profile.svelte.ts';
+	import { profile, ROLE_LABELS, NIGHT_SPEED_MIN, NIGHT_SPEED_MAX, type RoleView } from '#lib/stores/profile.svelte.ts';
 	import { auth } from '#lib/stores/auth.svelte.ts';
 	import { BRAND } from '#lib/config/brand.ts';
 	import { validateBodyHeightCm } from '#lib/validate.ts';
@@ -75,6 +75,22 @@
 			onchange={(e) => profile.update({ showSunMarker: e.currentTarget.checked })}
 		/>
 	</label>
+	<div class="li col">
+		<label for="nspd">Auto sun night speed · {profile.data.nightSpeed.toFixed(1)}×</label>
+		<span class="muted note">How much faster the night plays than the daytime</span>
+		<input
+			id="nspd"
+			type="range"
+			min={NIGHT_SPEED_MIN}
+			max={NIGHT_SPEED_MAX}
+			step="0.5"
+			value={profile.data.nightSpeed}
+			oninput={(e) => {
+				const v = Number(e.currentTarget.value);
+				if (Number.isFinite(v)) profile.update({ nightSpeed: Math.min(NIGHT_SPEED_MAX, Math.max(NIGHT_SPEED_MIN, v)) });
+			}}
+		/>
+	</div>
 </div>
 
 <h3>Units &amp; time</h3>
@@ -198,6 +214,15 @@
 		justify-content: space-between;
 		padding: 10px 0;
 		border-bottom: 1px solid var(--line);
+	}
+	.li.col {
+		flex-direction: column;
+		align-items: stretch;
+		gap: 4px;
+	}
+	.li.col input[type='range'] {
+		width: 100%;
+		margin-top: 6px;
 	}
 	.li:last-child {
 		border-bottom: 0;
