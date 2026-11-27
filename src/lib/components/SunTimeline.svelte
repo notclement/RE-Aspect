@@ -4,6 +4,7 @@
 	 * `minutes` = minutes after local midnight (0–1440). "Auto sun" runs the whole day in `cycleSeconds`.
 	 */
 	import Icon from './Icon.svelte';
+	import SunArc from './SunArc.svelte';
 	import { profile } from '#lib/stores/profile.svelte.ts';
 
 	let {
@@ -11,8 +12,20 @@
 		date = $bindable(''),
 		cycleSeconds = 25,
 		sunrise = null,
-		sunset = null
-	}: { minutes?: number; date?: string; cycleSeconds?: number; sunrise?: number | null; sunset?: number | null } = $props();
+		sunset = null,
+		lat = null,
+		lon = null,
+		sun = null
+	}: {
+		minutes?: number;
+		date?: string;
+		cycleSeconds?: number;
+		sunrise?: number | null;
+		sunset?: number | null;
+		lat?: number | null;
+		lon?: number | null;
+		sun?: { altitude: number; azimuth: number } | null;
+	} = $props();
 
 	/** Night passes 1.5× faster than daytime; the speed eases across sunrise/sunset so there's no jolt. */
 	const NIGHT_SPEED = 1.5;
@@ -84,6 +97,9 @@
 			/>
 		</label>
 	</div>
+	{#if sun && lat !== null && lon !== null}
+		<SunArc {date} {minutes} {lat} {lon} {sunrise} {sunset} altitude={sun.altitude} azimuth={sun.azimuth} {fmt} />
+	{/if}
 	<div class="row">
 		<button class="auto" class:on={playing} onclick={toggle} aria-pressed={playing}>
 			<Icon name={playing ? 'pause' : 'playo'} size={16} />

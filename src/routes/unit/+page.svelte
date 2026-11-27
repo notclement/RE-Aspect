@@ -194,7 +194,7 @@
 
 <p class="summary">{summary}</p>
 
-<SunTimeline bind:minutes={vs.minutes} bind:date={vs.date} sunrise={times.sunrise} sunset={times.sunset} />
+<SunTimeline bind:minutes={vs.minutes} bind:date={vs.date} sunrise={times.sunrise} sunset={times.sunset} lat={unit.lat} lon={unit.lon} {sun} />
 
 <div class="details">
 	<Collapse title="Project details" bind:open={detailsOpen}>

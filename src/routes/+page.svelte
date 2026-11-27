@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Icon from '#lib/components/Icon.svelte';
+	import UnitThumb from '#lib/components/UnitThumb.svelte';
 	import { profile, greeting } from '#lib/stores/profile.svelte.ts';
 	import { nav } from '#lib/stores/nav.svelte.ts';
 	import { PLANS } from '#lib/config/plans.ts';
@@ -23,14 +24,7 @@
 {#each SAMPLE_UNITS as u (u.id)}
 	{@const d = projectDetails(u.id)}
 	<a class="unit card" href="/unit?id={u.id}">
-		<div class="thumb" aria-hidden="true">
-			<svg viewBox="0 0 200 130">
-				<rect x="10" y="10" width="180" height="110" rx="4" fill="#E9DFCB" />
-				<polygon points="30,120 120,120 150,70 60,70" fill="#F2B84B" opacity=".7" />
-				<rect x="10" y="10" width="180" height="110" rx="4" fill="none" stroke="#3A4139" stroke-width="6" />
-				<path d="M120 10v50M120 75v45M120 65h70M10 55h45" stroke="#3A4139" stroke-width="5" />
-			</svg>
-		</div>
+		<div class="thumb"><UnitThumb unit={u} /></div>
 		<div class="info">
 			<span class="tag">DEMO</span>
 			<strong>{d.name}</strong>
@@ -77,7 +71,8 @@
 		border-radius: var(--radius);
 	}
 	.thumb {
-		width: 96px;
+		width: 120px;
+		height: 96px;
 		flex-shrink: 0;
 		background: var(--canvas);
 		border-radius: 12px;

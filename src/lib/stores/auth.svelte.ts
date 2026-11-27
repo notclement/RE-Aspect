@@ -83,7 +83,7 @@ class Auth {
 		const sb = await getSupabase();
 		const { error } = await sb.auth.signInWithOAuth({
 			provider: 'google',
-			options: { redirectTo: `${location.origin}/welcome` }
+			options: { redirectTo: `${location.origin}/` }
 		});
 		if (error) this.error = error.message;
 	}
@@ -92,6 +92,11 @@ class Auth {
 		if (supabaseConfigured) {
 			const sb = await getSupabase();
 			await sb.auth.signOut();
+		}
+		if (supabaseConfigured) {
+			// Forget this account's details in the browser so the next person to sign in doesn't inherit them.
+			profile.setViewAs(null);
+			profile.update({ name: '', plan: 'free', isAdmin: false });
 		}
 		this.status = supabaseConfigured ? 'signed-out' : 'preview';
 	}

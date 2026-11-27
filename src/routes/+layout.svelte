@@ -29,6 +29,8 @@
 		if (auth.status === 'signed-out' && path !== '/login') goto('/login', { replaceState: true });
 		else if (auth.status !== 'signed-out' && !profile.data.name && !BARE.includes(path))
 			goto('/welcome', { replaceState: true });
+		// Already named (e.g. returning user, or name taken from Google) → never ask again.
+		else if (auth.status !== 'signed-out' && profile.data.name && path === '/welcome') goto('/', { replaceState: true });
 	});
 </script>
 

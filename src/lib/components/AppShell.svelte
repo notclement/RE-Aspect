@@ -28,8 +28,11 @@
 	}
 
 	const links: { href: string; label: string; icon: IconName }[] = [
-		{ href: '/', label: 'Projects', icon: 'home' },
-		{ href: '/anchor', label: 'New project', icon: 'plus' },
+		{ href: '/', label: 'Projects', icon: 'home' }
+	];
+	// Account menu (tap the avatar): Profile, Settings, Sign out.
+	let acct = $state(false);
+	const acctLinks: { href: string; label: string; icon: IconName }[] = [
 		{ href: '/profile', label: 'Profile', icon: 'user' },
 		{ href: '/settings', label: 'Settings', icon: 'gear' }
 	];
@@ -37,6 +40,7 @@
 	$effect(() => {
 		page.url.pathname; // close the menu on navigation
 		open = false;
+		acct = false;
 	});
 </script>
 
@@ -52,7 +56,26 @@
 			{#if c.href && i < nav.crumbs.length - 1}<a href={c.href}>{c.label}</a>{:else}<strong>{c.label}</strong>{/if}
 		{/each}
 	</nav>
-	<a class="me" href="/profile" aria-label="Profile">{profile.firstName.slice(0, 1).toUpperCase() || '?'}</a>
+	<div class="acct">
+		<button class="me" class:on={acct} onclick={() => (acct = !acct)} aria-label="Account menu" aria-expanded={acct}>
+			{profile.firstName.slice(0, 1).toUpperCase() || '?'}
+		</button>
+		{#if acct}
+			<button class="acct-scrim" aria-label="Close account menu" onclick={() => (acct = false)}></button>
+			<div class="menu" role="menu">
+				<div class="who">
+					<strong>{profile.data.name || 'You'}</strong>
+					{#if auth.email}<span class="muted">{auth.email}</span>{/if}
+				</div>
+				{#each acctLinks as l (l.href)}
+					<a role="menuitem" href={l.href} class:on={page.url.pathname === l.href}><Icon name={l.icon} />{l.label}</a>
+				{/each}
+				{#if auth.status === 'signed-in'}
+					<button role="menuitem" onclick={() => auth.signOut()}><Icon name="logout" />Sign out</button>
+				{/if}
+			</div>
+		{/if}
+	</div>
 </header>
 
 {#if auth.status === 'preview'}
@@ -134,6 +157,90 @@
 		text-decoration: none;
 		font-weight: 600;
 		color: var(--forest);
+	}
+	.me.on {
+		border-color: var(--forest);
+		background: var(--surface-2);
+	}
+	button.me {
+		background: var(--surface);
+		cursor: pointer;
+		font-size: 16px;
+		padding: 0;
+		min-width: 44px;
+		min-height: 44px;
+		width: 44px;
+		height: 44px;
+	}
+	.acct {
+		position: relative;
+	}
+	.acct-scrim {
+		position: fixed;
+		inset: 0;
+		border: 0;
+		background: transparent;
+		z-index: 20;
+		cursor: default;
+	}
+	.menu {
+		position: absolute;
+		right: 0;
+		top: calc(100% + 8px);
+		z-index: 21;
+		width: 230px;
+		background: var(--surface);
+		border: 1px solid var(--line);
+		border-radius: 14px;
+		box-shadow: 0 12px 30px rgba(20, 26, 22, 0.16);
+		padding: 6px;
+		display: flex;
+		flex-direction: column;
+		animation: pop 0.14s ease-out;
+		transform-origin: top right;
+	}
+	@keyframes pop {
+		from {
+			opacity: 0;
+			transform: scale(0.96) translateY(-4px);
+		}
+	}
+	.who {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		padding: 10px 12px 10px;
+		border-bottom: 1px solid var(--line);
+		margin-bottom: 4px;
+		font-size: 14px;
+		overflow: hidden;
+	}
+	.who span {
+		font-size: 12px;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.menu a,
+	.menu button {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		min-height: 44px;
+		padding: 0 12px;
+		border-radius: 10px;
+		text-decoration: none;
+		font: inherit;
+		font-weight: 500;
+		color: inherit;
+		background: none;
+		border: 0;
+		cursor: pointer;
+		text-align: left;
+	}
+	.menu a:hover,
+	.menu button:hover,
+	.menu a.on {
+		background: var(--surface-2);
 	}
 	.preview {
 		font-size: 12px;
