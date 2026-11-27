@@ -71,3 +71,7 @@ export function agencyUnitPool(paidSeats: number): number {
 export function agencyMemberLimit(paidSeats: number): number {
 	return Math.max(0, Math.floor(paidSeats)) + 1;
 }
+
+/** New sign-ups before this moment (SGT) get 3 months of Pro (mirrors migration 0012). */
+export const SIGNUP_PRO_UNTIL = Date.parse('2027-02-01T00:00:00+08:00');
+export const signupProOpen = () => Date.now() < SIGNUP_PRO_UNTIL;

@@ -5,6 +5,7 @@
 	import { auth } from '#lib/stores/auth.svelte.ts';
 	import { BRAND } from '#lib/config/brand.ts';
 	import Logo from '#lib/components/Logo.svelte';
+	import RoomArt from '#lib/components/RoomArt.svelte';
 
 	let busy = $state(false);
 
@@ -22,12 +23,7 @@
 <svelte:head><title>Sign in · RE:Aspect</title></svelte:head>
 
 <div class="wrap">
-	<div class="sky" aria-hidden="true">
-		<svg viewBox="0 0 320 180" width="100%">
-			<path d="M10 178 Q160 -50 310 178" fill="none" stroke="currentColor" stroke-dasharray="1.5 8" stroke-linecap="round" />
-			<circle cx="225" cy="62" r="20" fill="var(--sun)" />
-		</svg>
-	</div>
+	<div class="sky"><RoomArt height={200} eager /></div>
 	<h1 class="brandmark"><Logo height={52} label={BRAND.name} /></h1>
 	<p class="muted">{BRAND.tagline}</p>
 
@@ -53,8 +49,7 @@
 		text-align: center;
 	}
 	.sky {
-		color: var(--muted);
-		margin-bottom: -6px;
+		margin-bottom: 6px;
 	}
 	h1 {
 		font-size: 30px;

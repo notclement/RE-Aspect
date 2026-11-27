@@ -16,7 +16,7 @@
 	let { children }: LayoutProps = $props();
 
 	// Pages that render full-screen, without the nav shell.
-	const BARE = ['/login', '/welcome', '/s']; // /s = public share page (no account needed)
+	const BARE = ['/login', '/welcome', '/s', '/start']; // /start = public landing page // /s = public share page (no account needed)
 	const bare = $derived(BARE.includes(page.url.pathname));
 
 	onMount(() => {
@@ -27,7 +27,7 @@
 		return unblock;
 	});
 
-	// Route guard: signed-out → /login; signed-in (or preview) without a name → /welcome.
+	// Route guard: signed-out → /start (home) or /login; signed-in (or preview) without a name → /welcome.
 	$effect(() => {
 		const path = page.url.pathname;
 		if (auth.status === 'loading' || !profile.loaded) return;
@@ -37,12 +37,16 @@
 			const c = validateInviteCode(page.url.searchParams.get('code') ?? '');
 			if (c.ok) pendingJoin.set(c.value);
 		}
-		if (auth.status === 'signed-out' && path !== '/login') goto('/login', { replaceState: true });
+		// Signed out: the home page shows the landing page; anything else asks to sign in.
+		if (auth.status === 'signed-out') {
+			if (path === '/') goto('/start', { replaceState: true });
+			else if (path !== '/login' && path !== '/start') goto('/login', { replaceState: true });
+		} else if (path === '/start') goto('/', { replaceState: true });
 		else if (auth.status === 'signed-in' && profile.data.name && path !== '/join' && pendingJoin.get()) goto('/join', { replaceState: true });
-		else if (auth.status !== 'signed-out' && !profile.data.name && !BARE.includes(path))
+		else if (!profile.data.name && !BARE.includes(path))
 			goto('/welcome', { replaceState: true });
 		// Already named (e.g. returning user, or name taken from Google) → never ask again.
-		else if (auth.status !== 'signed-out' && profile.data.name && path === '/welcome') goto('/', { replaceState: true });
+		else if (profile.data.name && path === '/welcome') goto('/', { replaceState: true });
 	});
 </script>
 

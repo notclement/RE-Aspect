@@ -11,4 +11,8 @@
 - **Link preview:** `static/og/reaspect-share.jpg` (1200×630). Source: `share-image-source.svg`
   (headline set in Source Serif 4 SemiBold). The absolute URL comes from `SITE_ORIGIN`, set per branch in `vite.config.ts`.
 - **Icons:** share uses the standard box-and-arrow symbol (the kit's arrow-out glyph reads as "log out").
-- **On hold:** the AI room illustration; web-font loading (system fallbacks for now).
+- **Room illustration** (`RoomArt.svelte`, `static/img/room-*.webp`): generic mood art. Used on the landing page (`/start`),
+  sign-in, the empty Projects card, the AI processing screen and the app's own link preview (`static/og/reaspect-app.jpg`).
+  Never on shared unit pages, the live plan/3D, or a unit's link preview: those show the real unit.
+  `scripts/og-routes.mjs` (runs after `vite build`) gives `/s` the buyer preview instead of the app one.
+- **On hold:** web-font loading (system fallbacks for now).

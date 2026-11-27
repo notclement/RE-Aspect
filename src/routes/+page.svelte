@@ -10,6 +10,7 @@
 	import { propertyTypeLabel } from '#lib/config/property-types.ts';
 	import ConfirmDelete from '#lib/components/ConfirmDelete.svelte';
 	import UpgradeSheet from '#lib/components/UpgradeSheet.svelte';
+	import RoomArt from '#lib/components/RoomArt.svelte';
 	import { projectUsage } from '#lib/usage.svelte.ts';
 	const usage = $derived(projectUsage());
 	let showUpgrade = $state(false);
@@ -73,10 +74,14 @@
 {#if toDelete}<ConfirmDelete id={toDelete.id} name={toDelete.name} onclose={() => (toDelete = null)} />{/if}
 
 {#if myProjects.length === 0}
-	<a class="first card" href="/new">
-		<Icon name="plus" size={22} />
-		<span><strong>Add your own project</strong><br /><span class="muted">Upload the floor plan and photos — see where the sun lands in minutes.</span></span>
-	</a>
+	<section class="first card">
+		<RoomArt height={190} />
+		<div class="first-body">
+			<h2>No projects yet, {profile.firstName}</h2>
+			<p class="muted">Upload a floor plan and see the sun move through each room in a few minutes.</p>
+			<a class="btn primary wide" href="/new" onclick={newProject}><Icon name="plus" size={18} /> New project</a>
+		</div>
+	</section>
 {/if}
 
 <h3 class="demos">Demo projects</h3>
@@ -197,16 +202,29 @@
 		color: var(--muted);
 	}
 	.first {
-		display: flex;
-		align-items: center;
-		gap: 14px;
-		text-decoration: none;
+		padding: 0;
+		overflow: hidden;
 		margin-bottom: 10px;
-		border-style: dashed;
-		color: var(--forest);
+		max-width: 560px;
 	}
-	.first .muted {
-		font-size: 13px;
+	.first :global(.room-art) {
+		border-radius: 0;
+	}
+	.first-body {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+		padding: 16px;
+	}
+	.first h2 {
+		margin: 0;
+		font-family: var(--serif);
+		font-weight: var(--heading-weight);
+		font-size: 22px;
+	}
+	.first p {
+		margin: 0 0 6px;
+		font-size: 15px;
 	}
 	.demo-note {
 		margin: -4px 0 10px;

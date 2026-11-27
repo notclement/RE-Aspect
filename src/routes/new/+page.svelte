@@ -1,4 +1,5 @@
 <script lang="ts">
+	import RoomArt from '#lib/components/RoomArt.svelte';
 	import { pinchZoom } from '#lib/pinch.ts';
 	/**
 	 * New project wizard: Photos (≤15) → Details → Floor plan (pick + rotate north up) → Create.
@@ -307,6 +308,7 @@
 
 {#if phase !== 'edit'}
 	<div class="busy">
+		<div class="busy-art"><RoomArt height={220} eager /></div>
 		<Spinner size={28} />
 		<h2>{phase === 'creating' ? 'Creating your project…' : STAGES[stage]}</h2>
 		<p class="muted">{phase === 'processing' ? 'This usually takes under a minute. Your photos are deleted as soon as it’s done.' : ''}</p>
@@ -944,6 +946,10 @@
 	}
 	.busy p {
 		max-width: 340px;
+	}
+	.busy-art {
+		width: min(100%, 420px);
+		margin-bottom: 10px;
 	}
 	.tip {
 		display: flex;
