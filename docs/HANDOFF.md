@@ -61,6 +61,10 @@ All of these are documented in `docs/REQUIREMENTS.md`:
 - **Type:** Source Serif 4 for headings, Inter for UI.
 - **Logo:** window + dotted sun arc + light patch. The colon in the name is two suns.
 - **Assets requested from Astra:** logo files, PWA icons (1024 / 512 / 192 / 180 / favicon), link preview 1200×630, website hero 2400×1600, feature illustrations 1200×900, empty states, demo flat covers, social templates.
+- **Applied on `dev` by another session:**
+  - Brand kit v1 (`5f46d83`): Logo component, favicons and app icons, og:image, brand colour tokens, Source Serif 4, contrast fixes. Notes in `docs/brand/README.md`.
+  - The room illustration (`a75e513`…`7fb2bb8`): landing page, sign-in, empty projects, processing screen and the app's link preview.
+  - Check those before redoing any brand work.
 
 ## In flight: north detection (`supabase/functions/detect-north`)
 
