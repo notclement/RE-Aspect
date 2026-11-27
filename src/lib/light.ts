@@ -155,7 +155,7 @@ export function lightRays(unit: Unit, azimuth: number, altitude: number, spacing
 	const edges = unit.outline.map((p, i) => [p, unit.outline[(i + 1) % unit.outline.length]] as [Pt, Pt]);
 	const rays: Ray[] = [];
 	for (let t = -R; t <= R; t += spacing) {
-		const start: Pt = [c[0] - d[0] * (R + 460) + perp[0] * t, c[1] - d[1] * (R + 460) + perp[1] * t];
+		const start: Pt = [c[0] - d[0] * (R + 1040) + perp[0] * t, c[1] - d[1] * (R + 1040) + perp[1] * t];
 		let best: number | null = null;
 		for (const [a, b] of edges) {
 			const u = hit(start, d, a, b);
@@ -171,7 +171,7 @@ export function lightRays(unit: Unit, azimuth: number, altitude: number, spacing
 			const db = Math.hypot(at[0] - w.b[0], at[1] - w.b[1]);
 			return Math.abs(da + db - len) < 2;
 		});
-		const outside: [Pt, Pt] = [[start[0] + d[0] * (best - 420), start[1] + d[1] * (best - 420)], at];
+		const outside: [Pt, Pt] = [[start[0] + d[0] * (best - 1000), start[1] + d[1] * (best - 1000)], at];
 		if (!win) {
 			rays.push({ outside, inside: null, blocked: true });
 			continue;

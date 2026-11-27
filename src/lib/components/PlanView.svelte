@@ -81,8 +81,10 @@
 	let rot = $state(-28);
 	let tilt = $state(52);
 
+	const MIN_ZOOM = 0.7;
+	const MAX_ZOOM = 2.5;
 	export function zoomBy(f: number) {
-		scale = Math.min(4, Math.max(0.5, scale * f));
+		scale = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, scale * f));
 	}
 	export function reset() {
 		scale = 1;
@@ -166,6 +168,13 @@
 		{#each patches as p, i (i)}
 			<clipPath id="room{i}"><polygon points={pts(p.clip)} /></clipPath>
 		{/each}
+		<radialGradient id="rayfade" gradientUnits="userSpaceOnUse" cx={cx} cy={cy} r={R * 1.35}>
+			<stop offset="0.45" stop-color="#fff" />
+			<stop offset="1" stop-color="#fff" stop-opacity="0" />
+		</radialGradient>
+		<mask id="raymask" maskUnits="userSpaceOnUse" x={vb.x - 3000} y={vb.y - 3000} width={vb.w + 6000} height={vb.h + 6000}>
+			<rect x={vb.x - 3000} y={vb.y - 3000} width={vb.w + 6000} height={vb.h + 6000} fill="url(#rayfade)" />
+		</mask>
 		<clipPath id="litarea">
 			{#each patches as p, i (i)}<polygon points={pts(p.points)} />{/each}
 		</clipPath>
@@ -192,7 +201,7 @@
 	</g>
 	<polygon points={outline} fill="#1A2740" opacity={dark * 0.28} />
 	{#if sunUp}
-		<g class="rays" opacity={Math.min(1, sun.altitude / 6)}>
+		<g class="rays" opacity={Math.min(1, sun.altitude / 6)} mask="url(#raymask)">
 			{#each rays as r, k (k)}
 				<line class="out" class:blocked={r.blocked} x1={r.outside[0][0]} y1={r.outside[0][1]} x2={r.outside[1][0]} y2={r.outside[1][1]} />
 				{#if r.blocked}
