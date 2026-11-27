@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { nav } from '#lib/stores/nav.svelte.ts';
+	$effect(() => nav.set({ label: 'Settings' }));
 	import Icon, { type IconName } from '#lib/components/Icon.svelte';
 	import InstallCard from '#lib/components/InstallCard.svelte';
 	import { theme, type ThemeChoice } from '#lib/stores/theme.svelte.ts';

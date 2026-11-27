@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { nav } from '#lib/stores/nav.svelte.ts';
+	$effect(() => nav.set({ label: 'Units', href: '/' }, { label: 'New unit' }));
 	import ComingSoon from '#lib/components/ComingSoon.svelte';
 </script>
 

@@ -20,7 +20,8 @@ const SUPABASE_PUBLIC = {
 		SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_loOMCARkP8_ehJ98SDXV3w_xIyIZQVY'
 	}
 } as const;
-for (const key of ['SUPABASE_URL', 'SUPABASE_PUBLISHABLE_KEY'] as const) {
+// REA_PREVIEW=1 builds a no-backend preview (local demos / screenshots).
+for (const key of process.env.REA_PREVIEW === '1' ? [] : (['SUPABASE_URL', 'SUPABASE_PUBLISHABLE_KEY'] as const)) {
 	const env = live ? 'LIVE' : 'TEST';
 	if (!process.env[key])
 		process.env[key] = process.env[`${key}_${env}`] || SUPABASE_PUBLIC[env][key];

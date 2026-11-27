@@ -1,39 +1,48 @@
 /* RE:Aspect design tokens — see docs/REQUIREMENTS.md and the design brief. */
 :root {
-	--ink: #1b1a17;
-	--paper: #fbf8f3;
+	/* Palette from the approved mockup: warm paper, forest green, ochre sun. */
+	--paper: #f7f6f1;
 	--surface: #ffffff;
-	--surface-2: #f3eee6;
-	--line: #e7dfd2;
-	--muted: #8b8273;
-	--text: #1b1a17;
-	--sun: #f2a93b;
-	--dusk: #e46f4e;
+	--surface-2: #eeede6;
+	--canvas: #f0efe8;
+	--line: #e2e1d8;
+	--text: #24302a;
+	--muted: #7b8077;
+	--forest: #2f4a3b;
+	--forest-2: #3e5d4b;
+	--ochre: #b07a2a;
+	--ochre-soft: #f6ead2;
+	--sun: #f2b84b;
 	--sky: #6c8ebf;
-	--shade: #26324a;
 	--gold: #c8963e;
+	--dusk: var(--ochre); /* legacy alias */
+	--ink: #1f2a24;
 
-	--radius: 12px;
-	--radius-sm: 8px;
-	--shadow: 0 4px 14px rgba(40, 30, 10, 0.08);
-	--rail-w: 76px;
-	--tabs-h: 64px;
+	--radius: 18px;
+	--radius-sm: 10px;
+	--shadow: 0 4px 16px rgba(36, 48, 42, 0.07);
 	--safe-b: env(safe-area-inset-bottom, 0px);
 	--safe-t: env(safe-area-inset-top, 0px);
 
 	--font: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+	--serif: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif;
 	color-scheme: light;
 }
 
 :root[data-theme='dark'] {
-	--paper: #151412;
-	--surface: #1f1d1a;
-	--surface-2: #2a2724;
-	--line: #34302b;
-	--muted: #a39a8b;
-	--text: #f3eee6;
-	--ink: #0e0d0c;
-	--shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+	--paper: #141815;
+	--surface: #1c211d;
+	--surface-2: #262c27;
+	--canvas: #1a1f1b;
+	--line: #303731;
+	--text: #ecebe4;
+	--muted: #9aa094;
+	--forest: #5f8a70;
+	--forest-2: #6f9a80;
+	--ochre: #d39a45;
+	--ochre-soft: #3a3120;
+	--ink: #0d100e;
+	--shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
 	color-scheme: dark;
 }
 
@@ -58,6 +67,13 @@ body {
 	touch-action: manipulation;
 	-webkit-tap-highlight-color: transparent;
 	overscroll-behavior-y: none;
+}
+
+h1 {
+	font-family: var(--serif);
+	font-weight: 600;
+	font-size: 34px;
+	letter-spacing: -0.02em;
 }
 
 h1,
@@ -102,8 +118,8 @@ select {
 	cursor: not-allowed;
 }
 .btn.primary {
-	background: var(--dusk);
-	border-color: var(--dusk);
+	background: var(--forest);
+	border-color: var(--forest);
 	color: #fff;
 }
 .btn.dark {
@@ -148,7 +164,7 @@ select {
 	font-size: 16px; /* ≥16px stops iOS auto-zoom on focus */
 }
 .field input:focus {
-	outline: 2px solid var(--sun);
+	outline: 2px solid var(--forest);
 	outline-offset: 1px;
 }
 .field .error {
@@ -169,8 +185,8 @@ select {
 	color: var(--muted);
 }
 .tag.pro {
-	background: var(--dusk);
-	color: #fff;
+	background: var(--ochre-soft);
+	color: var(--ochre);
 }
 .tag.lead {
 	background: #fbebc8;

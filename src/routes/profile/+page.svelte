@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { nav } from '#lib/stores/nav.svelte.ts';
+	$effect(() => nav.set({ label: 'Profile' }));
 	import { profile } from '#lib/stores/profile.svelte.ts';
 	import { auth } from '#lib/stores/auth.svelte.ts';
 	import { PLANS, effectivePlan, FREE_LAUNCH } from '#lib/config/plans.ts';

@@ -1,162 +1,188 @@
 <script lang="ts">
 	/**
-	 * App frame: slim left rail on tablet/desktop (≥ 900px), bottom tab bar on phones.
-	 * Lenses (Sun View, Studio, 3D) are part of one canvas in Phase 1 — switching never reloads.
+	 * App frame, organised by unit: a slim top bar (menu · breadcrumb · account) and a slide-in menu.
+	 * Views of a unit (3D plan / Top down / Walk) are tabs inside the unit page, not global navigation.
 	 */
 	import type { Snippet } from 'svelte';
 	import { page } from '$app/state';
 	import Icon, { type IconName } from './Icon.svelte';
 	import { auth } from '#lib/stores/auth.svelte.ts';
+	import { nav } from '#lib/stores/nav.svelte.ts';
+	import { profile } from '#lib/stores/profile.svelte.ts';
+	import { BRAND } from '#lib/config/brand.ts';
 
 	let { children }: { children: Snippet } = $props();
+	let open = $state(false);
 
-	const items: { href: string; label: string; icon: IconName }[] = [
-		{ href: '/', label: 'Projects', icon: 'home' },
-		{ href: '/sun', label: 'Sun View', icon: 'sun' },
-		{ href: '/studio', label: 'Studio', icon: 'plan' },
-		{ href: '/walk', label: '3D', icon: 'cube' },
+	const links: { href: string; label: string; icon: IconName }[] = [
+		{ href: '/', label: 'Units', icon: 'home' },
+		{ href: '/anchor', label: 'New unit', icon: 'plus' },
+		{ href: '/profile', label: 'Profile', icon: 'user' },
 		{ href: '/settings', label: 'Settings', icon: 'gear' }
 	];
 
-	const isActive = (href: string) =>
-		href === '/' ? page.url.pathname === '/' : page.url.pathname.startsWith(href);
+	$effect(() => {
+		page.url.pathname; // close the menu on navigation
+		open = false;
+	});
 </script>
 
-<div class="shell">
-	<nav class="rail" aria-label="Main">
-		<a href="/" class="logo" aria-label="RE:Aspect home"><span class="dot"></span></a>
-		{#each items as it (it.href)}
-			<a href={it.href} class="ri" class:on={isActive(it.href)} aria-current={isActive(it.href) ? 'page' : undefined}>
-				<Icon name={it.icon} />
-				<small>{it.label}</small>
-			</a>
+<header class="top">
+	<button class="iconbtn" onclick={() => (open = true)} aria-label="Open menu"><Icon name="menu" size={20} /></button>
+	<nav class="crumbs" aria-label="Breadcrumb">
+		{#each nav.crumbs as c, i (i)}
+			{#if i > 0}<span class="sep">/</span>{/if}
+			{#if c.href && i < nav.crumbs.length - 1}<a href={c.href}>{c.label}</a>{:else}<strong>{c.label}</strong>{/if}
 		{/each}
 	</nav>
+	<a class="me" href="/profile" aria-label="Profile">{profile.firstName.slice(0, 1).toUpperCase() || '?'}</a>
+</header>
 
-	<main class="main">
-		{#if auth.status === 'preview'}
-			<div class="preview">Preview mode — sign-in turns on once Supabase is connected. Data stays in this browser.</div>
-		{/if}
-		{@render children()}
-	</main>
+{#if auth.status === 'preview'}
+	<div class="preview">Preview mode — data stays in this browser.</div>
+{/if}
 
-	<nav class="tabs" aria-label="Main">
-		{#each items as it (it.href)}
-			<a href={it.href} class:on={isActive(it.href)} aria-current={isActive(it.href) ? 'page' : undefined}>
-				<Icon name={it.icon} size={22} />
-				<small>{it.label}</small>
-			</a>
+<main class="main">{@render children()}</main>
+
+{#if open}
+	<button class="scrim" aria-label="Close menu" onclick={() => (open = false)}></button>
+	<aside class="drawer" aria-label="Menu">
+		<div class="brand"><span class="dot"></span><strong>{BRAND.name}</strong></div>
+		{#each links as l (l.href)}
+			<a href={l.href} class:on={page.url.pathname === l.href}><Icon name={l.icon} />{l.label}</a>
 		{/each}
-	</nav>
-</div>
+		<div class="spacer"></div>
+		<p class="muted small">Signed in as {profile.data.name}</p>
+		<button class="btn wide" onclick={() => auth.signOut()}><Icon name="logout" /> Sign out</button>
+	</aside>
+{/if}
 
 <style>
-	.shell {
-		min-height: 100dvh;
+	.top {
+		position: sticky;
+		top: 0;
+		z-index: 10;
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		padding: calc(10px + var(--safe-t)) 14px 10px;
+		background: color-mix(in srgb, var(--paper) 92%, transparent);
+		backdrop-filter: blur(10px);
+		border-bottom: 1px solid var(--line);
 	}
-	.main {
-		padding: calc(16px + var(--safe-t)) 18px calc(var(--tabs-h) + var(--safe-b) + 20px);
-		max-width: 1100px;
-		margin: 0 auto;
+	.iconbtn {
+		width: 40px;
+		height: 40px;
+		border: 0;
+		background: transparent;
+		border-radius: 10px;
+		display: grid;
+		place-items: center;
+		cursor: pointer;
+	}
+	.crumbs {
+		flex: 1;
+		min-width: 0;
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		white-space: nowrap;
+		overflow: hidden;
+		font-size: 16px;
+	}
+	.crumbs a {
+		color: var(--muted);
+		text-decoration: none;
+	}
+	.crumbs strong {
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.sep {
+		color: var(--muted);
+	}
+	.me {
+		width: 36px;
+		height: 36px;
+		border-radius: 50%;
+		border: 1.5px solid var(--line);
+		display: grid;
+		place-items: center;
+		text-decoration: none;
+		font-weight: 600;
+		color: var(--forest);
 	}
 	.preview {
 		font-size: 12px;
-		background: color-mix(in srgb, var(--sun) 18%, var(--surface));
-		border: 1px solid color-mix(in srgb, var(--sun) 50%, var(--line));
-		padding: 6px 10px;
-		border-radius: 8px;
-		margin-bottom: 14px;
+		text-align: center;
+		padding: 5px;
+		background: var(--ochre-soft);
+		color: var(--ochre);
 	}
-
-	/* Phone: bottom tabs */
-	.rail {
-		display: none;
+	.main {
+		padding: 18px 16px calc(28px + var(--safe-b));
+		max-width: 1040px;
+		margin: 0 auto;
 	}
-	.tabs {
+	.scrim {
 		position: fixed;
-		left: 0;
-		right: 0;
-		bottom: 0;
-		height: calc(var(--tabs-h) + var(--safe-b));
-		padding-bottom: var(--safe-b);
-		display: flex;
-		background: color-mix(in srgb, var(--surface) 92%, transparent);
-		backdrop-filter: blur(10px);
-		border-top: 1px solid var(--line);
-		z-index: 20;
+		inset: 0;
+		border: 0;
+		background: rgba(20, 26, 22, 0.35);
+		z-index: 30;
 	}
-	.tabs a {
-		flex: 1;
+	.drawer {
+		position: fixed;
+		top: 0;
+		bottom: 0;
+		left: 0;
+		width: min(300px, 84vw);
+		z-index: 31;
+		background: var(--surface);
+		border-right: 1px solid var(--line);
+		padding: calc(18px + var(--safe-t)) 14px calc(18px + var(--safe-b));
 		display: flex;
 		flex-direction: column;
+		gap: 4px;
+		animation: slide 0.18s ease-out;
+	}
+	@keyframes slide {
+		from {
+			transform: translateX(-100%);
+		}
+	}
+	.brand {
+		display: flex;
 		align-items: center;
-		justify-content: center;
-		gap: 2px;
+		gap: 10px;
+		font-size: 18px;
+		padding: 6px 10px 16px;
+	}
+	.dot {
+		width: 24px;
+		height: 24px;
+		border-radius: 50%;
+		background: radial-gradient(circle at 40% 40%, #f8d98c, var(--ochre));
+	}
+	.drawer a {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		min-height: 46px;
+		padding: 0 12px;
+		border-radius: 12px;
 		text-decoration: none;
-		color: var(--muted);
+		font-weight: 500;
 	}
-	.tabs small {
-		font-size: 10.5px;
-		font-weight: 600;
+	.drawer a.on {
+		background: var(--surface-2);
+		color: var(--forest);
 	}
-	.tabs a.on {
-		color: var(--dusk);
+	.spacer {
+		flex: 1;
 	}
-
-	/* Tablet / desktop: left rail */
-	@media (min-width: 900px) {
-		.tabs {
-			display: none;
-		}
-		.rail {
-			display: flex;
-			flex-direction: column;
-			align-items: center;
-			gap: 4px;
-			position: fixed;
-			left: 0;
-			top: 0;
-			bottom: 0;
-			width: var(--rail-w);
-			padding: 14px 0;
-			background: var(--ink);
-			z-index: 20;
-		}
-		.main {
-			margin-left: var(--rail-w);
-			padding: 28px 32px 40px;
-			max-width: calc(1100px + var(--rail-w));
-		}
-		.logo {
-			margin-bottom: 14px;
-		}
-		.dot {
-			display: block;
-			width: 26px;
-			height: 26px;
-			border-radius: 50%;
-			background: radial-gradient(circle at 40% 40%, #ffd98a, var(--dusk));
-		}
-		.ri {
-			display: flex;
-			flex-direction: column;
-			align-items: center;
-			gap: 2px;
-			width: 62px;
-			padding: 8px 0;
-			border-radius: 10px;
-			color: #b9b0a1;
-			text-decoration: none;
-		}
-		.ri small {
-			font-size: 10px;
-		}
-		.ri.on {
-			background: #34312b;
-			color: #fff;
-		}
-		.ri:last-of-type {
-			margin-top: auto;
-		}
+	.small {
+		font-size: 13px;
+		padding: 0 4px;
 	}
 </style>
