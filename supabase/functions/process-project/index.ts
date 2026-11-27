@@ -102,7 +102,7 @@ async function callAI(provider: string, key: string, prompt: string, images: str
 			headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
 			body: JSON.stringify({
 				model: MODELS.anthropic,
-				max_tokens: 3000,
+				max_tokens: 8000,
 				messages: [{
 					role: 'user',
 					content: [
