@@ -53,14 +53,6 @@
 
 <h3>Sun view</h3>
 <div class="card list">
-	<label class="li toggle">
-		<span>Show the sun's position<br /><span class="muted note">A sun marker in the sky above the plan</span></span>
-		<input
-			type="checkbox"
-			checked={profile.data.showSunMarker}
-			onchange={(e) => profile.update({ showSunMarker: e.currentTarget.checked })}
-		/>
-	</label>
 	<div class="li col">
 		<label for="nspd">Auto sun night speed · {profile.data.nightSpeed.toFixed(1)}×</label>
 		<span class="muted note">How much faster the night plays than the daytime</span>
@@ -293,40 +285,6 @@
 		font-weight: 600;
 		color: var(--sky);
 		text-decoration: none;
-	}
-	.toggle {
-		gap: 12px;
-		cursor: pointer;
-	}
-	.toggle input {
-		appearance: none;
-		width: 48px;
-		height: 28px;
-		border-radius: 14px;
-		background: var(--surface-2);
-		border: 1px solid var(--line);
-		position: relative;
-		flex-shrink: 0;
-		cursor: pointer;
-		transition: background 0.15s;
-	}
-	.toggle input::after {
-		content: '';
-		position: absolute;
-		top: 2px;
-		left: 2px;
-		width: 22px;
-		height: 22px;
-		border-radius: 50%;
-		background: #fff;
-		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
-		transition: transform 0.15s;
-	}
-	.toggle input:checked {
-		background: var(--forest);
-	}
-	.toggle input:checked::after {
-		transform: translateX(20px);
 	}
 	.signout {
 		margin-top: 24px;

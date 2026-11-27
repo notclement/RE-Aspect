@@ -90,7 +90,7 @@ function batch(scene: T.Scene, transparent = false, itemCount = 0) {
 		const mesh = new T.Mesh(geo, mat);
 		if (indices.length) scene.add(mesh);
 		const tint = new T.Color(),
-			night = new T.Color('#708398'),
+			night = new T.Color('#5c5c5c'), // RE:Aspect: neutral darkening at night (no blue cast)
 			cache = new Map<string, T.Color>();
 		let lastDark = -1;
 		return {
@@ -308,7 +308,7 @@ export function apartment(scene: T.Scene, u: Unit, walk: boolean) {
 	markerBatch.prism(0, 0, 0, 22, 22, 12, 0, 'ochre', 'ochre', -1, 1, 12);
 	const markerPaint = markerBatch.finish(),
 		marker = markerPaint.mesh;
-	const night = new T.Color('#788ca4');
+	const night = new T.Color('#5c5c5c');
 	return {
 		b,
 		parts,

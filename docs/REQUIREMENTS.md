@@ -205,3 +205,8 @@ West-sun heat warning · air-con cost estimate · cross-ventilation · furniture
 - **Every icon button has a hover tip** (`title`, same text as its accessible label).
 - Top down: sun rays outside are 2.2 m long and fade away from the wall; furniture no longer glows orange all over — only the part actually in a sun patch lights up (3D: no whole-object tint).
 - Walk on touch: looking around is 2.5× more sensitive than mouse.
+- **(28 Nov) Timeline card, compact**: slider row on top; then the time with a short note under it ("Afternoon · sun on S & W windows"), and a row of Date · Sun score (hover/tap explains it, opens "How we worked this out") · Sun info. "Sun timeline" heading, the separate sun sentence and the Sun score pill are gone. "Most sun inside" sits centred under the arc.
+- Walk field of view ~120° horizontal (vertical 70–105°).
+- **Night** = plain darkening in every view (no blue overlay, contrast kept).
+- **"Show the sun's position" setting removed** (and the marker).
+- Tracing: a plan's dimension line sets the scale only if the floor area it gives is 64–125 % of the stated sq ft; otherwise the outline is fitted to the sq ft.

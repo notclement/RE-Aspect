@@ -70,7 +70,7 @@
 		? 'Apartment walkthrough. WASD or arrows move, click for mouse look, Escape exits. On touch, move with the joystick and drag to look.'
 		: 'Three-dimensional apartment plan. Drag to orbit, pinch to zoom.'}
 >
-	<div class="sky" aria-hidden="true" style:opacity={settings.dark * 0.63}></div>
+	<div class="sky" aria-hidden="true" style:opacity={settings.dark * 0.45}></div>
 	<canvas
 		bind:this={canvas}
 		tabindex={walk ? 0 : undefined}
@@ -100,7 +100,7 @@
 	.sky {
 		position: absolute;
 		inset: 0;
-		background: #23354c;
+		background: #000;
 		pointer-events: none;
 	}
 	canvas {

@@ -3,6 +3,7 @@
 	 * Sun position at a glance: the day's sun path (sunrise → sunset) as an arc, with the sun
 	 * marked where it is at the selected time, plus altitude / azimuth and rise / set times.
 	 */
+	import type { Snippet } from 'svelte';
 	import Icon from './Icon.svelte';
 	import { sunPosition, localDate, compass } from '#lib/sun.ts';
 
@@ -18,7 +19,9 @@
 		fmt,
 		full = false,
 		exposure = null,
-		onpick
+		onpick,
+		note = '',
+		tools
 	}: {
 		date: string;
 		minutes: number;
@@ -35,6 +38,10 @@
 		exposure?: { pts: { m: number; v: number }[]; peak: number | null } | null;
 		/** Jump the timeline to a minute (tapping the peak). */
 		onpick?: (m: number) => void;
+		/** Short line under the time; replaces the generic label when set. */
+		note?: string;
+		/** Date / score / info buttons shown under the time (compact timeline). */
+		tools?: Snippet;
 	} = $props();
 
 	const W = 300;
@@ -82,14 +89,15 @@
 	});
 </script>
 
-<div class="sp" class:night={!up} class:full>
+<div class="sp" class:night={!up} class:full class:withtools={!!tools}>
 	<div class="now">
 		<span class="bubble"><Icon name={up ? 'sun' : 'moon'} size={24} /></span>
 		<div>
 			<div class="time">{fmt(minutes)}</div>
-			<div class="lbl">{label}</div>
+			<div class="lbl">{note || label}</div>
 		</div>
 	</div>
+	{#if tools}<div class="tl-tools">{@render tools()}</div>{/if}
 
 	<div class="mid">
 	<svg class="arc" viewBox="0 0 {W} {H}" aria-label="Sun path for the day" role="img">
@@ -132,13 +140,10 @@
 <style>
 	.sp {
 		display: grid;
-		grid-template-columns: 250px minmax(0, 1fr) 230px;
-		grid-template-areas: 'now mid stats';
+		grid-template-columns: max-content minmax(0, 1fr) 210px;
+		grid-template-areas: 'now mid stats' 'tools mid stats';
 		align-items: center;
 		gap: 4px 18px;
-		padding-bottom: 12px;
-		margin-bottom: 12px;
-		border-bottom: 1px solid var(--line);
 	}
 	.now {
 		grid-area: now;
@@ -163,7 +168,7 @@
 	}
 	.time {
 		font-family: var(--serif);
-		font-size: 30px;
+		font-size: 28px;
 		line-height: 1.05;
 		font-variant-numeric: tabular-nums;
 		white-space: nowrap;
@@ -178,6 +183,17 @@
 		width: 100%;
 		max-width: 340px;
 		justify-self: center;
+		text-align: center; /* "Most sun inside" sits centred under the arc */
+	}
+	.tl-tools {
+		grid-area: tools;
+		align-self: start;
+	}
+	.sp:not(.withtools):not(.full) {
+		grid-template-areas: 'now mid stats' 'now mid stats';
+	}
+	.now {
+		align-self: end;
 	}
 	.arc {
 		width: 100%;
@@ -289,6 +305,8 @@
 		color: var(--text);
 	}
 	.full {
+		padding-bottom: 12px;
+		margin-bottom: 12px;
 		grid-template-columns: 1fr;
 		grid-template-areas: 'now' 'mid' 'stats';
 		border-bottom: 0;
@@ -305,10 +323,14 @@
 	@media (max-width: 720px) {
 		.sp:not(.full) {
 			grid-template-columns: 1fr minmax(0, 150px);
-			grid-template-areas: 'now mid';
-			gap: 10px;
-			padding-bottom: 8px;
-			margin-bottom: 8px;
+			grid-template-areas: 'now mid' 'tools tools';
+			gap: 8px;
+		}
+		.sp:not(.full) .time {
+			font-size: 22px;
+		}
+		.sp:not(.full) .lbl {
+			font-size: 12px;
 		}
 		.sp:not(.full) .stats,
 		.sp:not(.full) .rs {
@@ -325,8 +347,7 @@
 			padding: 2px 8px;
 		}
 		.sp:not(.full) .bubble {
-			width: 36px;
-			height: 36px;
+			display: none;
 		}
 		.sp:not(.full) .time {
 			font-size: 22px;

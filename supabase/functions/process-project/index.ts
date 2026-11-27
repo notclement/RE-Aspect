@@ -193,8 +193,9 @@ function buildPlan(ai: Record<string, unknown>, W: number, H: number, sizeSqft: 
 			const pb = toPx(b);
 			const dPx = Math.hypot(pb[0] - pa[0], pb[1] - pa[1]);
 			const sDim = dPx > 30 ? mm / 10 / dPx : 0;
-			// Believable = within 0.6–1.6× of the sq-ft fit (outlines often exclude ledges, so they can differ a bit).
-			if (sDim > 0 && sDim / sArea > 0.6 && sDim / sArea < 1.6) {
+			// Believable = the floor area it gives is 64–125 % of the stated sq ft (stated sizes include walls and
+			// ledges, so the traced inside is usually a little smaller). Otherwise trust the sq ft.
+			if (sDim > 0 && sDim / sArea > 0.8 && sDim / sArea < 1.12) {
 				s = sDim;
 				scaleSource = 'dimensions';
 				scaleNote = `${Math.round(mm).toLocaleString('en-US')} mm dimension on the plan`;

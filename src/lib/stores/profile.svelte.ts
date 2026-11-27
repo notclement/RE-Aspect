@@ -33,7 +33,6 @@ export interface Profile {
 	walkSpeed: number; // m/s
 	lookSensitivity: number; // 1 = default
 	isAdmin: boolean; // mirrored from the server on sign-in
-	showSunMarker: boolean; // show the sun disc (position in the sky) on the plan
 	nightSpeed: number; // Auto sun: how much faster night plays than daytime (1–5×)
 }
 
@@ -50,14 +49,13 @@ const DEFAULTS: Profile = {
 	walkSpeed: 1.3,
 	lookSensitivity: 1,
 	isAdmin: false,
-	showSunMarker: false,
 	nightSpeed: 2.5
 };
 export const NIGHT_SPEED_MIN = 1;
 export const NIGHT_SPEED_MAX = 5;
 
 /** Personal settings that sync to the account (profiles.settings) so they follow the user across devices. */
-const SETTING_KEYS = ['bodyHeightCm', 'areaUnit', 'clock', 'walkSpeed', 'lookSensitivity', 'showSunMarker', 'nightSpeed'] as const;
+const SETTING_KEYS = ['bodyHeightCm', 'areaUnit', 'clock', 'walkSpeed', 'lookSensitivity', 'nightSpeed'] as const;
 type SettingKey = (typeof SETTING_KEYS)[number];
 export type Settings = Pick<Profile, SettingKey> & { theme: ThemeChoice };
 
@@ -78,7 +76,6 @@ export function sanitizeSettings(raw: unknown): Partial<Settings> {
 	if (ws !== undefined) out.walkSpeed = ws;
 	const ls = clamp(r.lookSensitivity, 0.3, 3);
 	if (ls !== undefined) out.lookSensitivity = ls;
-	if (typeof r.showSunMarker === 'boolean') out.showSunMarker = r.showSunMarker;
 	const ns = clamp(r.nightSpeed, NIGHT_SPEED_MIN, NIGHT_SPEED_MAX);
 	if (ns !== undefined) out.nightSpeed = ns;
 	if (isThemeChoice(r.theme)) out.theme = r.theme;

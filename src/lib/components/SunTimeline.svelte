@@ -18,7 +18,10 @@
 		lon = null,
 		sun = null,
 		exposure = null,
-		oninfo
+		oninfo,
+		note = '',
+		score = null,
+		onscore
 	}: {
 		sliderFirst?: boolean;
 		minutes?: number;
@@ -31,6 +34,11 @@
 		sun?: { altitude: number; azimuth: number } | null;
 		exposure?: { pts: { m: number; v: number }[]; peak: number | null } | null;
 		oninfo?: () => void;
+		/** Short line under the time (replaces the generic "Afternoon sunlight"). */
+		note?: string;
+		/** Sun score chip (value out of 10 + hover explanation). */
+		score?: { value: number; tip: string } | null;
+		onscore?: () => void;
 	} = $props();
 	const withArc = $derived(!!sun && lat !== null && lon !== null);
 
@@ -95,12 +103,10 @@
 	let dateInput: HTMLInputElement;
 </script>
 
-<section class="tl" class:first={sliderFirst}>
-	<div class="head">
-		<Icon name="clock" size={20} />
-		<strong>Sun timeline</strong>
-		<label class="date">
-			<Icon name="cal" size={18} />
+{#snippet toolbar()}
+	<div class="tools">
+		<label class="date" title="Change the date">
+			<Icon name="cal" size={16} />
 			<span>{dateLabel}</span>
 			<input
 				bind:this={dateInput}
@@ -110,12 +116,24 @@
 				onclick={() => dateInput.showPicker?.()}
 			/>
 		</label>
+		{#if score}
+			<button class="score" onclick={onscore} title={score.tip} aria-label={score.tip}>
+				<Icon name="sun" size={14} /><strong>{score.value.toFixed(1)}</strong><small>/10</small>
+			</button>
+		{/if}
 		{#if oninfo}
-			<button class="info" onclick={oninfo} title="Sun info" aria-label="Sun info"><Icon name="info" size={20} /></button>
+			<button class="info" onclick={oninfo} title="Sun info" aria-label="Sun info"><Icon name="info" size={18} /></button>
 		{/if}
 	</div>
+{/snippet}
+
+<section class="tl" class:first={sliderFirst}>
 	{#if withArc && sun && lat !== null && lon !== null}
-		<SunArc {date} {minutes} {lat} {lon} {sunrise} {sunset} altitude={sun.altitude} azimuth={sun.azimuth} {fmt} {exposure} onpick={(m) => (manual(), (minutes = Math.round(m)))} />
+		<SunArc {date} {minutes} {lat} {lon} {sunrise} {sunset} altitude={sun.altitude} azimuth={sun.azimuth} {fmt} {exposure} {note} onpick={(m) => (manual(), (minutes = Math.round(m)))}>
+			{#snippet tools()}{@render toolbar()}{/snippet}
+		</SunArc>
+	{:else}
+		<div class="head">{@render toolbar()}</div>
 	{/if}
 	<div class="row">
 		<button class="auto" class:on={playing} onclick={toggle} aria-pressed={playing} title={playing ? 'Pause auto sun' : 'Auto sun'} aria-label={playing ? 'Pause auto sun' : 'Auto sun'}>
@@ -157,21 +175,44 @@
 		margin-bottom: 12px;
 		color: var(--muted);
 	}
-	.head strong {
+	.tools {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		flex-wrap: wrap;
+	}
+	.score {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+		min-height: 44px;
+		padding: 0 10px;
+		border: 1px solid var(--line);
+		border-radius: 12px;
+		background: none;
+		color: var(--muted);
+		font: inherit;
+		font-size: 13px;
+		cursor: pointer;
+	}
+	.score :global(svg) {
+		color: var(--ochre);
+	}
+	.score strong {
 		color: var(--text);
-		font-size: 17px;
-		flex: 1;
+		font-size: 14px;
 	}
 	.date {
 		position: relative;
 		display: inline-flex;
 		align-items: center;
 		gap: 8px;
-		min-height: 42px;
-		padding: 0 14px;
+		min-height: 44px;
+		padding: 0 10px;
 		border: 1px solid var(--line);
 		border-radius: 12px;
 		color: var(--text);
+		font-size: 14px;
 		font-weight: 600;
 		cursor: pointer;
 	}
@@ -194,8 +235,8 @@
 	}
 	.tl.first .row {
 		order: -1;
-		padding-bottom: 10px;
-		margin-bottom: 12px;
+		padding-bottom: 6px;
+		margin-bottom: 10px;
 		border-bottom: 1px solid var(--line);
 	}
 	.auto {
@@ -286,13 +327,9 @@
 			gap: 8px;
 			margin-bottom: 8px;
 		}
-		.head strong {
-			font-size: 15px;
-		}
 		.date {
-			min-height: 44px;
-			padding: 0 10px;
-			font-size: 14px;
+			padding: 0 8px;
+			font-size: 13px;
 		}
 		.row {
 			gap: 10px;

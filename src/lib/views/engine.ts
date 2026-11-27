@@ -139,8 +139,8 @@ export function create(
 		draw,
 		(w, h, dpr) => {
 			camera.aspect = w / h;
-			// RE:Aspect: Walk keeps a wide ~100° horizontal view whatever the screen shape (vertical 60–90°).
-			if (walk) camera.fov = clamp((2 * Math.atan(Math.tan(50 * rad) / camera.aspect)) / rad, 60, 90);
+			// RE:Aspect: Walk keeps a very wide ~120° horizontal view whatever the screen shape (vertical 70–105°).
+			if (walk) camera.fov = clamp((2 * Math.atan(Math.tan(60 * rad) / camera.aspect)) / rad, 70, 105);
 			camera.updateProjectionMatrix();
 			if (ratio !== dpr || width !== w || height !== h) {
 				ratio = dpr;

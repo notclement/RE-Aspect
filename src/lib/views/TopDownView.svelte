@@ -271,10 +271,12 @@
 				}
 				if (dark > 0) {
 					c.setTransform(dpr, 0, 0, dpr, 0, 0);
-					c.fillStyle = '#23354c';
-					c.globalAlpha = 0.62 * dark;
+					// RE:Aspect: night = plain darkening (multiply keeps contrast; no blue wash).
+					const v = Math.round(255 * (1 - 0.55 * dark));
+					c.globalCompositeOperation = 'multiply';
+					c.fillStyle = `rgb(${v},${v},${v})`;
 					c.fillRect(0, 0, w, h);
-					c.globalAlpha = 1;
+					c.globalCompositeOperation = 'source-over';
 				}
 				// RE:Aspect: scale bar (bottom-left). k = CSS px per cm; pick a round length of 60–140 px.
 				{

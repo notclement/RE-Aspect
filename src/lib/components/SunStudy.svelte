@@ -17,7 +17,7 @@
 <script lang="ts">
 	/**
 	 * The sun study: view tabs, the plan (Astra's Top down / 3D / Walk views), legend + gesture hints,
-	 * the live summary + Sun score pill, the DayTrace timeline and "How we worked this out".
+	 * the DayTrace timeline (slider, time + short note, date, Sun score, sun arc) and "How we worked this out".
 	 * Full width on every screen so the plan stays as big as possible.
 	 * Shared by /unit and the public share page /s, so both look exactly the same.
 	 */
@@ -32,9 +32,9 @@
 	import type { Unit } from '#lib/sample-unit.ts';
 	import type { View } from '#lib/stores/unit-view.svelte.ts';
 	import { sunPosition, localDate, sunTimes, compass } from '#lib/sun.ts';
-	import { sunPatches, darkness, furnitureLight, indoorExposure, ITEM_LABELS } from '#lib/light.ts';
+	import { sunPatches, darkness, furnitureLight, indoorExposure } from '#lib/light.ts';
 	import { sunColor } from '#lib/sun-tint.ts';
-	import { sunScore, compass16 } from '#lib/sun-score.ts';
+	import { sunScore } from '#lib/sun-score.ts';
 	import { parseViewHash, viewHash } from '#lib/share-state.ts';
 	import { profile } from '#lib/stores/profile.svelte.ts';
 
@@ -151,21 +151,31 @@
 			: null
 	);
 	const score = $derived(sunScore(unit));
-	const sunnyItems = $derived([...new Set([...furniture.lit].map((i) => ITEM_LABELS[unit.items[i].kind]).filter((n) => n !== 'Rug'))]);
 	const litWalls = $derived(
 		[...new Set(unit.windows.filter((w) => {
 			const az = ((sun.azimuth - unit.bearing) * Math.PI) / 180;
 			return sun.altitude > 0 && Math.sin(az) * w.normal[0] - Math.cos(az) * w.normal[1] > 0.03;
 		}).map((w) => compass(Math.atan2(w.normal[0], -w.normal[1]) * (180 / Math.PI) + unit.bearing)))]
 	);
-	const summary = $derived(
-		sun.altitude <= 0
-			? 'The sun is down — the home is in shade.'
-			: litWalls.length
-				? `Direct sun through the ${litWalls.join(' & ')}-facing windows.` +
-					(sunnyItems.length ? ` In the sun: ${sunnyItems.join(', ').toLowerCase()}.` : '')
-				: 'Sun is up, but no windows face it right now — soft daylight only.'
+	// One short line under the time in the timeline.
+	const note = $derived.by(() => {
+		if (sun.altitude <= 0) return 'Sun down · home in shade';
+		const m = vs.minutes;
+		const phase = m < 11 * 60 + 30 ? 'Morning' : m < 13 * 60 + 30 ? 'Midday' : m < 17 * 60 + 30 ? 'Afternoon' : 'Evening';
+		return litWalls.length ? `${phase} · sun on ${litWalls.join(' & ')} windows` : `${phase} · no direct sun inside`;
+	});
+	const scoreChip = $derived(
+		score
+			? {
+					value: score.score,
+					tip: `Sun score ${score.score.toFixed(1)}/10 — ${score.verdict}. Measures harsh afternoon sun on the ${score.room.toLowerCase()} windows over a year (10 = none, 1 = the hottest facing). ${score.room} faces ${score.facingWords} (${score.facingDeg}°). Tap for how we worked it out.`
+				}
+			: null
 	);
+	function openHow() {
+		howOpen = true;
+		requestAnimationFrame(() => howEl?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+	}
 	let infoOpen = $state(false);
 	let howOpen = $state(false);
 	let howEl = $state<HTMLDivElement>();
@@ -237,9 +247,9 @@
 			{#if vs.view === 'walk'}
 				<WalkView {unit} {sun} {patches} {dark} {furniture} sunColor={tint} eyeLevelCm={profile.eyeLevelCm} walkSpeed={profile.data.walkSpeed} lookSensitivity={profile.data.lookSensitivity} onexit={() => (vs.view = views[0])} />
 			{:else if vs.view === 'top'}
-					<TopDownView bind:this={plan} {unit} {sun} {patches} {dark} {furniture} sunColor={tint} showSun={profile.data.showSunMarker} bind:grid onzoom={(k) => (zoomPct = Math.round(k * 100))} />
+					<TopDownView bind:this={plan} {unit} {sun} {patches} {dark} {furniture} sunColor={tint} bind:grid onzoom={(k) => (zoomPct = Math.round(k * 100))} />
 			{:else}
-					<Plan3DView bind:this={plan} {unit} {sun} {patches} {dark} {furniture} sunColor={tint} showSun={profile.data.showSunMarker} bind:grid onzoom={(k) => (zoomPct = Math.round(k * 100))} />
+					<Plan3DView bind:this={plan} {unit} {sun} {patches} {dark} {furniture} sunColor={tint} bind:grid onzoom={(k) => (zoomPct = Math.round(k * 100))} />
 			{/if}
 			</div>
 			{#if vs.view !== 'walk'}
@@ -276,16 +286,7 @@
 	</section>
 
 	<div class="timeline">
-		<SunTimeline sliderFirst bind:minutes={vs.minutes} bind:date={vs.date} sunrise={times.sunrise} sunset={times.sunset} lat={unit.lat} lon={unit.lon} {sun} {exposure} oninfo={() => (infoOpen = true)} />
-	</div>
-
-	<div class="below">
-		<p class="summary">{summary}</p>
-		{#if score}
-			<button class="score" onclick={() => { howOpen = true; requestAnimationFrame(() => howEl?.scrollIntoView({ behavior: 'smooth', block: 'start' })); }} title={score.verdict} aria-label="Sun score {score.score} out of 10, {score.room.toLowerCase()} faces {score.facingWords}. {score.verdict}. How we worked this out">
-				<Icon name="sun" size={14} /><strong>{score.score.toFixed(1)}</strong>/10 · faces {compass16(score.facingDeg)}
-			</button>
-		{/if}
+		<SunTimeline sliderFirst {note} score={scoreChip} onscore={openHow} bind:minutes={vs.minutes} bind:date={vs.date} sunrise={times.sunrise} sunset={times.sunset} lat={unit.lat} lon={unit.lon} {sun} {exposure} oninfo={() => (infoOpen = true)} />
 	</div>
 
 	<div class="how" bind:this={howEl}>
@@ -316,7 +317,7 @@
 	.study {
 		display: grid;
 		grid-template-columns: minmax(0, 1fr);
-		grid-template-areas: 'viewer' 'timeline' 'below' 'how';
+		grid-template-areas: 'viewer' 'timeline' 'how';
 	}
 	.viewer {
 		grid-area: viewer;
@@ -324,9 +325,6 @@
 		border: 1px solid var(--line);
 		border-radius: var(--radius);
 		overflow: hidden;
-	}
-	.below {
-		grid-area: below;
 	}
 	.timeline {
 		grid-area: timeline;
@@ -464,39 +462,6 @@
 		font-size: 10px;
 		font-variant-numeric: tabular-nums;
 		color: var(--muted);
-	}
-	.below {
-		display: flex;
-		align-items: center;
-		gap: 10px;
-		margin: 10px 4px;
-	}
-	.summary {
-		flex: 1;
-		margin: 0;
-		font-size: 14px;
-		color: var(--muted);
-	}
-	.score {
-		flex-shrink: 0;
-		display: inline-flex;
-		align-items: center;
-		gap: 5px;
-		min-height: 44px;
-		padding: 0 12px;
-		border: 1px solid var(--line);
-		border-radius: 999px;
-		background: var(--surface);
-		color: var(--muted);
-		font-size: 13px;
-		cursor: pointer;
-	}
-	.score :global(svg) {
-		color: var(--ochre);
-	}
-	.score strong {
-		color: var(--text);
-		font-size: 14px;
 	}
 	dl {
 		display: grid;
