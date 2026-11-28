@@ -14,12 +14,13 @@ const ALLOWED_ORIGINS = [
 	'http://localhost:5173',
 	'http://localhost:4173'
 ];
-const MODELS = {
-	openai: Deno.env.get('OPENAI_MODEL') ?? 'gpt-4.1',
-	anthropic: Deno.env.get('ANTHROPIC_MODEL') ?? 'claude-sonnet-5-5',
-	google: Deno.env.get('GOOGLE_MODEL') ?? 'gemini-3.5-flash', // 2.5 Flash was retired in June 2026
-	deepseek: Deno.env.get('DEEPSEEK_MODEL') ?? 'deepseek-flash'
-};
+// Claude is required for north detection. Speed: Sonnet 5.5 thinks at "high" effort by default, so each of the
+// 8 calls waited on long up-front thinking. Finding the stack and arrow is the hard step (medium); reading a
+// zoomed crop and voting between four turned plans are short visual checks (low). Override with secrets.
+const MODEL = Deno.env.get('ANTHROPIC_MODEL') ?? 'claude-sonnet-5-5';
+const EFFORT_FIND = Deno.env.get('NORTH_EFFORT_FIND') ?? 'medium';
+const EFFORT_READ = Deno.env.get('NORTH_EFFORT_READ') ?? 'low';
+const EFFORT_CHOOSE = Deno.env.get('NORTH_EFFORT_CHOOSE') ?? 'low';
 const DAILY_LIMIT = 30;
 const IMG = /^data:image\/(webp|jpeg|png);base64,[A-Za-z0-9+/=]+$/;
 
@@ -301,84 +302,45 @@ function parseJson(text: string): Record<string, unknown> {
 	return JSON.parse(text.slice(s, e + 1));
 }
 
-async function callAI(provider: string, key: string, prompt: string, images: string[]): Promise<Record<string, unknown>> {
-	const signal = AbortSignal.timeout(90_000);
-	if (provider === 'openai' || provider === 'deepseek') {
-		// DeepSeek uses the same OpenAI-compatible Chat Completions format (deepseek-flash reads images).
-		const ds = provider === 'deepseek';
-		const name = ds ? 'DeepSeek' : 'OpenAI';
-		const send = (jsonMode: boolean) =>
-			fetch(ds ? 'https://api.deepseek.com/chat/completions' : 'https://api.openai.com/v1/chat/completions', {
-				method: 'POST',
-				signal,
-				headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					model: ds ? MODELS.deepseek : MODELS.openai,
-					...(jsonMode ? { response_format: { type: 'json_object' } } : {}),
-					messages: [{ role: 'user', content: [{ type: 'text', text: prompt }, ...images.map((url) => ({ type: 'image_url', image_url: { url, detail: 'high' } }))] }]
-				})
-			});
-		let r = await send(true);
-		// Some models / providers reject JSON mode together with images — retry once without it.
-		if (r.status === 400 || r.status === 422) {
-			const first = await r.text().catch(() => '');
-			console.warn(`[ai] ${name} ${r.status} with JSON mode, retrying without:`, first.slice(0, 300));
-			r = await send(false);
-		}
-		if (!r.ok) throw new Error(`${name} ${r.status}: ${(await r.text().catch(() => '')).replace(/\s+/g, ' ').slice(0, 300)}`);
-		const d = await r.json();
-		const msg = d.choices?.[0]?.message ?? {};
-		const text: string = msg.content || '';
-		if (!text) throw new Error(`${name} returned an empty reply (finish: ${d.choices?.[0]?.finish_reason ?? '?'}${msg.refusal ? `, refusal: ${String(msg.refusal).slice(0, 120)}` : ''})`);
-		return parseJson(text);
-	}
-	if (provider === 'anthropic') {
-		const r = await fetch('https://api.anthropic.com/v1/messages', {
-			method: 'POST',
-			signal,
-			headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
-			body: JSON.stringify({
-				model: MODELS.anthropic,
-				max_tokens: 4000,
-				messages: [{
-					role: 'user',
-					content: [
-						...images.map((url) => {
-							const [head, data] = url.split(',');
-							return { type: 'image', source: { type: 'base64', media_type: head.slice(5, head.indexOf(';')), data } };
-						}),
-						{ type: 'text', text: prompt }
-					]
-				}]
-			})
-		});
-		if (!r.ok) throw new Error(`Anthropic ${r.status}: ${(await r.text().catch(() => '')).replace(/\s+/g, ' ').slice(0, 300)}`);
-		const d = await r.json();
-		return parseJson((d.content ?? []).map((c: { text?: string }) => c.text ?? '').join(''));
-	}
-	if (provider === 'google') {
-		const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODELS.google}:generateContent`, {
-			method: 'POST',
-			signal,
-			headers: { 'x-goog-api-key': key, 'Content-Type': 'application/json' },
-			body: JSON.stringify({
-				contents: [{
-					parts: [
-						{ text: prompt },
-						...images.map((url) => {
-							const [head, data] = url.split(',');
-							return { inline_data: { mime_type: head.slice(5, head.indexOf(';')), data } };
-						})
-					]
-				}],
-				generationConfig: { responseMimeType: 'application/json' }
-			})
-		});
-		if (!r.ok) throw new Error(`Gemini ${r.status}: ${(await r.text().catch(() => '')).replace(/\s+/g, ' ').slice(0, 300)}`);
-		const d = await r.json();
-		return parseJson(d.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text ?? '').join('') ?? '');
-	}
-	throw new Error('Unsupported AI provider');
+/** Claude only. `cacheFirst` marks the first image (the floor plan, sent to most calls) for prompt caching, so the
+ *  later calls of the same check read it from cache: cheaper and a little faster. Returns the parsed JSON reply
+ *  and the call's cost from the token counts Claude reports. */
+const PRICES: Record<string, [number, number, number, number]> = {
+	// US$ per million tokens: input, output, cache read, cache write (5 min)
+	'claude-sonnet-5-5': [2, 10, 0.1, 2.5],
+	'claude-haiku-5-5': [0.1, 0.5, 0.01, 0.125]
+};
+type Usage = { fn: string; model: string; in_tok: number; out_tok: number; cache_read: number; cache_write: number; usd: number; ms: number };
+async function callClaude(log: Usage[], key: string, prompt: string, images: string[], effort: string, cacheFirst = false): Promise<Record<string, unknown>> {
+	const t0 = Date.now();
+	const r = await fetch('https://api.anthropic.com/v1/messages', {
+		method: 'POST',
+		signal: AbortSignal.timeout(90_000),
+		headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
+		body: JSON.stringify({
+			model: MODEL,
+			max_tokens: 4000,
+			output_config: { effort },
+			messages: [{
+				role: 'user',
+				content: [
+					...images.map((url, i) => {
+						const [head, data] = url.split(',');
+						return { type: 'image', source: { type: 'base64', media_type: head.slice(5, head.indexOf(';')), data }, ...(cacheFirst && i === 0 ? { cache_control: { type: 'ephemeral' } } : {}) };
+					}),
+					{ type: 'text', text: prompt }
+				]
+			}]
+		})
+	});
+	if (!r.ok) throw new Error(`Claude ${r.status}: ${(await r.text().catch(() => '')).replace(/\s+/g, ' ').slice(0, 300)}`);
+	const d = await r.json();
+	const u = d.usage ?? {};
+	const p = PRICES[MODEL] ?? PRICES['claude-sonnet-5-5'];
+	const use: Usage = { fn: 'detect-north', model: MODEL, in_tok: u.input_tokens ?? 0, out_tok: u.output_tokens ?? 0, cache_read: u.cache_read_input_tokens ?? 0, cache_write: u.cache_creation_input_tokens ?? 0, usd: 0, ms: Date.now() - t0 };
+	use.usd = (use.in_tok * p[0] + use.out_tok * p[1] + use.cache_read * p[2] + use.cache_write * p[3]) / 1e6;
+	log.push(use);
+	return parseJson((d.content ?? []).filter((c: { type?: string }) => c.type === 'text').map((c: { text?: string }) => c.text ?? '').join(''));
 }
 
 Deno.serve(async (req) => {
@@ -424,16 +386,21 @@ Deno.serve(async (req) => {
 	const { error: le } = await admin.rpc('ai_daily_take', { p_user: u.user.id, p_fn: 'north', p_limit: DAILY_LIMIT });
 	if (le) return json(req, { error: le.message }, le.message.includes('limit') ? 429 : 403);
 
-	const { data: keyRows } = await admin.rpc('active_ai_key');
+	// Claude is required: use the Claude key even if another provider is marked active.
+	const { data: keyRows } = await admin.rpc('ai_key_for', { p_provider: 'anthropic' });
 	const k = Array.isArray(keyRows) ? keyRows[0] : null;
 	if (!k?.api_key) return json(req, { found: false, reason: 'no-key' });
+	const usages: Usage[] = []; // this request's calls only
+	const t0 = Date.now();
+	// Log what this check cost (token counts from Claude), whatever the outcome.
+	const logUsage = () => usages.length && admin.from('ai_usage').insert(usages.splice(0)).then(({ error }) => error && console.warn('[detect-north] usage log', error.message));
 
 	try {
 		const stack = stackOf(clean(c.unitNo, 12));
 		const block = blockOf(clean(c.address, 120));
 		const sizes = [imageSize(plan), ...others.map(imageSize)];
 		// Step 1 — find the site plan, the stack and the north arrow.
-		const f = await callAI(k.provider, k.api_key, PROMPT_FIND(others.length, ctx, stack, block, sizes), [plan, ...others]);
+		const f = await callClaude(usages, k.api_key, PROMPT_FIND(others.length, ctx, stack, block, sizes), [plan, ...others], EFFORT_FIND, true);
 		let found = f.found === true;
 		let deg = Number(f.rotate_cw_deg);
 		deg = Number.isFinite(deg) ? (((deg % 360) + 360) % 360) : NaN;
@@ -458,7 +425,7 @@ Deno.serve(async (req) => {
 				// difference minus the north arrow is the rotation, snapped to the block's exact tilt (plans are drawn
 				// square, so the answer = block axis − north + a multiple of 90°).
 				const prompt = PROMPT_READ(stack, block, sizes[0], [crop.w, crop.h]);
-				const replies = await Promise.allSettled([0, 1, 2].map(() => callAI(k.provider, k.api_key, prompt, [plan, crop.url])));
+				const replies = await Promise.allSettled([0, 1, 2].map(() => callClaude(usages, k.api_key, prompt, [plan, crop.url], EFFORT_READ, true)));
 				for (const r of replies) {
 					if (r.status !== 'fulfilled') continue;
 					const ai = r.value;
@@ -524,7 +491,7 @@ Deno.serve(async (req) => {
 					const tiles = planTiles(planImg, cands.map((a) => (a + north) % 360));
 					const orders = [0, 1, 2, 3].map((o) => [0, 1, 2, 3].map((j) => (j + o) % 4));
 					const urls = await Promise.all(tiles.map(toUrl));
-					const replies = await Promise.allSettled(orders.map((ord) => callAI(k.provider, k.api_key, PROMPT_CHOOSE(stack, block), [...ord.map((j) => urls[j]), crop!.url])));
+					const replies = await Promise.allSettled(orders.map((ord) => callClaude(usages, k.api_key, PROMPT_CHOOSE(stack, block), [...ord.map((j) => urls[j]), crop!.url], EFFORT_CHOOSE)));
 					const score = [0, 0, 0, 0];
 					replies.forEach((r, i) => {
 						if (r.status !== 'fulfilled') return;
@@ -556,10 +523,13 @@ Deno.serve(async (req) => {
 			const { data: isAdmin } = await userClient.rpc('is_admin');
 			if (isAdmin === true) debug = { stack, block, sizes, find: f, runs: runs.map((r) => ({ deg: Math.round(r.deg), geo: r.geo, ai: r.ai })), chose, votes };
 		}
-		return json(req, { found, angle, confidence, evidence, method, ...(debug ? { debug } : {}) });
+		const ms = Date.now() - t0;
+		await logUsage();
+		return json(req, { found, angle, confidence, evidence, method, ms, ...(debug ? { debug } : {}) });
 	} catch (e) {
 		const detail = (e instanceof Error ? e.message : String(e)).replace(/[<>{}\\\u0000-\u001f]/g, '').replace(/\b(sk|key|AIza)[-_A-Za-z0-9*]{8,}/g, '[key]').slice(0, 240);
-		console.error('[detect-north]', k.provider, detail);
-		return json(req, { found: false, reason: 'error', provider: k.provider, detail });
+		console.error('[detect-north]', detail);
+		await logUsage();
+		return json(req, { found: false, reason: 'error', provider: 'anthropic', detail });
 	}
 });
