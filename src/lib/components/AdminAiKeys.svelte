@@ -113,16 +113,25 @@
 		keys.filter((k) => k.provider === 'anthropic').sort((a, b) => Number(b.active) - Number(a.active) || b.created_at.localeCompare(a.created_at))[0]?.id ?? null
 	);
 
-	let check = $state<{ status: string; message: string } | null>(null);
+	// Any key can be tested; the dropdown starts on the Claude key in use.
+	let checkId = $state<string | null>(null);
+	const checkKeyId = $derived(checkId ?? claudeInUse ?? keys[0]?.id ?? null);
+	const BILLING: Record<string, string> = {
+		anthropic: 'https://platform.claude.com/settings/billing',
+		openai: 'https://platform.openai.com/settings/organization/billing/overview',
+		deepseek: 'https://platform.deepseek.com/top_up',
+		google: 'https://aistudio.google.com/usage'
+	};
+	let check = $state<{ status: string; message: string; provider?: string; balance?: string } | null>(null);
 	let checking = $state(false);
 	async function checkKey() {
 		checking = true;
 		check = null;
 		try {
 			const sb = await getSupabase();
-			const { data, error: e } = await sb.functions.invoke('ai-key-check', { body: {} });
+			const { data, error: e } = await sb.functions.invoke('ai-key-check', { body: checkKeyId ? { id: checkKeyId } : {} });
 			if (e) throw e;
-			check = data as { status: string; message: string };
+			check = data as { status: string; message: string; provider?: string; balance?: string };
 			loadUsage();
 		} catch {
 			check = { status: 'error', message: 'Could not run the check.' };
@@ -164,11 +173,27 @@
 
 <section class="card claude">
 	<div class="head">
-		<strong>Claude</strong>
-		<button class="btn" onclick={checkKey} disabled={checking}>{#if checking}<Spinner size={16} /> Checking…{:else}Check key{/if}</button>
+		<strong>Key check</strong>
 	</div>
 	<p class="muted small">Wall tracing and north detection always use your Claude key.</p>
-	{#if check}<p class="status {check.status}" role="status">{check.message}</p>{/if}
+	<div class="checkrow">
+		<label class="sr-only" for="k-check">Key to check</label>
+		<select id="k-check" value={checkKeyId} onchange={(e) => ((checkId = e.currentTarget.value), (check = null))} disabled={!keys.length}>
+			{#each keys as k (k.id)}<option value={k.id}>{k.label} · {providerLabel(k.provider)}{k.id === claudeInUse ? ' · in use' : ''}</option>{/each}
+		</select>
+		<button class="btn" onclick={checkKey} disabled={checking || !checkKeyId}>{#if checking}<Spinner size={16} /> Checking…{:else}Check key{/if}</button>
+	</div>
+	{#if check}
+		<div class="status {check.status}" role="status">
+			<span>{check.message}</span>
+			{#if check.provider}
+				<span class="bal">
+					Balance: {#if check.balance}<strong>{check.balance}</strong>{:else}not shared by {providerLabel(check.provider)}{/if}
+					{#if BILLING[check.provider]} · <a href={BILLING[check.provider]} target="_blank" rel="noopener">Billing ↗</a>{/if}
+				</span>
+			{/if}
+		</div>
+	{/if}
 	<table class="spend">
 		<thead><tr><th>Spend</th>{#each PERIODS as [, l] (l)}<th>{l}</th>{/each}</tr></thead>
 		<tbody>
@@ -339,6 +364,31 @@
 	}
 	.claude {
 		margin-bottom: 12px;
+	}
+	.checkrow {
+		display: flex;
+		gap: 8px;
+		margin-top: 8px;
+	}
+	.checkrow select {
+		flex: 1;
+		min-width: 0;
+	}
+	.sr-only {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip: rect(0 0 0 0);
+	}
+	.status .bal {
+		display: block;
+		margin-top: 2px;
+		font-size: 13px;
+		opacity: 0.9;
+	}
+	.status a {
+		color: inherit;
 	}
 	.status {
 		margin: 8px 0 4px;
