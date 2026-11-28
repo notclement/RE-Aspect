@@ -29,7 +29,6 @@
 	let title = $state('');
 	let description = $state('');
 	let info = $state<StudyInfo | null>(null);
-	let agent = $state<{ name: string; avatar: string; agency: string } | null>(null);
 
 	// Always the warm light look for clients, whatever theme the sender or the viewer's device uses:
 	// a bright, daylit page makes the home feel airy and makes the sunlight (the point of the page) pop.
@@ -60,12 +59,6 @@
 	}
 	const score = $derived(unit ? sunScore(unit) : null);
 	const sqm = $derived(info?.sizeSqft ? Math.round(info.sizeSqft / 10.764) : null);
-	const waText = (kind: 'interested' | 'viewing' | 'question') => {
-		const what = `${title}${info?.unitNo ? ` (${info.unitNo})` : ''}`;
-		const msg = kind === 'viewing' ? `Hi! I'd like to arrange a viewing for ${what}. When are you available?` : kind === 'interested' ? `Hi! I'm interested in ${what}. Could you share more details?` : `Hi! I have a question about ${what}: `;
-		return `https://wa.me/?text=${encodeURIComponent(`${msg}\n${location.href}`)}`;
-	};
-	const AVATAR = /^data:image\/(webp|jpeg);base64,[A-Za-z0-9+/=]+$/;
 	const vs = $state<{ view: View; date: string; minutes: number }>({
 		view: 'top',
 		date: todaySG(),
@@ -90,7 +83,6 @@
 			title = d.name;
 			description = d.description;
 			info = { address: d.address, unitNo: d.unitNo, level: sample.level, sizeSqft: sample.sizeSqft, ceilingCm: sample.ceiling, typeLabel: propertyTypeLabel(d.propertyType), plan: null, northAngle: null, demo: true };
-			agent = null;
 			openOnBestMoment(sample);
 			state_ = 'ready';
 			return;
@@ -114,9 +106,6 @@
 			description = str(r.description, 280);
 			unit = planToUnit(plan, { id, name: title, unitNo: str(r.unit_no, 12), level, sizeSqft, ceilingCm, lat: num(r.lat, -90, 90), lon: num(r.lon, -180, 180) });
 			info = { address: str(r.address, 120), unitNo: str(r.unit_no, 12), level, sizeSqft, ceilingCm, typeLabel: propertyTypeLabel(str(r.property_type, 20)), plan, northAngle: null, demo: false };
-			const an = str(r.agent_name, 40);
-			const av = str(r.agent_avatar, 16000);
-			agent = an ? { name: an, avatar: AVATAR.test(av) ? av : '', agency: str(r.agency, 60) } : null;
 			openOnBestMoment(unit);
 			state_ = 'ready';
 		} catch {
@@ -161,29 +150,8 @@
 
 		<SunStudy {unit} {vs} {info} views={['3d', 'top']} />
 
-		<section class="contact card" aria-label="Contact">
-			<div class="who">
-				{#if agent?.avatar}<img src={agent.avatar} alt="" width="48" height="48" />{:else}<span class="ph"><Icon name="user" size={22} /></span>{/if}
-				<div>
-					<small>{agent ? 'Shared by' : 'Like what you see?'}</small>
-					<strong>{agent ? agent.name : 'Talk to the person who sent you this'}</strong>
-					{#if agent?.agency}<span class="muted">{agent.agency}</span>{/if}
-				</div>
-			</div>
-			<p class="muted">Like the light in this home? Reply in one tap — your message opens in WhatsApp with this page attached.</p>
-			<div class="ctas">
-				<a class="btn primary" href={waText('viewing')} target="_blank" rel="noopener noreferrer">Book a viewing</a>
-				<a class="btn" href={waText('interested')} target="_blank" rel="noopener noreferrer">I'm interested</a>
-				<a class="btn" href={waText('question')} target="_blank" rel="noopener noreferrer">Ask a question</a>
-			</div>
-		</section>
-
 		<p class="foot muted">Sunlight for this exact unit, worked out from its floor plan and Singapore's sun path through the year. Estimates for guidance; neighbouring buildings aren't included. </p>
 		<p class="sign muted"><Logo kind="mark" height={20} label="" /><span><strong>{BRAND.name}</strong> · {BRAND.buyerLine}</span> <a href="/login">Agents &amp; designers: show your listings in sunlight</a></p>
-		<nav class="sticky" data-bottom-bar aria-label="Quick reply">
-			<a class="btn primary" href={waText('viewing')} target="_blank" rel="noopener noreferrer">Book a viewing</a>
-			<a class="btn" href={waText('interested')} target="_blank" rel="noopener noreferrer" aria-label="I'm interested" title="I'm interested">♥ Interested</a>
-		</nav>
 	{/if}
 </div>
 
@@ -265,70 +233,6 @@
 		margin: 10px 0 0;
 		font-size: 14px;
 		color: var(--muted);
-	}
-	.contact {
-		margin-top: 16px;
-		padding: 16px;
-	}
-	.who {
-		display: flex;
-		align-items: center;
-		gap: 12px;
-	}
-	.who img,
-	.who .ph {
-		width: 48px;
-		height: 48px;
-		border-radius: 50%;
-		object-fit: cover;
-		flex-shrink: 0;
-	}
-	.who .ph {
-		display: grid;
-		place-items: center;
-		background: var(--surface-2);
-		color: var(--muted);
-	}
-	.who div {
-		display: grid;
-	}
-	.who small {
-		color: var(--muted);
-		font-size: 12px;
-	}
-	.contact > p {
-		margin: 10px 0 12px;
-		font-size: 14px;
-	}
-	.ctas {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 8px;
-	}
-	/* Thumb-reach reply bar on phones (desktop has the contact card). */
-	.sticky {
-		display: none;
-	}
-	@media (max-width: 720px) {
-		.sticky {
-			position: fixed;
-			left: 0;
-			right: 0;
-			bottom: 0;
-			z-index: 30;
-			display: flex;
-			gap: 8px;
-			padding: 10px 14px calc(10px + var(--safe-b));
-			background: color-mix(in srgb, var(--surface) 94%, transparent);
-			border-top: 1px solid var(--line);
-			backdrop-filter: blur(8px);
-		}
-		.sticky .btn {
-			flex: 1;
-		}
-		.wrap {
-			padding-bottom: calc(90px + var(--safe-b));
-		}
 	}
 	.loc {
 		display: flex;
