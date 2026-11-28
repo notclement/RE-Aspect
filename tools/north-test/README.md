@@ -40,3 +40,4 @@ corridor above → 195). 09 kept at 83 (corridor ends at 576's bottom-left) but 
 | Date | Key | Set | Score | Notes |
 |---|---|---|---|---|
 | 28 Nov 2026 | Anthropic (Sonnet 5.5) | 1024 px, 18 cases × 2 | **28/36 (78%)** with the corrected key (21/36 with the first key) | Old cases 00–07: 10/16 (14/16 on the larger images before). Misses: 06 flipped 180° ×2, 07 stack not found (estimate) ×2, 00 and 02 one run each, 09 ×2. ~35 s per check. |
+| 28 Nov 2026 | Anthropic (Sonnet 5.5), find high / read low / choose medium | 1024 px, cases 00–15 × 4 turns (stopped at 63/72) | **45/61 real runs (74%)** | ~27 s per check (−23%). Turn 90°: 14/16 best; turn 0°: 9/16 worst. Misses: 07 stack never found (0/4), 06 flipped 180° (1/4), 09 (1/4), 03 and 08 (2/4). 2 runs lost to sign-in/network. |
