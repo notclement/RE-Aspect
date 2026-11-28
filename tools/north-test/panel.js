@@ -99,7 +99,8 @@
 			const d = r.debug || {};
 			window.__nt.res.push({ id, turn: t, good, a, want, s: Math.round((Date.now() - t0) / 1000), method: r.method, conf: r.confidence, stack: d.find?.stack_found, chose: d.chose, err: String(r.detail || r.error || r.err || '').slice(0, 120) });
 			localStorage.setItem('nt-results-' + label, JSON.stringify(window.__nt.res));
-			await new Promise((z) => setTimeout(z, 2000));
+			// Brief pause without setTimeout: Chrome throttles timers in a covered window, which stalled runs for minutes.
+			await new Promise((z) => { const ch = new MessageChannel(); ch.port1.onmessage = () => z(); ch.port2.postMessage(0); });
 		}
 		window.__nt.running = false;
 		window.__nt.done = true;
