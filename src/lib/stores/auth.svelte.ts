@@ -59,7 +59,8 @@ class Auth {
 	}
 
 	/** Pull name + plan from the `profiles` table (server is the source of truth for the plan). */
-	private async loadProfile() {
+	/** Re-read the profile row (plan, Pro end date) from the server. */
+	async loadProfile() {
 		if (!this.userId) return;
 		try {
 			const sb = await getSupabase();

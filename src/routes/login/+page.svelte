@@ -33,7 +33,7 @@
 	<button class="btn wide dark" disabled title="Coming later">Continue with Apple · soon</button>
 
 	{#if auth.error}<p class="err">{auth.error}</p>{/if}
-	<p class="fine muted">By continuing you agree to the Terms and Privacy Policy. Sun results are estimates.</p>
+	<p class="fine muted">By continuing you agree to the <a href="/legal#terms">Terms</a> and <a href="/legal#privacy">Privacy notice</a>. Sun results are <a href="/legal#accuracy">estimates</a>.</p>
 </div>
 
 <style>

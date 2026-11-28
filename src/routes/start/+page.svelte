@@ -47,7 +47,7 @@
 	</ol>
 
 	<footer class="foot muted">
-		{BRAND.name} · featuring {BRAND.sunFeature} · <a href={BRAND.developer.linkedin} target="_blank" rel="noopener noreferrer">Built by {BRAND.developer.name}</a>
+		{BRAND.name} · featuring {BRAND.sunFeature} · <a href="/legal">Terms &amp; privacy</a> · <a href={BRAND.developer.linkedin} target="_blank" rel="noopener noreferrer">Built by {BRAND.developer.name}</a>
 	</footer>
 </div>
 

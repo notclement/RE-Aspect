@@ -12,6 +12,7 @@
 	import CropSquare from '#lib/components/CropSquare.svelte';
 	import { agency } from '#lib/stores/agency.svelte.ts';
 	import { projectUsage } from '#lib/usage.svelte.ts';
+	import InviteFriend from '#lib/components/InviteFriend.svelte';
 
 	let fileInput = $state<HTMLInputElement>();
 	let photoBusy = $state(false);
@@ -145,6 +146,8 @@
 	<p class="muted small">Demo projects don't count.</p>
 	<a class="plans-link" class:hot={(usage.full || usage.near) && profile.planId === 'free'} href="/upgrade">{(usage.full || usage.near) && profile.planId === 'free' ? 'Get more with Pro' : 'See plans'}<Icon name="chevron" size={16} /></a>
 </section>
+
+<InviteFriend />
 
 <style>
 	.head {

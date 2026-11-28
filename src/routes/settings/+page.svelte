@@ -114,7 +114,7 @@
 <h3>About</h3>
 <div class="card">
 	<p><strong>{BRAND.name}</strong> · featuring <strong>{BRAND.sunFeature}</strong></p>
-	<p class="muted">Sun positions are calculated estimates for guidance only.</p>
+	<p class="muted">Sun positions are calculated estimates for guidance only. <a href="/legal">Terms &amp; privacy</a></p>
 	<a class="dev" href={BRAND.developer.linkedin} target="_blank" rel="noopener noreferrer">
 		<Icon name="linkedin" /> Built by {BRAND.developer.name}
 	</a>

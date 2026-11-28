@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { pendingJoin } from '#lib/stores/agency.svelte.ts';
+	import { pendingRef } from '#lib/stores/referral.svelte.ts';
 	import { validateInviteCode } from '#lib/validate.ts';
 	import '../app.css';
 	import { onMount } from 'svelte';
@@ -31,11 +32,16 @@
 	$effect(() => {
 		const path = page.url.pathname;
 		if (auth.status === 'loading' || !profile.loaded) return;
-		if (path === '/s') return; // public read-only share links work signed out
+		if (path === '/s' || path === '/legal') return; // public: read-only share links and the terms work signed out
 		// A scanned agency QR (/join?code=…) survives the sign-in: keep the code until /join handles it.
 		if (path === '/join') {
 			const c = validateInviteCode(page.url.searchParams.get('code') ?? '');
 			if (c.ok) pendingJoin.set(c.value);
+		}
+		// A scanned referral QR (/refer?code=…) also survives the sign-in.
+		if (path === '/refer') {
+			const c = validateInviteCode(page.url.searchParams.get('code') ?? '');
+			if (c.ok) pendingRef.set(c.value);
 		}
 		// Signed out: the home page shows the landing page; anything else asks to sign in.
 		if (auth.status === 'signed-out') {
@@ -43,6 +49,7 @@
 			else if (path !== '/login' && path !== '/start') goto('/login', { replaceState: true });
 		} else if (path === '/start') goto('/', { replaceState: true });
 		else if (auth.status === 'signed-in' && profile.data.name && path !== '/join' && pendingJoin.get()) goto('/join', { replaceState: true });
+		else if (auth.status === 'signed-in' && profile.data.name && path !== '/refer' && path !== '/join' && pendingRef.get()) goto('/refer', { replaceState: true });
 		else if (!profile.data.name && !BARE.includes(path))
 			goto('/welcome', { replaceState: true });
 		// Already named (e.g. returning user, or name taken from Google) → never ask again.

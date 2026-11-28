@@ -113,7 +113,7 @@
 ## 10. QR codes (no "add user" buttons)
 - Referrals and team invites happen **only** via QR codes, each tied to its function.
 - Team QR: one fixed code per team. It can expire by time or by number of joins. Members can join and leave; once it has expired, the Lead must reinstate it before anyone new can join.
-- Referral: both sides get 1 month of Pro free.
+- Referral: both sides get 1 month of Pro free (migration 0018, `/refer?code=…`, card on Profile). One code per user; only new accounts (≤ 14 days old) can claim, once, never their own; a referrer earns at most 12 months. Months stack on existing Pro time.
 
 ## 11. Sharing / export
 - Nothing is downloaded to the user's device; everything stays in the browser or our cloud.
@@ -126,6 +126,7 @@
 ## 12. Privacy
 - **BaZi birth dates/times are stored only in the user's browser**, and users are told this.
 - PDPA-compliant privacy notice. Uploaders confirm they have the right to upload plans.
+- `/legal` (public, works signed out): Terms of use, accuracy disclaimer, PDPA privacy notice. **Draft wording — needs a Singapore lawyer's review before paid launch.** Contact = `BRAND.contactEmail` (falls back to LinkedIn until set).
 
 ## 13. Admin
 - See all users and projects, with owner and thumbnail. Grant Pro (1 month / lifetime) and Agency Lead.

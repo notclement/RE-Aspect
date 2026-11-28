@@ -8,6 +8,8 @@ export const BRAND = {
 	tagline: 'Show clients the light in every room, before they visit.',
 	/** For buyers / homeowners who open a shared link (shared page, link previews). */
 	buyerLine: 'See the light before you move in.',
+	/** Data-protection contact shown on /legal (PDPA). null = link to the developer's LinkedIn until set. */
+	contactEmail: null as string | null,
 	developer: {
 		name: 'Clement',
 		linkedin: 'https://www.linkedin.com/in/clementsg'
