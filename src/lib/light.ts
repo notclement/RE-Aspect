@@ -2,7 +2,7 @@
  * DayTrace light model v1: project each window along the sun direction onto the floor.
  * Standalone unit — no neighbouring buildings (see docs/REQUIREMENTS.md §6).
  */
-import { itemCorners, type Unit, type Opening, type Wall } from './sample-unit.ts';
+import { itemCorners, type Unit, type Opening, type Wall, type Door } from './sample-unit.ts';
 
 export interface Patch {
 	points: [number, number][];
@@ -23,6 +23,15 @@ export function roomFor(unit: Unit, win: Opening): [number, number][] {
 	return win.room ?? unit.outline;
 }
 
+/**
+ * Where a window's light may fall. When the plan has walls, the light is traced against them (so it stops at
+ * walls but carries on through open doorways into the next room), and only the unit outline limits it.
+ * Plans without walls fall back to the window's room.
+ */
+function lightArea(unit: Unit, win: Opening): [number, number][] {
+	return unit.walls.length ? unit.outline : roomFor(unit, win);
+}
+
 /** Shortest distance from p to segment a–b. */
 function segDist(p: [number, number], a: [number, number], b: [number, number]): number {
 	const dx = b[0] - a[0];
@@ -37,18 +46,24 @@ function blockers(unit: Unit, w: Opening): Wall[] {
 	return unit.walls.filter((wl) => !(segDist(w.a, wl.a, wl.b) < 4 && segDist(w.b, wl.a, wl.b) < 4));
 }
 
-/** How far light entering at p (travelling along d) gets before a wall stops it. */
-function reachFrom(p: [number, number], d: [number, number], walls: Wall[], max: number): number {
+/** How far light entering at p (travelling along d) gets before a wall stops it. Doorways let it through:
+ *  plans draw walls straight across doors, so a hit inside a door's span is ignored (doors are taken as open). */
+function reachFrom(p: [number, number], d: [number, number], walls: Wall[], max: number, doors: Door[] = []): number {
 	let reach = max;
 	const q: [number, number] = [p[0] + d[0] * 2, p[1] + d[1] * 2];
 	for (const wl of walls) {
 		const u = hit(q, d, wl.a, wl.b);
-		if (u !== null && u + 2 < reach) reach = u + 2;
+		if (u === null || u + 2 >= reach) continue;
+		const at: [number, number] = [q[0] + d[0] * u, q[1] + d[1] * u];
+		if (doors.some((dr) => segDist(at, dr.a, dr.b) < 3)) continue;
+		reach = u + 2;
 	}
 	return reach;
 }
 
-const SLICES = 24; // light is traced in slices across each window, so walls cut it off where they stand
+const SLICES = 48; // light is traced in slices across each window, so walls cut it off where they stand
+/** Neighbouring slices whose reach differs more than this (cm) meet a wall edge or door jamb: step, don't slope. */
+const STEP_CM = 12;
 
 export function sunPatches(unit: Unit, azimuth: number, altitude: number): Patch[] {
 	if (altitude <= 0.3) return [];
@@ -63,14 +78,14 @@ export function sunPatches(unit: Unit, azimuth: number, altitude: number): Patch
 		const dS = w.sill * cot;
 		const dH = w.head * cot;
 		const intensity = Math.min(1, facing * 1.5) * smooth(altitude / 12);
-		const clip = roomFor(unit, w);
+		const clip = lightArea(unit, w);
 		const walls = blockers(unit, w);
 		const at = (p: [number, number], k: number): [number, number] => [p[0] + d[0] * k, p[1] + d[1] * k];
 		const lerp = (t: number): [number, number] => [w.a[0] + (w.b[0] - w.a[0]) * t, w.a[1] + (w.b[1] - w.a[1]) * t];
 		// Far edge of the light for each slice boundary (null = that part is blocked before the light reaches the floor).
 		const far: (number | null)[] = [];
 		for (let i = 0; i <= SLICES; i++) {
-			const r = reachFrom(lerp(i / SLICES), d, walls, dH);
+			const r = reachFrom(lerp(i / SLICES), d, walls, dH, unit.doors ?? []);
 			far.push(r > dS + 1 ? r : null);
 		}
 		// One polygon per run of lit slices.
@@ -78,7 +93,19 @@ export function sunPatches(unit: Unit, azimuth: number, altitude: number): Patch
 		const flush = () => {
 			if (run.length >= 2) {
 				const near = run.map((i) => at(lerp(i / SLICES), dS));
-				const back = run.map((i) => at(lerp(i / SLICES), far[i]!)).reverse();
+				// Far edge: a straight line between slices, except where the reach jumps (a door jamb or wall end).
+				// There it steps at the shorter reach, so light never cuts diagonally through the wall beside a doorway.
+				const back: [number, number][] = [];
+				run.forEach((i, k) => {
+					const prev = k > 0 ? far[run[k - 1]]! : null;
+					const here = far[i]!;
+					if (prev !== null && Math.abs(prev - here) > STEP_CM) {
+						const m = Math.min(prev, here);
+						back.push(at(lerp((i - 1) / SLICES), m), at(lerp(i / SLICES), m));
+					}
+					back.push(at(lerp(i / SLICES), here));
+				});
+				back.reverse();
 				out.push({ points: [...near, ...back], intensity, clip });
 			}
 			run = [];
@@ -262,7 +289,7 @@ export function windowRays(unit: Unit, azimuth: number, altitude: number, spacin
 			const t = (k + 0.5) / n;
 			const at: Pt = [w.a[0] + (w.b[0] - w.a[0]) * t, w.a[1] + (w.b[1] - w.a[1]) * t];
 			// Walls stop the light: the ray ends where it meets one (and is dropped if that's before it reaches the floor).
-			const reach = reachFrom(at, d, walls, w.head * cot);
+			const reach = reachFrom(at, d, walls, w.head * cot, unit.doors ?? []);
 			const sill = w.sill * cot;
 			if (reach <= sill + 1) continue;
 			out.push({
