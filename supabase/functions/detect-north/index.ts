@@ -125,6 +125,13 @@ const sobel = (L: Float32Array, W: number) => [
  * coloured shapes with no outline). The sharper peak wins. Tested on 24 site plans: 83% within 6° (dark edges
  * alone: 77%). Steadier than lines drawn by eye. */
 function pixelTilt(img: Image, lx: number, ly: number): number | null {
+	const c = tiltCandidates(img, lx, ly);
+	return c.length ? c.reduce((a, b) => (b[1] > a[1] ? b : a))[0] : null;
+}
+/** Both readings (dark outlines, colour edges) as [angle, sharpness]. When they disagree, the caller picks the one
+ * nearest the AI's own block line: colour edges win on HDB brochures, dark edges where a 3-room unit is pale green
+ * on green grass (Ulu Pandan Glades). */
+function tiltCandidates(img: Image, lx: number, ly: number): [number, number][] {
 	const side = Math.max(img.width, img.height);
 	const peaks: [number, number][] = [];
 	for (const [Rk, colour] of [[32, false], [48, true]] as const) {
@@ -166,12 +173,11 @@ function pixelTilt(img: Image, lx: number, ly: number): number | null {
 			if (p) peaks.push(p);
 		}
 	}
-	if (!peaks.length) return null;
-	return peaks.reduce((a, b) => (b[1] > a[1] ? b : a))[0];
+	return peaks;
 }
 
 /** A zoomed crop of the site plan around the stack label (JPEG / PNG only), with a red ring on the label. */
-async function zoomCrop(dataUrl: string, label: [number, number], size: [number, number]): Promise<{ url: string; w: number; h: number; tilt: number | null; img: Image; x0: number; y0: number; k: number } | null> {
+async function zoomCrop(dataUrl: string, label: [number, number], size: [number, number]): Promise<{ url: string; w: number; h: number; tilt: number | null; img: Image; x0: number; y0: number; k: number; label: [number, number] } | null> {
 	try {
 		const bin = atob(dataUrl.slice(dataUrl.indexOf(',') + 1));
 		const bytes = new Uint8Array(bin.length);
@@ -209,7 +215,7 @@ async function zoomCrop(dataUrl: string, label: [number, number], size: [number,
 		const jpg = await big.encodeJPEG(85);
 		let s = '';
 		for (let i = 0; i < jpg.length; i += 0x8000) s += String.fromCharCode(...jpg.subarray(i, i + 0x8000));
-		return { url: `data:image/jpeg;base64,${btoa(s)}`, w: big.width, h: big.height, tilt, img, x0, y0, k };
+		return { url: `data:image/jpeg;base64,${btoa(s)}`, w: big.width, h: big.height, tilt, img, x0, y0, k, label: [lx, ly] };
 	} catch (e) {
 		console.warn('[detect-north] crop failed', e instanceof Error ? e.message : e);
 		return null;
@@ -497,17 +503,31 @@ Deno.serve(async (req) => {
 				// The block tilt measured from the site plan's pixels beats the AI's hand-drawn lines. Measure it around the
 				// first label guess and around each reading's exact label / unit centre, and take the median (a guess that
 				// lands on a neighbour or a linkway is outvoted).
-				const ptilts: number[] = crop!.tilt !== null ? [crop!.tilt] : [];
+				// The AI's block lines (median) only break ties between the two pixel readings: they are rough (±10°) but
+				// tell a 4° reading from a 23° one.
+				let aiTilt: number | null = null;
+				if (tilts.length) {
+					const r0 = tilts[0];
+					const un = tilts.map((t) => r0 + ((((t - r0) % 90) + 135) % 90) - 45).sort((x, y) => x - y);
+					aiTilt = ((un[Math.floor(un.length / 2)] % 90) + 90) % 90;
+				}
+				const d90 = (a: number, b: number) => { const d = Math.abs(a - b) % 90; return Math.min(d, 90 - d); };
+				const choose = (c: [number, number][]): number | null =>
+					!c.length ? null : aiTilt === null ? c.reduce((a, b) => (b[1] > a[1] ? b : a))[0] : c.reduce((a, b) => (d90(b[0], aiTilt!) < d90(a[0], aiTilt!) ? b : a))[0];
+				const ptilts: number[] = [];
+				const pts0: [number, number][] = [];
+				const lab = crop!.label;
+				if (lab) pts0.push(lab);
 				for (const r of runs)
-					for (const q of [pt(r.ai.site_label), pt(r.ai.site_unit_center)]) {
-						if (!q) continue;
-						try {
-							const v = pixelTilt(crop!.img, crop!.x0 + q[0] / crop!.k, crop!.y0 + q[1] / crop!.k);
-							if (v !== null) ptilts.push(v);
-						} catch {
-							/* skip */
-						}
+					for (const q of [pt(r.ai.site_label), pt(r.ai.site_unit_center)]) if (q) pts0.push([crop!.x0 + q[0] / crop!.k, crop!.y0 + q[1] / crop!.k]);
+				for (const [x, y] of pts0) {
+					try {
+						const v = choose(tiltCandidates(crop!.img, x, y));
+						if (v !== null) ptilts.push(v);
+					} catch {
+						/* skip */
 					}
+				}
 				let ptilt: number | null = null;
 				if (ptilts.length) {
 					const ref = ptilts[0];
