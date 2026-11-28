@@ -126,14 +126,14 @@ const sobel = (L: Float32Array, W: number) => [
  * alone: 77%). Steadier than lines drawn by eye. */
 function pixelTilt(img: Image, lx: number, ly: number): number | null {
 	const c = tiltCandidates(img, lx, ly);
-	return c.length ? c.reduce((a, b) => (b[1] > a[1] ? b : a))[0] : null;
+	return c.dark ?? c.colour;
 }
-/** Both readings (dark outlines, colour edges) as [angle, sharpness]. When they disagree, the caller picks the one
- * nearest the AI's own block line: colour edges win on HDB brochures, dark edges where a 3-room unit is pale green
- * on green grass (Ulu Pandan Glades). */
-function tiltCandidates(img: Image, lx: number, ly: number): [number, number][] {
+/** Two readings: dark outline edges, and colour edges. Dark edges are used when they give a clear peak (condo-style
+ * plans, and pale 3-room units on grass); colour edges only when they don't (HDB brochures draw units as coloured
+ * shapes with no outline). Tested on 24 site plans with jitter: 87% within 8° (dark only 75%, colour only 85%). */
+function tiltCandidates(img: Image, lx: number, ly: number): { dark: number | null; colour: number | null } {
+	const out: { dark: number | null; colour: number | null } = { dark: null, colour: null };
 	const side = Math.max(img.width, img.height);
-	const peaks: [number, number][] = [];
 	for (const [Rk, colour] of [[32, false], [48, true]] as const) {
 		const R = Math.max(12, Math.round((Rk / 1400) * side));
 		const x0 = Math.round(lx - R), y0 = Math.round(ly - R);
@@ -150,7 +150,7 @@ function tiltCandidates(img: Image, lx: number, ly: number): [number, number][] 
 				return false;
 			};
 			const p = edgePeak(gx, gy, darkNear, W, H);
-			if (p) peaks.push(p);
+			if (p) out.dark = p[0];
 		} else {
 			// Per pixel, the strongest gradient of R, G, B and saturation (max − min).
 			const ch = [0, 1, 2, 3].map(() => new Float32Array(W * H));
@@ -170,10 +170,10 @@ function tiltCandidates(img: Image, lx: number, ly: number): [number, number][] 
 					}
 				}
 			const p = edgePeak((i) => GX[i], (i) => GY[i], () => true, W, H);
-			if (p) peaks.push(p);
+			if (p) out.colour = p[0];
 		}
 	}
-	return peaks;
+	return out;
 }
 
 /** A zoomed crop of the site plan around the stack label (JPEG / PNG only), with a red ring on the label. */
@@ -503,17 +503,6 @@ Deno.serve(async (req) => {
 				// The block tilt measured from the site plan's pixels beats the AI's hand-drawn lines. Measure it around the
 				// first label guess and around each reading's exact label / unit centre, and take the median (a guess that
 				// lands on a neighbour or a linkway is outvoted).
-				// The AI's block lines (median) only break ties between the two pixel readings: they are rough (±10°) but
-				// tell a 4° reading from a 23° one.
-				let aiTilt: number | null = null;
-				if (tilts.length) {
-					const r0 = tilts[0];
-					const un = tilts.map((t) => r0 + ((((t - r0) % 90) + 135) % 90) - 45).sort((x, y) => x - y);
-					aiTilt = ((un[Math.floor(un.length / 2)] % 90) + 90) % 90;
-				}
-				const d90 = (a: number, b: number) => { const d = Math.abs(a - b) % 90; return Math.min(d, 90 - d); };
-				const choose = (c: [number, number][]): number | null =>
-					!c.length ? null : aiTilt === null ? c.reduce((a, b) => (b[1] > a[1] ? b : a))[0] : c.reduce((a, b) => (d90(b[0], aiTilt!) < d90(a[0], aiTilt!) ? b : a))[0];
 				const ptilts: number[] = [];
 				const pts0: [number, number][] = [];
 				const lab = crop!.label;
@@ -522,7 +511,7 @@ Deno.serve(async (req) => {
 					for (const q of [pt(r.ai.site_label), pt(r.ai.site_unit_center)]) if (q) pts0.push([crop!.x0 + q[0] / crop!.k, crop!.y0 + q[1] / crop!.k]);
 				for (const [x, y] of pts0) {
 					try {
-						const v = choose(tiltCandidates(crop!.img, x, y));
+						const v = pixelTilt(crop!.img, x, y);
 						if (v !== null) ptilts.push(v);
 					} catch {
 						/* skip */
