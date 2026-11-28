@@ -57,15 +57,22 @@ function reachHit(p: [number, number], d: [number, number], walls: Wall[], max: 
 	let by = -1;
 	const q: [number, number] = [p[0] + d[0] * 2, p[1] + d[1] * 2];
 	for (const [wi, wl] of walls.entries()) {
-		const u = hit(q, d, wl.a, wl.b);
-		if (u === null || u + 2 >= reach) continue;
-		const at: [number, number] = [q[0] + d[0] * u, q[1] + d[1] * u];
-		if (doors.some((dr) => segDist(at, dr.a, dr.b) < 1)) continue;
-		// Stop at the wall's near face, not its centre line, so light never shows on top of a wall.
+		// Light stops at the wall's near face, not its centre line, so it never shows on top of a wall. The face
+		// can be within reach even when the centre line isn't, so test the face distance.
 		const len = Math.hypot(wl.b[0] - wl.a[0], wl.b[1] - wl.a[1]) || 1;
 		const sin = Math.abs(d[0] * (wl.b[1] - wl.a[1]) - d[1] * (wl.b[0] - wl.a[0])) / len;
 		const face = Math.min(((wl.t || 10) / 2) / Math.max(sin, 0.2), 40);
-		reach = Math.max(0, u + 2 - face);
+		// Widen the wall by its half thickness so rays grazing its end are caught too.
+		const ext = (wl.t || 10) / 2 / len;
+		const ea: [number, number] = [wl.a[0] - (wl.b[0] - wl.a[0]) * ext, wl.a[1] - (wl.b[1] - wl.a[1]) * ext];
+		const eb: [number, number] = [wl.b[0] + (wl.b[0] - wl.a[0]) * ext, wl.b[1] + (wl.b[1] - wl.a[1]) * ext];
+		const u = hit(q, d, ea, eb);
+		if (u === null) continue;
+		const stopAt = Math.max(0, u + 2 - face);
+		if (stopAt >= reach) continue;
+		const at: [number, number] = [q[0] + d[0] * u, q[1] + d[1] * u];
+		if (doors.some((dr) => segDist(at, dr.a, dr.b) < 1)) continue;
+		reach = stopAt;
 		by = wi;
 	}
 	return [reach, by];
