@@ -31,6 +31,9 @@ create table if not exists public.ai_usage (
 );
 create index if not exists ai_usage_at on public.ai_usage (at desc);
 alter table public.ai_usage enable row level security; -- no policies: only the service role writes; admins read via the function below
+-- This project doesn't grant table rights by default: the server functions (service role) log here.
+grant select, insert on table public.ai_usage to service_role;
+grant usage, select on sequence public.ai_usage_id_seq to service_role;
 
 -- 3. Admin summary: spend and call counts per function, today / last 7 days / this month / all time.
 create or replace function public.admin_ai_usage_summary()
