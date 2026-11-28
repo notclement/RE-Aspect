@@ -77,6 +77,9 @@ async function callAI(provider: string, key: string, prompt: string, images: str
 				headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
 				body: JSON.stringify({
 					model: ds ? MODELS.deepseek : MODELS.openai,
+					// deepseek-flash "thinks" by default, which pushes a full trace past our time limit; the
+					// geometry is squared up afterwards (tidyPlan), so a direct answer is enough here.
+					...(ds ? { thinking: { type: 'disabled' } } : {}),
 					...(jsonMode ? { response_format: { type: 'json_object' } } : {}),
 					messages: [{ role: 'user', content: [{ type: 'text', text: prompt }, ...images.map((url) => ({ type: 'image_url', image_url: { url, detail: 'high' } }))] }]
 				})
