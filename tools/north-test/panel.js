@@ -67,7 +67,8 @@
 		if (!window.__ntCases) return msg('Choose the test set zip first.');
 		if (window.__nt.running) return 'already running';
 		window.__nt = { state: '', res: [], label, running: true, started: Date.now() };
-		const ids = (cases ?? Object.keys(window.__ntCases)).filter((id) => id in GT).sort();
+		const exp = window.__ntExp ?? {};
+		const ids = (cases ?? Object.keys(window.__ntCases)).filter((id) => id in exp || id in GT).sort();
 		const jobs = [];
 		for (const id of ids) for (const t of turns) for (let r = 0; r < reps; r++) jobs.push([id, t]);
 		window.__nt.total = jobs.length;
@@ -75,7 +76,7 @@
 		for (const [id, t] of jobs) {
 			const c = window.__ntCases[id];
 			const cj = JSON.parse(await c['case.json'].text());
-			const want = (((GT[id] - t) % 360) + 360) % 360;
+			const want = ((((exp[id] ?? GT[id]) - t) % 360) + 360) % 360;
 			const body = {
 				floorPlan: await enc(c['2_floor-plan-3room.jpg'], 1536, 0.8, t),
 				others: [await enc(c['1_site-plan.jpg'], 1400, 0.75)],
@@ -113,9 +114,17 @@
 			const cases = {};
 			for (const [name, blob] of Object.entries(files)) {
 				const m = name.match(/(?:^|\/)(\d\d)_[^/]*\/(1_site-plan\.jpg|2_floor-plan-3room\.jpg|case\.json)$/);
-				if (!m || !(m[1] in GT)) continue;
+				if (!m) continue;
 				(cases[m[1]] ??= {})[m[2]] = blob;
 			}
+			// New sets carry the answer in case.json (expected_cw); set 1 uses the GT table above.
+			const exp = {};
+			for (const [id, c] of Object.entries(cases)) {
+				if (!c['case.json']) continue;
+				const e = JSON.parse(await c['case.json'].text()).expected_cw;
+				if (typeof e === 'number') exp[id] = e;
+			}
+			window.__ntExp = exp;
 			window.__ntCases = cases;
 			document.getElementById('nt-pick').style.display = 'none';
 			msg(`Loaded ${Object.keys(cases).length} cases. Starting…`);
