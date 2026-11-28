@@ -148,7 +148,7 @@
 			{#if description}<p class="desc">{description}</p>{/if}
 		</header>
 
-		<SunStudy {unit} {vs} {info} views={['3d', 'top']} />
+		<SunStudy {unit} {vs} {info} />
 
 		<p class="foot muted">Sunlight for this exact unit, worked out from its floor plan and Singapore's sun path through the year. Estimates for guidance; neighbouring buildings aren't included. </p>
 		<p class="sign muted"><Logo kind="mark" height={20} label="" /><span><strong>{BRAND.name}</strong> · {BRAND.buyerLine}</span> <a href="/login">Agents &amp; designers: show your listings in sunlight</a></p>
