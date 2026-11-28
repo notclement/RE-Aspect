@@ -55,8 +55,12 @@ function reachFrom(p: [number, number], d: [number, number], walls: Wall[], max:
 		const u = hit(q, d, wl.a, wl.b);
 		if (u === null || u + 2 >= reach) continue;
 		const at: [number, number] = [q[0] + d[0] * u, q[1] + d[1] * u];
-		if (doors.some((dr) => segDist(at, dr.a, dr.b) < 3)) continue;
-		reach = u + 2;
+		if (doors.some((dr) => segDist(at, dr.a, dr.b) < 1)) continue;
+		// Stop at the wall's near face, not its centre line, so light never shows on top of a wall.
+		const len = Math.hypot(wl.b[0] - wl.a[0], wl.b[1] - wl.a[1]) || 1;
+		const sin = Math.abs(d[0] * (wl.b[1] - wl.a[1]) - d[1] * (wl.b[0] - wl.a[0])) / len;
+		const face = Math.min(((wl.t || 10) / 2) / Math.max(sin, 0.2), 40);
+		reach = Math.max(0, u + 2 - face);
 	}
 	return reach;
 }
