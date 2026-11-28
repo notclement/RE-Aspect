@@ -15,10 +15,11 @@ const ALLOWED_ORIGINS = [
 	'http://localhost:4173'
 ];
 // Claude is required for north detection. Speed: Sonnet 5.5 thinks at "high" effort by default, so each of the
-// 8 calls waited on long up-front thinking. Finding the stack and arrow is the hard step (medium); reading a
-// zoomed crop and voting between four turned plans are short visual checks (low). Override with secrets.
+// 8 calls waited on long up-front thinking. Finding the stack and arrow is the hard step and keeps high effort
+// (at medium it lost the stack on most cases, 28 Nov); reading a zoomed crop and voting between four turned plans
+// are short visual checks (low). Override with secrets.
 const MODEL = Deno.env.get('ANTHROPIC_MODEL') ?? 'claude-sonnet-5-5';
-const EFFORT_FIND = Deno.env.get('NORTH_EFFORT_FIND') ?? 'medium';
+const EFFORT_FIND = Deno.env.get('NORTH_EFFORT_FIND') ?? 'high';
 const EFFORT_READ = Deno.env.get('NORTH_EFFORT_READ') ?? 'low';
 const EFFORT_CHOOSE = Deno.env.get('NORTH_EFFORT_CHOOSE') ?? 'low';
 const DAILY_LIMIT = 30;
