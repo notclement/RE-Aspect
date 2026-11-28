@@ -14,6 +14,7 @@ export function projectUsage(): { used: number; limit: number | null; full: bool
 		limit = null; // admins: unlimited
 	} else {
 		limit = PLANS[profile.planId].includedUnits;
+		if (limit !== null && profile.planId === 'pro') limit += profile.data.extraProjects; // bought extra projects (0019)
 	}
 	const full = limit !== null && used >= limit;
 	const near = limit !== null && !full && limit > 1 && used / limit >= 0.8;

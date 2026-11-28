@@ -107,6 +107,8 @@
 | Members | 1 | 1 | paid seats **+ Lead** (10 seats → 11 members) |
 
 - **Launch period: everything is free** (everyone is treated as Pro). Limits are built in from day one; Stripe payments get switched on later, with test mode first.
+- **Stripe (migration 0019, functions `stripe-checkout` + `stripe-webhook`):** Pro S$50/month subscription; extra projects S$5 one-off each (Pro only; limit = 10 + extra). Only the webhook changes plans (signature-checked, each event recorded once, retry-safe). Stripe Pro runs to the end of the paid period + 3 days; cancelling just lets it run out; lifetime / admin-granted Pro is never shortened. Plans page shows "Upgrade to Pro", "Add a project" and "Manage billing" (Stripe portal) once the secrets are set; until then "Coming soon".
+  - Setup (test mode first): Stripe → Products: "RE:Aspect Pro" S$50 monthly → `STRIPE_PRICE_PRO`; "Extra project" S$5 one-off → `STRIPE_PRICE_PROJECT`. Secrets in Supabase: `STRIPE_SECRET_KEY` (sk_test_…), the two prices, `STRIPE_WEBHOOK_SECRET` (whsec_… from a webhook endpoint at `/functions/v1/stripe-webhook` with events `checkout.session.completed`, `invoice.paid`, `customer.subscription.deleted`). Turn on the customer portal in Stripe settings.
 - **AI runs only on the admin's key.** Users never add their own key.
 - Agency Lead: a gold, special-feeling dashboard showing members, usage and their units.
 

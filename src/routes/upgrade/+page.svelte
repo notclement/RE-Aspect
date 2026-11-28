@@ -10,10 +10,33 @@
 	import { PLANS } from '#lib/config/plans.ts';
 	import { validateCompanyName, validateNumber, validatePhone, validateFreeText } from '#lib/validate.ts';
 	import Icon from '#lib/components/Icon.svelte';
+	import { billing } from '#lib/stores/billing.svelte.ts';
+	import { page } from '$app/state';
+	import { onMount } from 'svelte';
 
 	$effect(() => nav.set({ label: 'Plans' }));
 
 	const current = $derived(profile.planId);
+
+	// Stripe (migration 0019): buttons appear once the payment keys are set; until then "Coming soon".
+	const paid = page.url.searchParams.get('paid');
+	let payBusy = $state<string | null>(null);
+	let payError = $state<string | null>(null);
+	onMount(() => {
+		billing.probe();
+		// Back from Stripe: the webhook upgrades the account within seconds; re-read the plan a few times.
+		if (paid && auth.status === 'signed-in') [3000, 8000, 15000].forEach((ms) => setTimeout(() => auth.loadProfile(), ms));
+	});
+	async function pay(kind: 'pro' | 'project' | 'portal') {
+		payBusy = kind;
+		payError = null;
+		try {
+			await billing.go(kind);
+		} catch (e) {
+			payError = e instanceof Error ? e.message : 'Could not open the payment page.';
+			payBusy = null;
+		}
+	}
 
 	let showForm = $state(false);
 	let company = $state('');
@@ -55,6 +78,9 @@
 
 <h1 class="title">Plans</h1>
 <p class="muted lead">New accounts get 3 months of Pro free until 1 Feb 2027.</p>
+{#if paid}<p class="card ok-note"><Icon name="check" size={18} />{paid === 'project' ? 'Payment received — your extra projects are being added.' : 'Payment received — welcome to Pro! Your plan updates in a few seconds.'}</p>{/if}
+{#if billing.on && billing.test}<p class="muted small test-note">Test mode: use card 4242 4242 4242 4242, any future date and any CVC. No real money is charged.</p>{/if}
+{#if payError}<p class="error">{payError}</p>{/if}
 
 <div class="plans">
 	<section class="card plan" class:on={current === 'free'}>
@@ -78,8 +104,18 @@
 		</ul>
 		{#if current === 'pro'}
 			<span class="tag pro">{profile.onPromo ? 'Free for now (promo)' : 'Your plan'}</span>
+			{#if billing.on && !profile.data.isAdmin}
+				<div class="pay-row">
+					{#if billing.projects}<button class="btn" onclick={() => pay('project')} disabled={payBusy !== null}>{payBusy === 'project' ? 'Opening…' : `Add a project · S$${PLANS.pro.extraUnitOneOffSgd}`}</button>{/if}
+					<button class="btn" onclick={() => pay('portal')} disabled={payBusy !== null}>{payBusy === 'portal' ? 'Opening…' : 'Manage billing'}</button>
+				</div>
+			{/if}
 		{:else if current === 'free'}
-			<button class="btn primary" disabled>Coming soon</button>
+			{#if billing.on}
+				<button class="btn primary" onclick={() => pay('pro')} disabled={payBusy !== null}>{payBusy === 'pro' ? 'Opening…' : 'Upgrade to Pro'}</button>
+			{:else}
+				<button class="btn primary" disabled>{billing.on === null ? 'Checking…' : 'Coming soon'}</button>
+			{/if}
 		{/if}
 	</section>
 
@@ -230,5 +266,22 @@
 	.small {
 		font-size: 12px;
 		margin: 0;
+	}
+	.ok-note {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		margin: 0 0 14px;
+		color: var(--forest);
+	}
+	.test-note {
+		margin: 0 0 12px;
+		font-size: 13px;
+	}
+	.pay-row {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 8px;
+		margin-top: 10px;
 	}
 </style>

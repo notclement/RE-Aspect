@@ -1,0 +1,29 @@
+{
+  "version": "5",
+  "specifiers": {
+    "jsr:@supabase/supabase-js@2": "2.119.2"
+  },
+  "jsr": {
+    "@supabase/supabase-js@2.119.2": {
+      "integrity": "e692a57e2e5ae408136cc32da9bebf50155cb73bfa014a28c16efb7b1c154eba"
+    }
+  },
+  "workspace": {
+    "packageJson": {
+      "dependencies": [
+        "npm:@supabase/supabase-js@^2.119.2",
+        "npm:@sveltejs/adapter-static@^4.0.1",
+        "npm:@sveltejs/kit@^3.2.0",
+        "npm:@sveltejs/vite-plugin-svelte@^7.3.1",
+        "npm:@types/node@^22.20.7",
+        "npm:@types/three@0.187",
+        "npm:qrcode-generator@^1.5.2",
+        "npm:svelte-check@^4.7.8",
+        "npm:svelte@^5.57.3",
+        "npm:three@0.187",
+        "npm:typescript@^6.0.3",
+        "npm:vite@^8.3.8"
+      ]
+    }
+  }
+}

@@ -66,7 +66,7 @@ class Auth {
 			const sb = await getSupabase();
 			const { data, error } = await sb
 				.from('profiles')
-				.select('name, plan, pro_until, is_admin, settings, avatar, disabled')
+				.select('*') // * so a column added by a newer migration (e.g. extra_projects) never breaks sign-in
 				.eq('id', this.userId)
 				.maybeSingle();
 			if (error) throw error;
@@ -81,6 +81,7 @@ class Auth {
 					isAdmin: data.is_admin === true,
 					avatar: isAvatarDataUrl(data.avatar) ? data.avatar : null,
 					disabled: data.disabled === true,
+					extraProjects: Number.isInteger(data.extra_projects) ? Math.max(0, Math.min(1000, data.extra_projects)) : 0,
 					...(data.name ? { name: data.name } : {})
 				});
 				if (!data.is_admin) profile.setViewAs(null);

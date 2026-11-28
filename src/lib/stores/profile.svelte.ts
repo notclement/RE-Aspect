@@ -26,6 +26,7 @@ export interface Profile {
 	plan: PlanId;
 	proUntil: string | null; // granted Pro end date (ISO), 'infinity' = lifetime, null = none
 	avatar: string | null; // tiny square profile photo (data URL, ≤16 KB), synced via profiles.avatar
+	extraProjects: number; // bought with Stripe (migration 0019): Pro limit = 10 + this
 	disabled: boolean; // set by an admin; the app shows a notice and stops working for this account
 	bodyHeightCm: number; // walkthrough eye level ≈ height − 12 cm
 	areaUnit: 'sqft' | 'sqm';
@@ -42,6 +43,7 @@ const DEFAULTS: Profile = {
 	plan: 'free',
 	proUntil: null,
 	avatar: null,
+	extraProjects: 0,
 	disabled: false,
 	bodyHeightCm: 175,
 	areaUnit: 'sqft',
