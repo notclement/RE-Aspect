@@ -49,9 +49,14 @@ function blockers(unit: Unit, w: Opening): Wall[] {
 /** How far light entering at p (travelling along d) gets before a wall stops it. Doorways let it through:
  *  plans draw walls straight across doors, so a hit inside a door's span is ignored (doors are taken as open). */
 function reachFrom(p: [number, number], d: [number, number], walls: Wall[], max: number, doors: Door[] = []): number {
+	return reachHit(p, d, walls, max, doors)[0];
+}
+/** Like reachFrom, plus which wall stopped the light (-1 = none: it ran out of height first). */
+function reachHit(p: [number, number], d: [number, number], walls: Wall[], max: number, doors: Door[] = []): [number, number] {
 	let reach = max;
+	let by = -1;
 	const q: [number, number] = [p[0] + d[0] * 2, p[1] + d[1] * 2];
-	for (const wl of walls) {
+	for (const [wi, wl] of walls.entries()) {
 		const u = hit(q, d, wl.a, wl.b);
 		if (u === null || u + 2 >= reach) continue;
 		const at: [number, number] = [q[0] + d[0] * u, q[1] + d[1] * u];
@@ -61,12 +66,13 @@ function reachFrom(p: [number, number], d: [number, number], walls: Wall[], max:
 		const sin = Math.abs(d[0] * (wl.b[1] - wl.a[1]) - d[1] * (wl.b[0] - wl.a[0])) / len;
 		const face = Math.min(((wl.t || 10) / 2) / Math.max(sin, 0.2), 40);
 		reach = Math.max(0, u + 2 - face);
+		by = wi;
 	}
-	return reach;
+	return [reach, by];
 }
 
 const SLICES = 48; // light is traced in slices across each window, so walls cut it off where they stand
-/** Neighbouring slices whose reach differs more than this (cm) meet a wall edge or door jamb: step, don't slope. */
+/** Neighbouring slices stopped by different walls (a wall end or door jamb) whose reach differs more than this (cm) step instead of sloping. */
 const STEP_CM = 12;
 
 export function sunPatches(unit: Unit, azimuth: number, altitude: number): Patch[] {
@@ -88,9 +94,11 @@ export function sunPatches(unit: Unit, azimuth: number, altitude: number): Patch
 		const lerp = (t: number): [number, number] => [w.a[0] + (w.b[0] - w.a[0]) * t, w.a[1] + (w.b[1] - w.a[1]) * t];
 		// Far edge of the light for each slice boundary (null = that part is blocked before the light reaches the floor).
 		const far: (number | null)[] = [];
+		const stop: number[] = []; // which wall stopped each slice (-1 = none)
 		for (let i = 0; i <= SLICES; i++) {
-			const r = reachFrom(lerp(i / SLICES), d, walls, dH, unit.doors ?? []);
+			const [r, by] = reachHit(lerp(i / SLICES), d, walls, dH, unit.doors ?? []);
 			far.push(r > dS + 1 ? r : null);
+			stop.push(by);
 		}
 		// One polygon per run of lit slices.
 		let run: number[] = [];
@@ -103,7 +111,8 @@ export function sunPatches(unit: Unit, azimuth: number, altitude: number): Patch
 				run.forEach((i, k) => {
 					const prev = k > 0 ? far[run[k - 1]]! : null;
 					const here = far[i]!;
-					if (prev !== null && Math.abs(prev - here) > STEP_CM) {
+					// Same wall (or none) on both sides = a straight edge: keep the slope. Different = a jamb: step.
+					if (prev !== null && stop[run[k - 1]] !== stop[i] && Math.abs(prev - here) > STEP_CM) {
 						const m = Math.min(prev, here);
 						back.push(at(lerp((i - 1) / SLICES), m), at(lerp(i / SLICES), m));
 					}
