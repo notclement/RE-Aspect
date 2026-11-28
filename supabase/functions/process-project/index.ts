@@ -12,13 +12,10 @@ const ALLOWED_ORIGINS = [
 	'http://localhost:5173',
 	'http://localhost:4173'
 ];
-// Fastest model of each provider (tracing must finish well before a phone gives up on the request).
-const MODELS = {
-	openai: Deno.env.get('OPENAI_TRACE_MODEL') ?? 'gpt-5.6-luna',
-	anthropic: Deno.env.get('ANTHROPIC_TRACE_MODEL') ?? 'claude-haiku-5-5',
-	google: Deno.env.get('GOOGLE_TRACE_MODEL') ?? 'gemini-3.5-flash-lite',
-	deepseek: Deno.env.get('DEEPSEEK_TRACE_MODEL') ?? 'deepseek-flash'
-};
+// Claude is required for tracing. Haiku 5.5 is the fastest; override with the ANTHROPIC_TRACE_MODEL secret
+// (e.g. claude-sonnet-5-5 for harder plans) and TRACE_EFFORT (low · medium · high).
+const TRACE_MODEL = Deno.env.get('ANTHROPIC_TRACE_MODEL') ?? 'claude-haiku-5-5';
+const TRACE_EFFORT = Deno.env.get('TRACE_EFFORT') ?? undefined; // undefined = the model's own default
 const KINDS = ['sofa', 'bed', 'table', 'chair', 'counter', 'console', 'wardrobe', 'rug', 'plant', 'desk', 'bath'];
 const COLORS: Record<string, string> = {
 	bed: '#B7BE9C', sofa: '#9DAE8F', table: '#9C7A57', chair: '#A68B6D', desk: '#9C7A57', wardrobe: '#7F7766',
@@ -64,87 +61,53 @@ function parseJson(text: string): Record<string, unknown> {
 	return JSON.parse(text.slice(s, e + 1));
 }
 
-async function callAI(provider: string, key: string, prompt: string, images: string[]): Promise<Record<string, unknown>> {
-	const signal = AbortSignal.timeout(55_000);
-	if (provider === 'openai' || provider === 'deepseek') {
-		// DeepSeek uses the same OpenAI-compatible Chat Completions format (deepseek-flash reads images).
-		const ds = provider === 'deepseek';
-		const name = ds ? 'DeepSeek' : 'OpenAI';
-		const send = (jsonMode: boolean) =>
-			fetch(ds ? 'https://api.deepseek.com/chat/completions' : 'https://api.openai.com/v1/chat/completions', {
-				method: 'POST',
-				signal,
-				headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					model: ds ? MODELS.deepseek : MODELS.openai,
-					// deepseek-flash "thinks" by default, which pushes a full trace past our time limit; the
-					// geometry is squared up afterwards (tidyPlan), so a direct answer is enough here.
-					...(ds ? { thinking: { type: 'disabled' } } : {}),
-					...(jsonMode ? { response_format: { type: 'json_object' } } : {}),
-					messages: [{ role: 'user', content: [{ type: 'text', text: prompt }, ...images.map((url) => ({ type: 'image_url', image_url: { url, detail: 'high' } }))] }]
-				})
-			});
-		let r = await send(true);
-		// Some models / providers reject JSON mode together with images — retry once without it.
-		if (r.status === 400 || r.status === 422) {
-			const first = await r.text().catch(() => '');
-			console.warn(`[ai] ${name} ${r.status} with JSON mode, retrying without:`, first.slice(0, 300));
-			r = await send(false);
-		}
-		if (!r.ok) throw new Error(`${name} ${r.status}: ${(await r.text().catch(() => '')).replace(/\s+/g, ' ').slice(0, 300)}`);
-		const d = await r.json();
-		const msg = d.choices?.[0]?.message ?? {};
-		const text: string = msg.content || '';
-		if (!text) throw new Error(`${name} returned an empty reply (finish: ${d.choices?.[0]?.finish_reason ?? '?'}${msg.refusal ? `, refusal: ${String(msg.refusal).slice(0, 120)}` : ''})`);
-		return parseJson(text);
-	}
-	if (provider === 'anthropic') {
-		const r = await fetch('https://api.anthropic.com/v1/messages', {
-			method: 'POST',
-			signal,
-			headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
-			body: JSON.stringify({
-				model: MODELS.anthropic,
-				max_tokens: 8000,
-				messages: [{
-					role: 'user',
-					content: [
-						...images.map((url) => {
-							const [head, data] = url.split(',');
-							return { type: 'image', source: { type: 'base64', media_type: head.slice(5, head.indexOf(';')), data } };
-						}),
-						{ type: 'text', text: prompt }
-					]
-				}]
-			})
-		});
-		if (!r.ok) throw new Error(`Anthropic ${r.status}: ${(await r.text().catch(() => '')).replace(/\s+/g, ' ').slice(0, 300)}`);
-		const d = await r.json();
-		return parseJson((d.content ?? []).map((c: { text?: string }) => c.text ?? '').join(''));
-	}
-	if (provider === 'google') {
-		const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODELS.google}:generateContent`, {
-			method: 'POST',
-			signal,
-			headers: { 'x-goog-api-key': key, 'Content-Type': 'application/json' },
-			body: JSON.stringify({
-				contents: [{
-					parts: [
-						{ text: prompt },
-						...images.map((url) => {
-							const [head, data] = url.split(',');
-							return { inline_data: { mime_type: head.slice(5, head.indexOf(';')), data } };
-						})
-					]
-				}],
-				generationConfig: { responseMimeType: 'application/json' }
-			})
-		});
-		if (!r.ok) throw new Error(`Gemini ${r.status}: ${(await r.text().catch(() => '')).replace(/\s+/g, ' ').slice(0, 300)}`);
-		const d = await r.json();
-		return parseJson(d.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text ?? '').join('') ?? '');
-	}
-	throw new Error('This AI provider is not supported for tracing yet');
+/** Claude only (tracing must be reliable; other providers were too slow or too rough). Returns the parsed JSON
+ *  reply and what the call cost, from the token counts Claude reports back. */
+const PRICES: Record<string, [number, number, number, number]> = {
+	// US$ per million tokens: input, output, cache read, cache write (5 min)
+	'claude-sonnet-5-5': [2, 10, 0.1, 2.5],
+	'claude-haiku-5-5': [0.1, 0.5, 0.01, 0.125]
+};
+type Usage = { fn: string; model: string; in_tok: number; out_tok: number; cache_read: number; cache_write: number; usd: number; ms: number };
+async function callClaude(key: string, prompt: string, images: string[], o: { model: string; maxTokens: number; timeoutMs: number; effort?: string; fn: string }): Promise<{ json: Record<string, unknown>; usage: Usage }> {
+	const t0 = Date.now();
+	const r = await fetch('https://api.anthropic.com/v1/messages', {
+		method: 'POST',
+		signal: AbortSignal.timeout(o.timeoutMs),
+		headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
+		body: JSON.stringify({
+			model: o.model,
+			max_tokens: o.maxTokens,
+			...(o.effort ? { output_config: { effort: o.effort } } : {}),
+			messages: [{
+				role: 'user',
+				content: [
+					...images.map((url) => {
+						const [head, data] = url.split(',');
+						return { type: 'image', source: { type: 'base64', media_type: head.slice(5, head.indexOf(';')), data } };
+					}),
+					{ type: 'text', text: prompt }
+				]
+			}]
+		})
+	});
+	if (!r.ok) throw new Error(`Claude ${r.status}: ${(await r.text().catch(() => '')).replace(/\s+/g, ' ').slice(0, 300)}`);
+	const d = await r.json();
+	const u = d.usage ?? {};
+	const p = PRICES[o.model] ?? PRICES['claude-sonnet-5-5'];
+	const usage: Usage = {
+		fn: o.fn,
+		model: o.model,
+		in_tok: u.input_tokens ?? 0,
+		out_tok: u.output_tokens ?? 0,
+		cache_read: u.cache_read_input_tokens ?? 0,
+		cache_write: u.cache_creation_input_tokens ?? 0,
+		usd: 0,
+		ms: Date.now() - t0
+	};
+	usage.usd = (usage.in_tok * p[0] + usage.out_tok * p[1] + usage.cache_read * p[2] + usage.cache_write * p[3]) / 1e6;
+	const text = (d.content ?? []).filter((c: { type?: string }) => c.type === 'text').map((c: { text?: string }) => c.text ?? '').join('');
+	return { json: parseJson(text), usage };
 }
 
 // ── geometry helpers ─────────────────────────────────────────────────────────
@@ -702,20 +665,22 @@ Deno.serve(async (req) => {
 	const { error: le } = await admin.rpc('ai_run_take', { p_project: projectId, p_fn: 'trace', p_user: u.user.id });
 	if (le) return json(req, { error: le.message }, le.message.includes('limit') ? 429 : 403);
 
-	const { data: keyRows, error: ke } = await admin.rpc('active_ai_key');
+	// Claude is required for tracing: use the Claude key even if another provider is marked active.
+	const { data: keyRows, error: ke } = await admin.rpc('ai_key_for', { p_provider: 'anthropic' });
 	const k = Array.isArray(keyRows) ? keyRows[0] : null;
-	if (ke || !k?.api_key) return json(req, { error: 'No AI key is set up yet.' }, 412);
+	if (ke || !k?.api_key) return json(req, { error: 'Add a Claude (Anthropic) key in Admin → AI keys — tracing needs Claude.' }, 412);
 
 	try {
-		const ai = await callAI(k.provider, k.api_key, PROMPT(sizeSqft), [fpUrl]);
+		const { json: ai, usage } = await callClaude(k.api_key, PROMPT(sizeSqft), [fpUrl], { model: TRACE_MODEL, maxTokens: 8000, timeoutMs: 55_000, effort: TRACE_EFFORT, fn: 'process-project' });
+		admin.from('ai_usage').insert(usage).then(({ error }) => error && console.warn('[process-project] usage log', error.message));
 		const plan = buildPlan(ai, W, H, sizeSqft);
 		const { error: se } = await admin.from('projects').update({ plan, status: 'ready' }).eq('id', projectId).eq('owner', u.user.id);
 		if (se) throw se;
 		return json(req, { plan });
 	} catch (e) {
 		await admin.from('projects').update({ status: 'failed' }).eq('id', projectId).eq('owner', u.user.id);
-		const detail = (e instanceof Error ? (e.name === 'TimeoutError' ? `${k.provider} took too long (over 55 s)` : e.message) : String(e)).replace(/[<>{}\\\u0000-\u001f]/g, '').replace(/\b(sk|key|AIza)[-_A-Za-z0-9*]{8,}/g, '[key]').slice(0, 240);
-		console.error('[process-project]', k.provider, detail);
-		return json(req, { error: 'Could not trace this floor plan automatically.', provider: k.provider, detail }, 422);
+		const detail = (e instanceof Error ? (e.name === 'TimeoutError' ? 'Claude took too long (over 55 s)' : e.message) : String(e)).replace(/[<>{}\\\u0000-\u001f]/g, '').replace(/\b(sk|key|AIza)[-_A-Za-z0-9*]{8,}/g, '[key]').slice(0, 240);
+		console.error('[process-project]', detail);
+		return json(req, { error: 'Could not trace this floor plan automatically.', provider: 'anthropic', detail }, 422);
 	}
 });
