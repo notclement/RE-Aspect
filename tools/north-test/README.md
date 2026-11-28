@@ -27,7 +27,16 @@ New cases: add an entry to `GT` in `run.py` (and `DOOR` in `lay.py` for the door
 
 | Case | 08 | 09 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18 |
 |---|---|---|---|---|---|---|---|---|---|---|
-| Expected | 270 | 83 | 180? | 180? | 180 | 180 | 353 | 212 | 154 | 90 |
+| Expected | 180 | 83? | 0 | 180? | 180 | 180 | 353 | 208 | 195 | 90 |
 
 `?` = less sure (corridor side or outline unclear at this size); look again if the function disagrees.
 Left out: **17 Rajah Summit** and **19 Toa Payoh Ascent** — their `2_floor-plan-3room.jpg` is a 4-ROOM plan.
+
+Rechecked 28 Nov after the first Anthropic run, on 4–5× zooms: 08 (lift core is north of stack 130 → door north, 180),
+10 (the narrow corridor runs *below* 206 → 0), 15 (block tilt ≈28° cw, corridor NE → 208), 16 (row turned ≈15–20° cw,
+corridor above → 195). 09 kept at 83 (corridor ends at 576's bottom-left) but marked unsure.
+
+### Run log
+| Date | Key | Set | Score | Notes |
+|---|---|---|---|---|
+| 28 Nov 2026 | Anthropic (Sonnet 5.5) | 1024 px, 18 cases × 2 | **28/36 (78%)** with the corrected key (21/36 with the first key) | Old cases 00–07: 10/16 (14/16 on the larger images before). Misses: 06 flipped 180° ×2, 07 stack not found (estimate) ×2, 00 and 02 one run each, 09 ×2. ~35 s per check. |

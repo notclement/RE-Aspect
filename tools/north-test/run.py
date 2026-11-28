@@ -10,9 +10,9 @@ pk=os.environ['SUPABASE_PUBLISHABLE_KEY']  # test project publishable key
 FN=os.environ.get('NORTH_FN','https://kyupdztsvwegaelrkyfd.supabase.co/functions/v1/detect-north')
 GT={'00':168,'01':293,'02':0,'03':0,'04':0,'05':190,'06':125,'07':205,
     # set 2 (1024 px, 28 Nov): read by eye at 1024 px (tilt by Hough on the unit outlines); '?' = less sure, see README
-    '08':270,'09':83,'10':180,'11':180,'12':180,'13':180,'14':353,'15':212,'16':154,'18':90}
+    '08':180,'09':83,'10':0,'11':180,'12':180,'13':180,'14':353,'15':208,'16':195,'18':90}
 # 17 Rajah Summit and 19 Toa Payoh Ascent are left out: their 2_floor-plan-3room.jpg is a 4-ROOM plan.
-UNSURE={'10','11'}
+UNSURE={'09','11'}
 def enc(f,maxs,q):
     im=Image.open(f).convert('RGB'); im.thumbnail((maxs,maxs)); b=io.BytesIO(); im.save(b,'JPEG',quality=int(q*100))
     return 'data:image/jpeg;base64,'+base64.b64encode(b.getvalue()).decode()
