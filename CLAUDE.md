@@ -12,6 +12,7 @@ Full requirements: `docs/REQUIREMENTS.md` (read it before changing behaviour).
 
 ## Backend files
 - `supabase/migrations/*.sql` — run in order in the Supabase SQL editor (test first, live on promotion).
+- **Claude is required** for AI tracing and north detection: both functions get the key with `ai_key_for('anthropic')` (migration 0016) and log tokens + US$ per call to `ai_usage`. `supabase/functions/ai-key-check` (admin only) tests the Claude key for Admin → AI keys.
 - `supabase/functions/process-project` — AI tracing; `supabase/functions/detect-north` — suggests the floor plan's north rotation from the photos (daily limit via `ai_daily_take`); `supabase/functions/geocode` — address search (OneMap via `ONEMAP_EMAIL`/`ONEMAP_PASSWORD` secrets, else the app falls back to OpenStreetMap from the browser). Deployed via the dashboard editor; Verify JWT with legacy secret OFF — they check the user themselves.
 
 ## Rules

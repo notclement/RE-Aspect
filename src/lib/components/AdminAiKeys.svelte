@@ -2,7 +2,9 @@
 	/**
 	 * Admin → AI keys. Keys are sent once to an admin-only server function that stores them in
 	 * Supabase Vault (encrypted). The browser only ever sees provider, label and the last 4 characters.
-	 * The active key is what the AI edge functions use.
+	 * Claude is required: wall tracing and north detection always use the Claude key (the active one if several).
+	 * "Check key" sends Claude a one-word test; spend comes from our own log of every AI call (Anthropic has no
+	 * balance API for individual organisations, so the balance itself is a link to the Console).
 	 */
 	import { onMount } from 'svelte';
 	import Icon from './Icon.svelte';
@@ -33,7 +35,7 @@
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 	let adding = $state(false);
-	let provider = $state<ProviderId>('openai');
+	let provider = $state<ProviderId>('anthropic');
 	let label = $state('');
 	let secret = $state('');
 	let formError = $state<string | null>(null);
@@ -106,8 +108,86 @@
 		busy = false;
 	}
 
-	onMount(load);
+	// The Claude key the server uses: the active Claude key, else the newest one (same rule as ai_key_for).
+	const claudeInUse = $derived(
+		keys.filter((k) => k.provider === 'anthropic').sort((a, b) => Number(b.active) - Number(a.active) || b.created_at.localeCompare(a.created_at))[0]?.id ?? null
+	);
+
+	let check = $state<{ status: string; message: string } | null>(null);
+	let checking = $state(false);
+	async function checkKey() {
+		checking = true;
+		check = null;
+		try {
+			const sb = await getSupabase();
+			const { data, error: e } = await sb.functions.invoke('ai-key-check', { body: {} });
+			if (e) throw e;
+			check = data as { status: string; message: string };
+			loadUsage();
+		} catch {
+			check = { status: 'error', message: 'Could not run the check.' };
+		}
+		checking = false;
+	}
+
+	interface UsageRow {
+		fn: string;
+		period: string;
+		calls: number;
+		usd: number;
+		avg_ms: number | null;
+	}
+	let usage = $state<UsageRow[]>([]);
+	async function loadUsage() {
+		try {
+			const sb = await getSupabase();
+			const { data } = await sb.rpc('admin_ai_usage_summary');
+			usage = (data ?? []) as UsageRow[];
+		} catch {
+			usage = [];
+		}
+	}
+	const PERIODS = [
+		['today', 'Today'],
+		['7d', '7 days'],
+		['month', 'This month']
+	] as const;
+	const FN_LABEL: Record<string, string> = { 'detect-north': 'North checks', 'process-project': 'Wall tracing', 'key-check': 'Key checks' };
+	const total = (p: string) => usage.filter((u) => u.period === p).reduce((a, u) => a + Number(u.usd), 0);
+	const usd = (n: number) => (n < 0.01 && n > 0 ? '< US$0.01' : `US$${n.toFixed(2)}`);
+
+	onMount(() => {
+		load();
+		loadUsage();
+	});
 </script>
+
+<section class="card claude">
+	<div class="head">
+		<strong>Claude</strong>
+		<button class="btn" onclick={checkKey} disabled={checking}>{#if checking}<Spinner size={16} /> Checking…{:else}Check key{/if}</button>
+	</div>
+	<p class="muted small">Wall tracing and north detection always use your Claude key.</p>
+	{#if check}<p class="status {check.status}" role="status">{check.message}</p>{/if}
+	<table class="spend">
+		<thead><tr><th>Spend</th>{#each PERIODS as [, l] (l)}<th>{l}</th>{/each}</tr></thead>
+		<tbody>
+			{#each Object.keys(FN_LABEL) as fn (fn)}
+				{#if usage.some((u) => u.fn === fn)}
+					<tr>
+						<td>{FN_LABEL[fn]}</td>
+						{#each PERIODS as [p] (p)}
+							{@const r = usage.find((u) => u.fn === fn && u.period === p)}
+							<td>{r ? `${usd(Number(r.usd))} · ${r.calls}` : '—'}</td>
+						{/each}
+					</tr>
+				{/if}
+			{/each}
+			<tr class="sum"><td>Total</td>{#each PERIODS as [p] (p)}<td>{usd(total(p))}</td>{/each}</tr>
+		</tbody>
+	</table>
+	<p class="muted small">From RE:Aspect's own log (US$ · calls). Remaining balance: <a href="https://platform.claude.com/settings/billing" target="_blank" rel="noopener">Claude Console ↗</a></p>
+</section>
 
 <section class="card">
 	<div class="head">
@@ -115,8 +195,8 @@
 		{#if !adding}<button class="btn" onclick={() => (adding = true)}><Icon name="plus" size={18} /> Add key</button>{/if}
 	</div>
 	<p class="muted small">
-		Keys are encrypted in Supabase Vault and can't be read back — only the last 4 characters are shown. The
-		<strong>active</strong> key is the one the AI features use.
+		Keys are encrypted in Supabase Vault and can't be read back — only the last 4 characters are shown. The AI
+		features use the Claude key marked <strong>In use</strong>; other providers' keys are kept but not used.
 	</p>
 
 	{#if adding}
@@ -152,7 +232,7 @@
 	{:else}
 		<ul class="keys">
 			{#each keys as k (k.id)}
-				<li class:active={k.active}>
+				<li class:active={k.id === claudeInUse}>
 					<span class="ic"><Icon name="key" size={18} /></span>
 					<span class="info">
 						<strong>{k.label}</strong>
@@ -165,7 +245,7 @@
 						</span>
 					{:else}
 						<span class="row-actions">
-							{#if k.active}<span class="tag on">Active</span>{:else}<button class="btn" onclick={() => use(k.id)} disabled={busy}>Use this</button>{/if}
+							{#if k.id === claudeInUse}<span class="tag on">In use</span>{:else if k.provider === 'anthropic'}<button class="btn" onclick={() => use(k.id)} disabled={busy}>Use this</button>{:else}<span class="tag" title="Tracing and north detection need Claude">Not used</span>{/if}
 							<button class="btn icon" title="Delete {k.label}" aria-label="Delete {k.label}" onclick={() => (confirmDelete = k.id)}><Icon name="trash" size={18} /></button>
 						</span>
 					{/if}
@@ -256,6 +336,52 @@
 	.btn.icon {
 		padding: 0;
 		width: 44px;
+	}
+	.claude {
+		margin-bottom: 12px;
+	}
+	.status {
+		margin: 8px 0 4px;
+		padding: 8px 10px;
+		border-radius: var(--radius-sm);
+		font-size: 14px;
+		background: var(--surface-2);
+	}
+	.status.ok {
+		background: color-mix(in srgb, #2f9e5b 14%, transparent);
+		color: #2a8a50;
+	}
+	.status.no-credit,
+	.status.invalid,
+	.status.no-key {
+		background: color-mix(in srgb, #b5483a 12%, transparent);
+		color: #b5483a;
+	}
+	.spend {
+		width: 100%;
+		margin: 10px 0 4px;
+		border-collapse: collapse;
+		font-size: 13px;
+		font-variant-numeric: tabular-nums;
+	}
+	.spend th,
+	.spend td {
+		padding: 6px 4px;
+		text-align: right;
+		border-top: 1px solid var(--line);
+		white-space: nowrap;
+	}
+	.spend th:first-child,
+	.spend td:first-child {
+		text-align: left;
+	}
+	.spend th {
+		color: var(--muted);
+		font-weight: 600;
+		border-top: 0;
+	}
+	.spend .sum td {
+		font-weight: 700;
 	}
 	.tag.on {
 		background: color-mix(in srgb, #2f9e5b 16%, transparent);
