@@ -2,8 +2,9 @@
 	import { pinchZoom } from '#lib/pinch.ts';
 	/**
 	 * Re-rotate a project's floor plan (back from Studio). Uses the original photo kept on this device,
-	 * so turning it again never loses quality. If an outline was traced on the old rotation, the
-	 * outline, walls and windows are cleared (furniture is kept) because they no longer line up.
+	 * so turning it again never loses quality. The photo itself is only turned in quarter turns (so its walls stay
+	 * straight); the fine turn is saved as the plan's bearing. So a fine turn keeps everything traced, and only a
+	 * new quarter turn clears the outline, walls and windows (furniture is kept), because they no longer line up.
 	 */
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
@@ -13,7 +14,7 @@
 	import { nav } from '#lib/stores/nav.svelte.ts';
 	import { getProject, updateProject } from '#lib/stores/projects.svelte.ts';
 	import { loadFloorPlan, saveFloorPlan, type FloorPlanImage } from '#lib/floorplan-store.ts';
-	import { rotateImage } from '#lib/image.ts';
+	import { rotateImage, splitNorth } from '#lib/image.ts';
 	import { sanitizePlan, emptyPlan } from '#lib/plan.ts';
 
 	const id = page.url.searchParams.get('id');
@@ -27,6 +28,8 @@
 	let saving = $state(false);
 	const angle = $derived(turns * 90 + fine);
 	const traced = $derived((project?.plan?.outline.length ?? 0) >= 3 || (project?.plan?.walls.length ?? 0) > 0);
+	// Tracing survives the change when the photo was already kept straight and the quarter turn stays the same.
+	const keepsTrace = $derived(!!img?.original && img.bearing !== undefined && splitNorth(angle).quarter === splitNorth(img.angle ?? 0).quarter);
 
 	onMount(async () => {
 		if (project) {
@@ -41,14 +44,18 @@
 	async function save() {
 		if (!project || !img) return;
 		saving = true;
-		const src = img.original ?? img.dataUrl;
-		const base = img.original ? 0 : (img.angle ?? 0);
-		const rotated = await rotateImage(src, img.original ? angle : angle - base, 2048);
-		await saveFloorPlan(project.id, { ...rotated, original: img.original ?? img.dataUrl, angle: img.original ? angle : angle - base });
-		const changed = angle !== (img.angle ?? 0);
-		if (changed && traced) {
-			const p = sanitizePlan(project.plan) ?? emptyPlan();
-			updateProject(project.id, { plan: { ...emptyPlan(), items: p.items }, status: 'draft' });
+		const p = sanitizePlan(project.plan) ?? emptyPlan();
+		if (img.original) {
+			const { quarter, bearing } = splitNorth(angle);
+			const straight = await rotateImage(img.original, quarter, 2048);
+			await saveFloorPlan(project.id, { ...straight, original: img.original, angle, bearing });
+			if (keepsTrace || !traced) updateProject(project.id, { plan: { ...p, bearing: bearing || undefined } });
+			else updateProject(project.id, { plan: { ...emptyPlan(), items: p.items, bearing: bearing || undefined }, status: 'draft' });
+		} else {
+			// Very old projects without the original photo: turn the stored copy as before.
+			const rotated = await rotateImage(img.dataUrl, angle - (img.angle ?? 0), 2048);
+			await saveFloorPlan(project.id, { ...rotated, angle });
+			if (angle !== (img.angle ?? 0) && traced) updateProject(project.id, { plan: { ...emptyPlan(), items: p.items }, status: 'draft' });
 		}
 		goto(`/studio?id=${project.id}`, { replaceState: true });
 	}
@@ -75,7 +82,7 @@
 		<input type="range" min="-45" max="45" step="0.5" bind:value={fine} aria-label="Fine turn" />
 		<button class="btn" onclick={() => (turns = (turns + 1) % 4)} title="Turn right 90°" aria-label="Turn right 90°">90° ⟳</button>
 	</div>
-	{#if traced && angle !== (img.angle ?? 0)}
+	{#if traced && angle !== (img.angle ?? 0) && !keepsTrace}
 		<p class="warn">Saving a new rotation clears the outline, walls and windows you traced (furniture stays), because they won't line up any more.</p>
 	{/if}
 	<div class="nav">

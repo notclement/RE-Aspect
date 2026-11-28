@@ -16,12 +16,12 @@
 	import { PLANS } from '#lib/config/plans.ts';
 	import { PROPERTY_TYPES, type PropertyType } from '#lib/config/property-types.ts';
 	import { createProject, updateProject, myProjects } from '#lib/stores/projects.svelte.ts';
-	import { shrinkPhoto, rotateImage, type Shrunk } from '#lib/image.ts';
+	import { shrinkPhoto, rotateImage, splitNorth, type Shrunk } from '#lib/image.ts';
 	import { saveFloorPlan } from '#lib/floorplan-store.ts';
 	import { searchAddress, type Place } from '#lib/onemap.ts';
 	import { validateProjectName, validateUnitNumber, validateFreeText, validateFloorLevel, validateSizeSqft, validateSizeSqm, validateCeilingHeightM } from '#lib/validate.ts';
 	import { getSupabase, supabaseConfigured } from '#lib/supabase.ts';
-	import { sanitizePlan } from '#lib/plan.ts';
+	import { sanitizePlan, emptyPlan } from '#lib/plan.ts';
 	import UpgradeSheet from '#lib/components/UpgradeSheet.svelte';
 	import { projectUsage } from '#lib/usage.svelte.ts';
 	// At the project limit: explain what Pro adds instead of letting them fill in the whole wizard first.
@@ -251,7 +251,10 @@
 		phase = 'creating';
 		createError = null;
 		try {
-			const rotated = await rotateImage(planPhoto.img.dataUrl, angle, 2048);
+			// Quarter turns only, so the drawing stays straight and the AI traces square walls; the small
+			// leftover angle becomes the plan's bearing (the sun maths turns it, not the picture).
+			const { quarter, bearing } = splitNorth(angle);
+			const rotated = await rotateImage(planPhoto.img.dataUrl, quarter, 2048);
 			const project = await createProject({
 				...d,
 				propertyType,
@@ -260,7 +263,8 @@
 				lat: place?.lat ?? null,
 				lon: place?.lon ?? null
 			});
-			await saveFloorPlan(project.id, { ...rotated, original: planPhoto.img.dataUrl, angle });
+			await saveFloorPlan(project.id, { ...rotated, original: planPhoto.img.dataUrl, angle, bearing });
+			if (bearing) updateProject(project.id, { plan: { ...emptyPlan(), bearing } });
 
 			// AI processing (when signed in and an AI key is set up). Photos travel in the request only.
 			if (supabaseConfigured && auth.status === 'signed-in') {
@@ -278,6 +282,7 @@
 					const p = sanitizePlan((data as { plan?: unknown })?.plan);
 					// The AI saw the smaller copy: convert its scale to the full-size photo kept on this device.
 					if (p?.imageScale) p.imageScale = Math.round(p.imageScale * (small.w / rotated.w) * 10000) / 10000;
+					if (p) p.bearing = bearing || undefined;
 					if (p && p.outline.length >= 3) {
 						updateProject(project.id, { plan: p, status: 'ready' });
 						clearInterval(tick);
@@ -521,7 +526,8 @@
 		margin: 0 0 16px;
 	}
 	.steps li {
-		flex: 1;
+		flex: 1 1 0;
+		min-width: 0;
 	}
 	.steps button {
 		width: 100%;
@@ -544,8 +550,9 @@
 			gap: 3px;
 		}
 		.steps button {
-			font-size: 12.5px;
-			gap: 4px;
+			font-size: 12px;
+			gap: 3px;
+			padding: 0 2px;
 		}
 		.steps button span {
 			width: 20px;
@@ -799,8 +806,14 @@
 	}
 	.row2 {
 		display: grid;
-		grid-template-columns: 1fr 1fr;
+		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); /* share the row; inputs don't push past a phone screen */
 		gap: 10px;
+	}
+	.row2 :global(input),
+	.row2 :global(select) {
+		min-width: 0;
+		width: 100%;
+		box-sizing: border-box;
 	}
 	.results {
 		list-style: none;
@@ -967,30 +980,41 @@
 		margin-top: 2px;
 		color: var(--ochre-ink);
 	}
+	/* The unit switch sits on the label line, no taller than the "SIZE" label, so this input lines up with the
+	   one beside it. The buttons look small but keep a 44 px tap area (an invisible extension, not layout). */
 	.sizehead {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
 		gap: 8px;
+		height: 18px;
 	}
 	.unit {
 		display: inline-flex;
+		height: 20px;
 		padding: 2px;
-		border-radius: 10px;
+		border-radius: 7px;
 		background: var(--surface-2);
 	}
 	.unit button {
-		min-height: 44px;
-		min-width: 44px;
-		padding: 0 8px;
+		position: relative;
+		height: 16px;
+		min-width: 34px;
+		padding: 0 6px;
 		border: 0;
-		border-radius: 8px;
+		border-radius: 5px;
 		background: none;
 		color: var(--muted);
 		font: inherit;
-		font-size: 13px;
+		font-size: 11px;
 		font-weight: 600;
+		line-height: 16px;
 		cursor: pointer;
+	}
+	.unit button::after {
+		content: '';
+		position: absolute;
+		inset: -14px -5px;
 	}
 	.unit button.on {
 		background: var(--surface);

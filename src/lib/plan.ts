@@ -1,6 +1,7 @@
 /**
  * Traced plans — our own compact format for a user's unit (what Studio edits and the sun engine draws).
- * All lengths in cm, plan "north-up" (+x = east, +y = south), so bearing is always 0.
+ * All lengths in cm, +x right / +y down on the straight floor plan (walls square to the page).
+ * `bearing` is the compass direction plan-up points to (0 = north-up, as in older projects); the sun maths uses it.
  * The same checks run in the database (size cap) and the process-project edge function.
  */
 import type { Unit, Wall, Opening, Item, Door } from './sample-unit.ts';
@@ -34,6 +35,8 @@ export interface PlanData {
 	scaleNote?: string;
 	/** Who drew the outline: the AI from the floor plan, or the user in Studio. */
 	source?: 'ai' | 'manual';
+	/** Compass bearing plan-up points to (the small north turn left after straight quarter turns). Missing = 0. */
+	bearing?: number;
 }
 
 export const emptyPlan = (): PlanData => ({ v: 1, outline: [], walls: [], windows: [], doors: [], items: [], rooms: [] });
@@ -118,12 +121,14 @@ export function sanitizePlan(raw: unknown): PlanData | null {
 	const scaleSource = r.scaleSource === 'dimensions' || r.scaleSource === 'area' ? r.scaleSource : undefined;
 	const scaleNote = cleanName(r.scaleNote, 60) || undefined;
 	const source = r.source === 'ai' || r.source === 'manual' ? r.source : undefined;
+	const bearing = num(r.bearing, -360, 360);
 	return {
 		v: 1, outline, walls, windows, doors, items, rooms,
 		...(imageScale ? { imageScale } : {}),
 		...(scaleSource ? { scaleSource } : {}),
 		...(scaleNote ? { scaleNote } : {}),
-		...(source ? { source } : {})
+		...(source ? { source } : {}),
+		...(bearing ? { bearing } : {})
 	};
 }
 
@@ -201,7 +206,7 @@ export function planToUnit(
 		sizeSqft: meta.sizeSqft ?? Math.round(area(plan.outline) / 929.03),
 		lat: meta.lat ?? 1.3521,
 		lon: meta.lon ?? 103.8198,
-		bearing: 0,
+		bearing: plan.bearing ?? 0,
 		outline: plan.outline,
 		walls,
 		windows,

@@ -172,7 +172,7 @@
 		score
 			? {
 					value: score.score,
-					tip: `How comfortable the main windows are: it adds up the direct afternoon sun (after 1 pm, the hot part of the day) on the ${score.room.toLowerCase()} windows over a whole year. 10 = no harsh afternoon sun, 1 = the hottest facing in Singapore. ${score.verdict} — ${score.room.toLowerCase()} faces ${score.facingWords} (${score.facingDeg}°).`
+					tip: `${score.verdict}. ${score.room} faces ${score.facingWords} (${score.facingDeg}°). Scores the hot afternoon sun (after 1 pm) on its windows over a year: 10 = barely any, 1 = Singapore's hottest facing.`
 				}
 			: null
 	);

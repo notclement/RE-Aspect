@@ -191,6 +191,7 @@
 		color: var(--muted);
 	}
 	.tools {
+		position: relative;
 		display: flex;
 		align-items: center;
 		gap: 6px;
@@ -210,8 +211,10 @@
 		font-size: 13px;
 		cursor: pointer;
 	}
+	/* The popover hangs off the whole tools row (not the chip), so on a phone it spans the row and can never
+	   run past the screen edge (which used to make the page scroll sideways). */
 	.scorewrap {
-		position: relative;
+		position: static;
 	}
 	.stack {
 		display: grid;
@@ -228,8 +231,11 @@
 		position: absolute;
 		z-index: 20;
 		left: 0;
+		right: 0;
 		bottom: calc(100% + 6px);
-		width: min(300px, 80vw);
+		max-width: 340px;
+		margin-inline: auto;
+		box-sizing: border-box;
 		display: grid;
 		gap: 6px;
 		padding: 10px 12px;

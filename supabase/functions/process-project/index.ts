@@ -40,15 +40,15 @@ function cors(req: Request) {
 const json = (req: Request, body: unknown, status = 200) =>
 	new Response(JSON.stringify(body), { status, headers: { ...cors(req), 'Content-Type': 'application/json' } });
 
-const PROMPT = (sizeSqft: number) => `Trace this apartment floor plan (north is up) for a sunlight simulator, and furnish it like an experienced Singapore interior designer.
+const PROMPT = (sizeSqft: number) => `Trace this apartment floor plan for a sunlight simulator, and furnish it like an experienced Singapore interior designer.
 The unit's total floor area is about ${sizeSqft} sq ft.
 Return ONLY a JSON object, no prose:
 {"outline": [[x,y], ...], "walls": [{"a":[x,y],"b":[x,y]}], "rooms": [{"name":"Living / Dining","x":x,"y":y}],
  "doors": [{"a":[x,y],"b":[x,y],"room":"Bath 1"}],
  "items": [{"kind":"bed","cx":x,"cy":y,"w_cm":152,"d_cm":190,"h_cm":50,"rot":0}],
  "scale": {"a":[x,y],"b":[x,y],"mm":9550}}
-- outline: the unit's external boundary, corners in order, excluding outside ledges / balconies.
-- walls: straight interior walls between rooms (one segment each).
+- outline: the unit's external boundary along the outside walls, every corner in order (include the kitchen / utility and bathrooms; exclude air-con ledges, planters and balconies outside the unit). Flats are drawn on a square grid, so almost every outline edge is exactly horizontal or vertical in the image.
+- walls: every interior wall between rooms, including the household shelter's walls, one straight segment per wall run. Walls are horizontal or vertical unless the plan clearly draws them at an angle. Each wall end must touch another wall or the outline (no gaps at corners or T-junctions). Draw a wall straight through any doorway in it — doors are listed separately.
 - rooms: every room's name at its centre (Living / Dining, Kitchen, Master Bedroom, Bedroom 2, Bath 1, Shelter, Yard …).
 - doors: EVERY room has a door — bedrooms, bathrooms/toilets, household shelter, kitchen, yard — plus the main entrance (room "Entrance"). Use the door openings drawn on the plan: the two ends of the opening on its wall, and the room it opens into. Usual widths: main 90–100 cm, rooms 80–90 cm, toilets 70–80 cm.
 - items: a practical, uncluttered furniture layout using what the plan shows (follow any furniture drawn on it). kind is one of ${KINDS.join(', ')}. cx, cy = item centre; w_cm along x and d_cm along y BEFORE rotation; rot = 0, 90, 180 or 270.
@@ -179,6 +179,249 @@ function snapToOutline(q: Pt, outline: Pt[]): Pt {
 	return best;
 }
 
+
+// ── tidy:start ── squaring up the AI's walls, the way an architect redraws a sketch ──────────────
+// The AI reads walls by eye, so they come back a few degrees off, not quite flush with each other and with
+// small gaps at the joints. Real flats (HDB, condo) are drawn on a square grid: every wall is parallel or
+// at right angles to the others, walls that line up share one line, and every wall end meets another wall.
+// So: find the plan's main direction, square every near-straight wall to it, merge lines that are a wall
+// thickness apart, then join each loose wall end to the wall it was heading for. Angled walls (> 12° off)
+// are kept as drawn. Lengths in cm.
+type TW = { a: Pt; b: Pt; t: number };
+const RAD = Math.PI / 180;
+const SQUARE_TOL = 12; // degrees: closer than this to the grid → square it
+const LINE_TOL = 14; // cm: lines closer than this are the same line (about one wall thickness)
+const JOIN_TOL = 60; // cm: a wall end this close to another wall is joined to it
+
+/** The plan's main wall direction in degrees (−45…45), from the longest straight runs. */
+function mainDirection(segs: [Pt, Pt][]): number {
+	const bins = new Array(90).fill(0);
+	for (const [a, b] of segs) {
+		const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+		if (L < 30) continue;
+		const ang = (((Math.atan2(b[1] - a[1], b[0] - a[0]) / RAD) % 90) + 90) % 90;
+		for (let d = -2; d <= 2; d++) bins[(Math.round(ang) + d + 90) % 90] += L * Math.exp(-(d * d) / 2);
+	}
+	let peak = 0;
+	for (let i = 1; i < 90; i++) if (bins[i] > bins[peak]) peak = i;
+	// refine: length-weighted mean of the runs within 4° of the peak
+	let s = 0,
+		w = 0;
+	for (const [a, b] of segs) {
+		const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+		const ang = (((Math.atan2(b[1] - a[1], b[0] - a[0]) / RAD) % 90) + 90) % 90;
+		let d = ang - peak;
+		if (d > 45) d -= 90;
+		if (d < -45) d += 90;
+		if (Math.abs(d) <= 4) (s += (peak + d) * L), (w += L);
+	}
+	const m = w ? s / w : peak;
+	return m > 45 ? m - 90 : m;
+}
+/** 'h' (along x), 'v' (along y) or 'd' (angled), in the squared frame. */
+function axisOf(a: Pt, b: Pt): 'h' | 'v' | 'd' {
+	const ang = Math.abs(((Math.atan2(b[1] - a[1], b[0] - a[0]) / RAD) % 180 + 180) % 180);
+	if (ang < SQUARE_TOL || ang > 180 - SQUARE_TOL) return 'h';
+	if (Math.abs(ang - 90) < SQUARE_TOL) return 'v';
+	return 'd';
+}
+/** Group nearby line positions (weighted by length) into shared lines; returns a lookup. */
+function lineSnapper(vals: { v: number; w: number }[]): (v: number) => number {
+	const s = [...vals].sort((p, q) => p.v - q.v);
+	const groups: { lo: number; hi: number; sum: number; w: number }[] = [];
+	for (const { v, w } of s) {
+		const g = groups[groups.length - 1];
+		if (g && v - g.hi <= LINE_TOL && v - g.lo <= 2 * LINE_TOL) (g.hi = v), (g.sum += v * w), (g.w += w);
+		else groups.push({ lo: v, hi: v, sum: v * w, w });
+	}
+	return (v: number) => {
+		for (const g of groups) if (v >= g.lo - 0.01 && v <= g.hi + 0.01) return Math.round(g.sum / g.w);
+		return Math.round(v);
+	};
+}
+function dropCollinear(p: Pt[]): Pt[] {
+	let pts = p.filter((q, i) => Math.hypot(q[0] - p[(i + 1) % p.length][0], q[1] - p[(i + 1) % p.length][1]) > 1);
+	for (let changed = true; changed && pts.length > 3; ) {
+		changed = false;
+		for (let i = 0; i < pts.length; i++) {
+			const a = pts[(i - 1 + pts.length) % pts.length];
+			const b = pts[i];
+			const c = pts[(i + 1) % pts.length];
+			const cross = (b[0] - a[0]) * (c[1] - b[1]) - (b[1] - a[1]) * (c[0] - b[0]);
+			if (Math.abs(cross) < 1 || Math.hypot(b[0] - c[0], b[1] - c[1]) < 1) {
+				pts.splice(i, 1);
+				changed = true;
+				break;
+			}
+		}
+	}
+	return pts;
+}
+
+function tidyPlan(outline0: Pt[], walls0: TW[], doorMids: Pt[]): { outline: Pt[]; walls: TW[]; tilt: number } {
+	const tilt = mainDirection([...outline0.map((p, i): [Pt, Pt] => [p, outline0[(i + 1) % outline0.length]]), ...walls0.map((w): [Pt, Pt] => [w.a, w.b])]);
+	const c = Math.cos(-tilt * RAD),
+		s = Math.sin(-tilt * RAD);
+	const into = (p: Pt): Pt => [p[0] * c - p[1] * s, p[0] * s + p[1] * c]; // squared frame
+	const back = (p: Pt): Pt => [Math.round(p[0] * c + p[1] * s), Math.round(-p[0] * s + p[1] * c)];
+
+	// 1. Outline: merge runs that go the same way, so each side of the unit is one edge.
+	let out = outline0.map(into);
+	for (let pass = 0; pass < 3; pass++) {
+		const kinds = out.map((p, i) => axisOf(p, out[(i + 1) % out.length]));
+		const keep = out.filter((_, i) => {
+			const prev = kinds[(i - 1 + out.length) % out.length];
+			return !(prev !== 'd' && prev === kinds[i]);
+		});
+		if (keep.length === out.length || keep.length < 3) break;
+		out = keep;
+	}
+	const walls = walls0.map((w) => ({ a: into(w.a), b: into(w.b), t: w.t, k: axisOf(into(w.a), into(w.b)) }));
+
+	// 2. Shared lines: every straight edge and wall offers its line; lines a wall-thickness apart merge.
+	//    The outline counts 3× so inside walls line up with the outside, not the other way round.
+	const xs: { v: number; w: number }[] = [];
+	const ys: { v: number; w: number }[] = [];
+	out.forEach((p, i) => {
+		const q = out[(i + 1) % out.length];
+		const k = axisOf(p, q);
+		const L = Math.hypot(q[0] - p[0], q[1] - p[1]) * 3;
+		if (k === 'h') ys.push({ v: (p[1] + q[1]) / 2, w: L });
+		if (k === 'v') xs.push({ v: (p[0] + q[0]) / 2, w: L });
+	});
+	for (const w of walls) {
+		const L = Math.hypot(w.b[0] - w.a[0], w.b[1] - w.a[1]);
+		if (w.k === 'h') ys.push({ v: (w.a[1] + w.b[1]) / 2, w: L });
+		if (w.k === 'v') xs.push({ v: (w.a[0] + w.b[0]) / 2, w: L });
+	}
+	const X = lineSnapper(xs);
+	const Y = lineSnapper(ys);
+
+	// 3. Square the outline: each straight edge sits on its line; corners are where two lines cross.
+	const kinds = out.map((p, i) => axisOf(p, out[(i + 1) % out.length]));
+	const lvl = out.map((p, i) => {
+		const q = out[(i + 1) % out.length];
+		return kinds[i] === 'h' ? Y((p[1] + q[1]) / 2) : kinds[i] === 'v' ? X((p[0] + q[0]) / 2) : 0;
+	});
+	let outline: Pt[] = out.map((p, i) => {
+		const j = (i - 1 + out.length) % out.length; // edge coming in
+		const kin = kinds[j],
+			kout = kinds[i];
+		let x = p[0],
+			y = p[1];
+		if (kin === 'h') y = lvl[j];
+		if (kin === 'v') x = lvl[j];
+		if (kout === 'h') y = lvl[i];
+		if (kout === 'v') x = lvl[i];
+		return [x, y];
+	});
+	outline = dropCollinear(outline);
+
+	// 4. Square the walls onto their lines; drop walls that just repeat the outside wall.
+	const edges = outline.map((p, i): [Pt, Pt] => [p, outline[(i + 1) % outline.length]]);
+	let ws = walls.map((w) => {
+		if (w.k === 'h') {
+			const y = Y((w.a[1] + w.b[1]) / 2);
+			return { ...w, a: [Math.min(w.a[0], w.b[0]), y] as Pt, b: [Math.max(w.a[0], w.b[0]), y] as Pt };
+		}
+		if (w.k === 'v') {
+			const x = X((w.a[0] + w.b[0]) / 2);
+			return { ...w, a: [x, Math.min(w.a[1], w.b[1])] as Pt, b: [x, Math.max(w.a[1], w.b[1])] as Pt };
+		}
+		return w;
+	});
+	const onOutline = (w: (typeof ws)[number]) =>
+		w.k !== 'd' &&
+		edges.some(([p, q]) => {
+			if (axisOf(p, q) !== w.k) return false;
+			const ax = w.k === 'h' ? 0 : 1;
+			if (Math.abs(p[1 - ax] - w.a[1 - ax]) > LINE_TOL) return false;
+			const lo = Math.max(Math.min(p[ax], q[ax]), w.a[ax]);
+			const hi = Math.min(Math.max(p[ax], q[ax]), w.b[ax]);
+			return hi - lo > 0.7 * (w.b[ax] - w.a[ax]);
+		});
+	ws = ws.filter((w) => !onOutline(w));
+
+	// 5. Join loose ends: each end of a straight wall runs on (or is trimmed) to the nearest wall or outside
+	//    wall across its path, within JOIN_TOL. Twice, so two walls heading for the same corner both get there.
+	type Tgt = { k: 'h' | 'v'; at: number; lo: number; hi: number; own: number };
+	for (let pass = 0; pass < 2; pass++) {
+		const tg: Tgt[] = [
+			...edges.filter(([p, q]) => axisOf(p, q) !== 'd').map(([p, q]): Tgt => {
+				const k = axisOf(p, q) as 'h' | 'v';
+				return k === 'h' ? { k, at: p[1], lo: Math.min(p[0], q[0]), hi: Math.max(p[0], q[0]), own: -1 } : { k, at: p[0], lo: Math.min(p[1], q[1]), hi: Math.max(p[1], q[1]), own: -1 };
+			}),
+			...ws.flatMap((w, i): Tgt[] => (w.k === 'h' ? [{ k: 'h', at: w.a[1], lo: w.a[0], hi: w.b[0], own: i }] : w.k === 'v' ? [{ k: 'v', at: w.a[0], lo: w.a[1], hi: w.b[1], own: i }] : []))
+		];
+		ws = ws.map((w, wi) => {
+			if (w.k === 'd') return w;
+			const ax = w.k === 'h' ? 0 : 1; // along
+			const cross = w.k === 'h' ? 'v' : 'h';
+			const line = w.a[1 - ax];
+			const ends = [w.a[ax], w.b[ax]];
+			for (const e of [0, 1]) {
+				let best: number | null = null;
+				for (const t of tg) {
+					if (t.k !== cross || t.own === wi) continue;
+					if (line < t.lo - JOIN_TOL / 2 || line > t.hi + JOIN_TOL / 2) continue; // our line must reach it
+					const gap = t.at - ends[e];
+					if (Math.abs(gap) > JOIN_TOL) continue;
+					// don't run through the wall's own length (only extend outward or trim back a stub)
+					const inward = e === 0 ? gap > 0 : gap < 0;
+					if (inward && Math.abs(gap) > 25) continue;
+					if (best === null || Math.abs(gap) < Math.abs(best - ends[e])) best = t.at;
+				}
+				if (best !== null) ends[e] = best;
+			}
+			const lo = Math.min(...ends),
+				hi = Math.max(...ends);
+			return ax === 0 ? { ...w, a: [lo, line] as Pt, b: [hi, line] as Pt } : { ...w, a: [line, lo] as Pt, b: [line, hi] as Pt };
+		});
+	}
+
+	// 6. One line, one wall: merge straight walls on the same line that overlap or nearly touch. A longer
+	//    gap is only closed when a door sits in it (doors are drawn over walls, not as holes in them).
+	const merged: typeof ws = [];
+	for (const w of ws) {
+		if (w.k === 'd') {
+			merged.push(w);
+			continue;
+		}
+		const ax = w.k === 'h' ? 0 : 1;
+		const m = merged.find((o) => {
+			if (o.k !== w.k || Math.abs(o.a[1 - ax] - w.a[1 - ax]) > 1) return false;
+			const gap = Math.max(o.a[ax], w.a[ax]) - Math.min(o.b[ax], w.b[ax]);
+			if (gap <= 30) return true;
+			if (gap > 120) return false;
+			const g0 = Math.min(o.b[ax], w.b[ax]),
+				g1 = Math.max(o.a[ax], w.a[ax]);
+			return doorMids.some((d) => Math.abs(d[1 - ax] - w.a[1 - ax]) < 30 && d[ax] > g0 && d[ax] < g1);
+		});
+		if (m) {
+			const lo = Math.min(m.a[ax], w.a[ax]),
+				hi = Math.max(m.b[ax], w.b[ax]);
+			if (ax === 0) (m.a = [lo, m.a[1]]), (m.b = [hi, m.a[1]]);
+			else (m.a = [m.a[0], lo]), (m.b = [m.a[0], hi]);
+			m.t = Math.max(m.t, w.t);
+		} else merged.push({ ...w, a: [...w.a] as Pt, b: [...w.b] as Pt });
+	}
+	// 7. Drop stubs and anything outside the unit.
+	const kept = merged.filter((w) => {
+		if (Math.hypot(w.b[0] - w.a[0], w.b[1] - w.a[1]) < 30) return false;
+		const mx = (w.a[0] + w.b[0]) / 2,
+			my = (w.a[1] + w.b[1]) / 2;
+		return inPoly(mx, my, outline) || edges.some(([p, q]) => segD([mx, my], p, q) < 20);
+	});
+	return { outline: outline.map(back), walls: kept.map((w) => ({ a: back(w.a), b: back(w.b), t: w.t })), tilt };
+}
+function segD(p: Pt, a: Pt, b: Pt) {
+	const dx = b[0] - a[0],
+		dy = b[1] - a[1];
+	const L2 = dx * dx + dy * dy || 1;
+	const t = Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / L2));
+	return Math.hypot(a[0] + dx * t - p[0], a[1] + dy * t - p[1]);
+}
+// ── tidy:end ──
 
 // ───────────── interior-design checks on the AI's doors and furniture ─────────────
 type Item = { kind: string; x: number; y: number; w: number; d: number; h: number; color: string; r: number; rot?: number };
@@ -353,7 +596,7 @@ function buildPlan(ai: Record<string, unknown>, W: number, H: number, sizeSqft: 
 		}
 	}
 	const cm = (p: Pt): Pt => [Math.round(p[0] * s), Math.round(p[1] * s)];
-	const outline = outlinePx.map(cm);
+	const rawOutline = outlinePx.map(cm);
 
 	const seg = (v: unknown) => {
 		const o = (v ?? {}) as Record<string, unknown>;
@@ -361,7 +604,11 @@ function buildPlan(ai: Record<string, unknown>, W: number, H: number, sizeSqft: 
 		const b = npt(o.b);
 		return a && b ? { a: cm(toPx(a)), b: cm(toPx(b)) } : null;
 	};
-	const walls = (Array.isArray(ai.walls) ? ai.walls : []).slice(0, 300).map(seg).filter((w) => !!w).map((w) => ({ ...w!, t: 12 }));
+	const rawWalls = (Array.isArray(ai.walls) ? ai.walls : []).slice(0, 300).map(seg).filter((w) => !!w).map((w) => ({ ...w!, t: 12 }));
+	const doorMids = (Array.isArray(ai.doors) ? ai.doors : []).map(seg).filter((d) => !!d).map((d): Pt => [(d!.a[0] + d!.b[0]) / 2, (d!.a[1] + d!.b[1]) / 2]);
+	// Square up and join the walls before doors and furniture are fitted to them.
+	const { outline, walls } = tidyPlan(rawOutline, rawWalls, doorMids);
+	if (outline.length < 3) throw new Error('No outline found');
 	const windows = (Array.isArray(ai.windows) ? ai.windows : [])
 		.slice(0, 80)
 		.map(seg)

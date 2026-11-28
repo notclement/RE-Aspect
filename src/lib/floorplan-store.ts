@@ -1,5 +1,5 @@
 /**
- * The rotated floor-plan image, kept ONLY on this device (IndexedDB) as a tracing backdrop for Studio.
+ * The floor-plan image, kept ONLY on this device (IndexedDB) as a tracing backdrop for Studio.
  * It is never stored on our servers — uploads are processed and discarded.
  */
 const DB = 'rea-floorplans';
@@ -15,11 +15,14 @@ function open(): Promise<IDBDatabase> {
 }
 
 export interface FloorPlanImage {
-	dataUrl: string; // rotated (north up)
+	/** The plan photo, turned by whole quarter turns only so its walls stay straight (older projects: fully north-up). */
+	dataUrl: string;
 	w: number;
 	h: number;
 	original?: string; // as uploaded, so it can be re-rotated without losing quality
-	angle?: number; // degrees clockwise applied to `original`
+	angle?: number; // the full north turn (degrees clockwise) chosen for `original`
+	/** Set when `dataUrl` is straight: degrees clockwise still needed for north-up (= the plan's bearing). */
+	bearing?: number;
 }
 
 export async function saveFloorPlan(projectId: string, img: FloorPlanImage): Promise<void> {

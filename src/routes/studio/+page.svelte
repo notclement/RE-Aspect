@@ -16,7 +16,7 @@
 	import Icon, { type IconName } from '#lib/components/Icon.svelte';
 	import { nav } from '#lib/stores/nav.svelte.ts';
 	import { getProject, updateProject, flush } from '#lib/stores/projects.svelte.ts';
-	import { loadFloorPlan, type FloorPlanImage } from '#lib/floorplan-store.ts';
+	import { loadFloorPlan, saveFloorPlan, type FloorPlanImage } from '#lib/floorplan-store.ts';
 	import { emptyPlan, sanitizePlan, area, outlineEdges, segDist, GLASS_OPTIONS, type PlanData, type Pt } from '#lib/plan.ts';
 	import { itemCorners, itemTransform, doorGeom } from '#lib/sample-unit.ts';
 	import { PRESETS, KIND_LABEL } from '#lib/studio/furniture.ts';
@@ -24,7 +24,7 @@
 	import { getSupabase, supabaseConfigured } from '#lib/supabase.ts';
 	import { auth } from '#lib/stores/auth.svelte.ts';
 	import { fnError } from '#lib/fn-error.ts';
-	import { shrinkPhoto } from '#lib/image.ts';
+	import { shrinkPhoto, rotateImage, splitNorth } from '#lib/image.ts';
 	import { profile } from '#lib/stores/profile.svelte.ts';
 	import Spinner from '#lib/components/Spinner.svelte';
 	import UpgradeSheet from '#lib/components/UpgradeSheet.svelte';
@@ -667,6 +667,14 @@
 		}
 		tracing = true;
 		try {
+			// Older projects kept the photo turned all the way to north-up (walls at a slant). Straighten it from
+			// the original first, so the AI traces square walls; the small leftover turn becomes the bearing.
+			if (backdrop.bearing === undefined && backdrop.original) {
+				const { quarter, bearing } = splitNorth(backdrop.angle ?? 0);
+				const straight = await rotateImage(backdrop.original, quarter, 2048);
+				backdrop = { ...straight, original: backdrop.original, angle: backdrop.angle ?? 0, bearing };
+				await saveFloorPlan(project.id, backdrop);
+			}
 			const sb = await getSupabase();
 			const small = await shrinkPhoto(backdrop.dataUrl, 1400, 0.85);
 			const { data, error } = await sb.functions.invoke('process-project', {
@@ -676,6 +684,7 @@
 			const p = sanitizePlan((data as { plan?: unknown })?.plan);
 			if (p?.imageScale) p.imageScale = Math.round(p.imageScale * (small.w / backdrop.w) * 10000) / 10000;
 			if (!p || p.outline.length < 3) throw new Error("The AI couldn't find the unit's outline in this photo.");
+			p.bearing = backdrop.bearing || undefined;
 			const before = snap();
 			plan = { ...p, items: plan.items };
 			sel = null;
@@ -752,6 +761,11 @@
 		if (project) {
 			loadFloorPlan(project.id).then((b) => {
 				backdrop = b;
+				// A straight backdrop carries the plan's north bearing; keep the plan in step (e.g. after hand tracing).
+				if (b?.bearing !== undefined && (plan.bearing ?? 0) !== b.bearing) {
+					plan.bearing = b.bearing || undefined;
+					save();
+				}
 				if (!draft.length && !wallStart) fit();
 			});
 		}

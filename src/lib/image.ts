@@ -62,6 +62,16 @@ export async function shrinkPhoto(src: Blob | string, maxSide = 2048, q = 0.82, 
 }
 
 /** Rotate an image by any angle (degrees, clockwise) onto a white background that fits the result. */
+/**
+ * Split a north turn into the quarter turns we apply to the photo (so the drawing stays straight and its walls
+ * trace square) and the small leftover angle, kept as the plan's bearing for the sun maths.
+ */
+export function splitNorth(deg: number): { quarter: number; bearing: number } {
+	const a = ((deg % 360) + 360) % 360;
+	const q = Math.round(a / 90) * 90;
+	return { quarter: q % 360, bearing: Math.round((a - q) * 10) / 10 };
+}
+
 export async function rotateImage(dataUrl: string, deg: number, maxSide = 2048): Promise<Shrunk> {
 	const bmp = await createImageBitmap(await (await fetch(dataUrl)).blob());
 	const r = (deg * Math.PI) / 180;
