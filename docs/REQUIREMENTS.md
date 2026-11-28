@@ -86,6 +86,7 @@
 ## 6. Sun model (v1)
 - Sun position is calculated from location, date and time.
 - Each unit is treated as **standalone**: no neighbouring buildings and no blockage at any floor level.
+- **Interior doors are always treated as open** (decided 28 Nov 2026): sunlight carries on through doorways into the next room; only walls and the unit outline stop it.
 
 ## 7. Furniture
 - Fully customisable dimensions, including unusual sizes and height. Visible in top-down, 3D and walkthrough.
