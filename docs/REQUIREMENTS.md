@@ -125,6 +125,8 @@
   - Share links can't be guessed and can be revoked.
 - **Sun Report**: an image-style card per unit that agents can screenshot for listings.
 
+- **Sender line (migration 0020):** every signed-in user gives their **full name (as registered with CEA)** and **CEA number** (salesperson `R123456A` or agency licence `L1234567A`) on the welcome step; existing users are asked once. Both are editable on Profile ("Shown to clients"). Shared pages show "Sent by <full name> · CEA <number> · <agency>" under the title.
+
 ## 12. Privacy
 - **BaZi birth dates/times are stored only in the user's browser**, and users are told this.
 - PDPA-compliant privacy notice. Uploaders confirm they have the right to upload plans.

@@ -13,6 +13,7 @@
 	import { agency } from '#lib/stores/agency.svelte.ts';
 	import { projectUsage } from '#lib/usage.svelte.ts';
 	import InviteFriend from '#lib/components/InviteFriend.svelte';
+	import AgentDetails from '#lib/components/AgentDetails.svelte';
 
 	let fileInput = $state<HTMLInputElement>();
 	let photoBusy = $state(false);
@@ -128,6 +129,7 @@
 		{#if photoError}<span class="error small">{photoError}</span>{/if}
 	</div>
 </section>
+<AgentDetails />
 {#if cropFile}<CropSquare file={cropFile} ondone={cropped} oncancel={() => (cropFile = null)} />{/if}
 
 <section class="card usage" aria-label="Usage">

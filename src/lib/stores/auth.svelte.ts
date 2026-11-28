@@ -81,9 +81,12 @@ class Auth {
 					isAdmin: data.is_admin === true,
 					avatar: isAvatarDataUrl(data.avatar) ? data.avatar : null,
 					disabled: data.disabled === true,
+					fullName: typeof data.full_name === 'string' ? data.full_name.slice(0, 80) : '',
+					ceaNo: typeof data.cea_no === 'string' && /^(R\d{6}[A-Z]|L\d{7}[A-Z])$/.test(data.cea_no) ? data.cea_no : '',
 					extraProjects: Number.isInteger(data.extra_projects) ? Math.max(0, Math.min(1000, data.extra_projects)) : 0,
 					...(data.name ? { name: data.name } : {})
 				});
+				profile.serverLoaded = true;
 				if (!data.is_admin) profile.setViewAs(null);
 				// Settings follow the account: use the saved ones; first time on this account, upload this device's.
 				const saved = sanitizeSettings(data.settings);
@@ -130,6 +133,15 @@ class Auth {
 		const sb = await getSupabase();
 		const { error } = await sb.from('profiles').update({ name }).eq('id', this.userId);
 		if (error) console.warn('[auth] could not save name', error.message);
+	}
+
+	/** Save the already-validated full name + CEA number (shown on shared pages). Throws a readable message. */
+	async saveAgentInfo(fullName: string, ceaNo: string) {
+		if (this.status !== 'signed-in' || !this.userId) return void profile.update({ fullName, ceaNo });
+		const sb = await getSupabase();
+		const { error } = await sb.from('profiles').update({ full_name: fullName, cea_no: ceaNo }).eq('id', this.userId);
+		if (error) throw new Error('Could not save — please check the details and try again.');
+		profile.update({ fullName, ceaNo });
 	}
 
 	async signInWithGoogle() {

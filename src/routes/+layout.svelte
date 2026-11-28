@@ -28,6 +28,9 @@
 		return unblock;
 	});
 
+	/** Every signed-in user gives their full name and CEA number once (shown on shared pages, migration 0020). */
+	const needsAgentInfo = () => auth.status === 'signed-in' && profile.serverLoaded && (!profile.data.fullName || !profile.data.ceaNo);
+
 	// Route guard: signed-out → /start (home) or /login; signed-in (or preview) without a name → /welcome.
 	$effect(() => {
 		const path = page.url.pathname;
@@ -50,10 +53,10 @@
 		} else if (path === '/start') goto('/', { replaceState: true });
 		else if (auth.status === 'signed-in' && profile.data.name && path !== '/join' && pendingJoin.get()) goto('/join', { replaceState: true });
 		else if (auth.status === 'signed-in' && profile.data.name && path !== '/refer' && path !== '/join' && pendingRef.get()) goto('/refer', { replaceState: true });
-		else if (!profile.data.name && !BARE.includes(path))
+		else if ((!profile.data.name || needsAgentInfo()) && !BARE.includes(path))
 			goto('/welcome', { replaceState: true });
-		// Already named (e.g. returning user, or name taken from Google) → never ask again.
-		else if (profile.data.name && path === '/welcome') goto('/', { replaceState: true });
+		// Already named, with full name + CEA number (e.g. returning user) → never ask again.
+		else if (path === '/welcome' && profile.data.name && !needsAgentInfo() && (auth.status !== 'signed-in' || profile.serverLoaded)) goto('/', { replaceState: true });
 	});
 </script>
 

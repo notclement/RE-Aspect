@@ -28,6 +28,8 @@
 	let unit = $state<Unit | null>(null);
 	let title = $state('');
 	let description = $state('');
+	/** Who sent the page (migration 0020): full name, CEA number, agency. */
+	let sender = $state<{ name: string; cea: string; agency: string } | null>(null);
 	let info = $state<StudyInfo | null>(null);
 
 	// Always the warm light look for clients, whatever theme the sender or the viewer's device uses:
@@ -104,6 +106,9 @@
 			const ceilingCm = num(r.ceiling_cm, 200, 800) ?? 260;
 			title = str(r.name, 60) || 'Shared unit';
 			description = str(r.description, 280);
+			const cea = str(r.agent_cea, 12);
+			const who = str(r.agent_name, 80);
+			sender = who ? { name: who, cea: /^(R\d{6}[A-Z]|L\d{7}[A-Z])$/.test(cea) ? cea : '', agency: str(r.agency, 60) } : null;
 			unit = planToUnit(plan, { id, name: title, unitNo: str(r.unit_no, 12), level, sizeSqft, ceilingCm, lat: num(r.lat, -90, 90), lon: num(r.lon, -180, 180) });
 			info = { address: str(r.address, 120), unitNo: str(r.unit_no, 12), level, sizeSqft, ceilingCm, typeLabel: propertyTypeLabel(str(r.property_type, 20)), plan, northAngle: null, demo: false };
 			openOnBestMoment(unit);
@@ -132,6 +137,7 @@
 	{:else}
 		<header class="hero">
 			<h1>{title}</h1>
+			{#if sender}<p class="sender">Sent by <strong>{sender.name}</strong>{#if sender.cea}<span> · CEA {sender.cea}</span>{/if}{#if sender.agency}<span> · {sender.agency}</span>{/if}</p>{/if}
 			{#if info.address || info.level !== null}
 				<p class="loc"><Icon name="pin" size={15} />{[info.address, info.level !== null ? `Level ${info.level}` : '', info.unitNo].filter(Boolean).join(' · ')}</p>
 			{/if}
@@ -233,6 +239,15 @@
 		margin: 10px 0 0;
 		font-size: 14px;
 		color: var(--muted);
+	}
+	.sender {
+		margin: 2px 0 4px;
+		font-size: 14px;
+		color: var(--muted);
+	}
+	.sender strong {
+		color: var(--ink, inherit);
+		font-weight: 600;
 	}
 	.loc {
 		display: flex;

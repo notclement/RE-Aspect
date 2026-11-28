@@ -27,6 +27,26 @@ export function validateName(input: string): Result<string> {
 	return ok(v);
 }
 
+/** Full name as registered with CEA (shown on shared pages): 2–80 letters, spaces, . ' or -. */
+export function validateFullName(input: string): Result<string> {
+	const v = cleanText(input).replace(/\s+/g, ' ');
+	if (v.length < 2) return fail('Please enter your full name.');
+	if (v.length > 80) return fail('Keep it under 80 characters.');
+	if (!/^[\p{L}\p{M}][\p{L}\p{M} .'-]*$/u.test(v)) return fail("Use letters, spaces, . ' or - only.");
+	return ok(v);
+}
+
+/**
+ * CEA (Council for Estate Agencies) number: salesperson registration "R123456A" or estate agent licence
+ * "L1234567A". Spaces and lower case are tidied up.
+ */
+export function validateCeaNo(input: string): Result<string> {
+	const v = cleanText(input).toUpperCase().replace(/[\s-]/g, '');
+	if (!v) return fail('Please enter your CEA registration number.');
+	if (!/^(R\d{6}[A-Z]|L\d{7}[A-Z])$/.test(v)) return fail('Use the format R123456A (salesperson) or L1234567A (agency licence).');
+	return ok(v);
+}
+
 /**
  * Singapore unit number, e.g. "#18-04", "18-04", "#05-1234", "#12-03A".
  * Normalised to "#FF-UUUU[A]". Floor 1–3 digits, unit 1–4 digits, optional single trailing letter.

@@ -26,6 +26,8 @@ export interface Profile {
 	plan: PlanId;
 	proUntil: string | null; // granted Pro end date (ISO), 'infinity' = lifetime, null = none
 	avatar: string | null; // tiny square profile photo (data URL, ≤16 KB), synced via profiles.avatar
+	fullName: string; // as registered with CEA, shown on shared pages (0020)
+	ceaNo: string; // CEA registration / licence number, e.g. R123456A
 	extraProjects: number; // bought with Stripe (migration 0019): Pro limit = 10 + this
 	disabled: boolean; // set by an admin; the app shows a notice and stops working for this account
 	bodyHeightCm: number; // walkthrough eye level ≈ height − 12 cm
@@ -43,6 +45,8 @@ const DEFAULTS: Profile = {
 	plan: 'free',
 	proUntil: null,
 	avatar: null,
+	fullName: '',
+	ceaNo: '',
 	extraProjects: 0,
 	disabled: false,
 	bodyHeightCm: 175,
@@ -92,6 +96,8 @@ class ProfileStore {
 	onSettingsChange: (() => void) | null = null;
 	/** Admin-only preview role (null = see the app as yourself). */
 	viewAs = $state<RoleView | null>(null);
+	/** True once the profile row has been read from the server this session (so guards don't act on stale cache). */
+	serverLoaded = $state(false);
 
 	load() {
 		try {
