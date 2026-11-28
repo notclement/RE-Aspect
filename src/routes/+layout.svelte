@@ -29,7 +29,7 @@
 	});
 
 	/** Every signed-in user gives their full name and CEA number once (shown on shared pages, migration 0020). */
-	const needsAgentInfo = () => auth.status === 'signed-in' && profile.serverLoaded && (!profile.data.fullName || !profile.data.ceaNo);
+	const needsAgentInfo = () => auth.status === 'signed-in' && profile.serverLoaded && (!profile.data.fullName || (!profile.data.ceaNo && !profile.data.notAgent));
 
 	// Route guard: signed-out → /start (home) or /login; signed-in (or preview) without a name → /welcome.
 	$effect(() => {

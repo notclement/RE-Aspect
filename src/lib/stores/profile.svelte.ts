@@ -28,6 +28,7 @@ export interface Profile {
 	avatar: string | null; // tiny square profile photo (data URL, ≤16 KB), synced via profiles.avatar
 	fullName: string; // as registered with CEA, shown on shared pages (0020)
 	ceaNo: string; // CEA registration / licence number, e.g. R123456A
+	notAgent: boolean; // e.g. interior designers: no CEA number (0021)
 	extraProjects: number; // bought with Stripe (migration 0019): Pro limit = 10 + this
 	disabled: boolean; // set by an admin; the app shows a notice and stops working for this account
 	bodyHeightCm: number; // walkthrough eye level ≈ height − 12 cm
@@ -47,6 +48,7 @@ const DEFAULTS: Profile = {
 	avatar: null,
 	fullName: '',
 	ceaNo: '',
+	notAgent: false,
 	extraProjects: 0,
 	disabled: false,
 	bodyHeightCm: 175,

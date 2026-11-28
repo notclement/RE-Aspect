@@ -8,24 +8,26 @@
 	let editing = $state(false);
 	let fullName = $state('');
 	let ceaNo = $state('');
+	let notAgent = $state(false);
 	let errors = $state<Record<string, string>>({});
 	let busy = $state(false);
 
 	function start() {
 		fullName = profile.data.fullName || profile.data.name;
 		ceaNo = profile.data.ceaNo;
+		notAgent = profile.data.notAgent;
 		errors = {};
 		editing = true;
 	}
 	async function save(e: SubmitEvent) {
 		e.preventDefault();
 		const f = validateFullName(fullName);
-		const c = validateCeaNo(ceaNo);
-		errors = { ...(f.ok ? {} : { fullName: f.error }), ...(c.ok ? {} : { ceaNo: c.error }) };
-		if (!f.ok || !c.ok) return;
+		const c = notAgent ? null : validateCeaNo(ceaNo);
+		errors = { ...(f.ok ? {} : { fullName: f.error }), ...(c && !c.ok ? { ceaNo: c.error } : {}) };
+		if (!f.ok || (c && !c.ok)) return;
 		busy = true;
 		try {
-			await auth.saveAgentInfo(f.value, c.value);
+			await auth.saveAgentInfo(f.value, c?.ok ? c.value : '', notAgent);
 			editing = false;
 		} catch (err) {
 			errors = { form: err instanceof Error ? err.message : 'Could not save.' };
@@ -47,11 +49,14 @@
 					<input id="ag-full" autocomplete="name" maxlength="80" bind:value={fullName} placeholder="Type here…" />
 					{#if errors.fullName}<span class="error">{errors.fullName}</span>{/if}
 				</div>
-				<div class="field">
-					<label for="ag-cea">CEA registration number</label>
-					<input id="ag-cea" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="12" bind:value={ceaNo} placeholder="e.g. R123456A" />
-					{#if errors.ceaNo}<span class="error">{errors.ceaNo}</span>{/if}
-				</div>
+				{#if !notAgent}
+					<div class="field">
+						<label for="ag-cea">CEA registration number</label>
+						<input id="ag-cea" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="12" bind:value={ceaNo} placeholder="e.g. R123456A" />
+						{#if errors.ceaNo}<span class="error">{errors.ceaNo}</span>{/if}
+					</div>
+				{/if}
+				<label class="check"><input type="checkbox" bind:checked={notAgent} /> I'm not a property agent (e.g. interior designer)</label>
 				{#if errors.form}<p class="error">{errors.form}</p>{/if}
 				<div class="btns">
 					<button type="button" class="btn" onclick={() => (editing = false)}>Cancel</button>
@@ -59,7 +64,7 @@
 				</div>
 			</form>
 		{:else}
-			<p class="line">Sent by <b>{profile.data.fullName || '—'}</b>{#if profile.data.ceaNo}<span class="muted"> · CEA {profile.data.ceaNo}</span>{/if}</p>
+			<p class="line">Sent by <b>{profile.data.fullName || '—'}</b>{#if profile.data.notAgent}<span class="muted"> · Interior designer</span>{:else if profile.data.ceaNo}<span class="muted"> · CEA {profile.data.ceaNo}</span>{/if}</p>
 			<p class="muted small">This line appears on every page you share.</p>
 		{/if}
 	</section>
@@ -85,6 +90,17 @@
 		color: var(--muted);
 		cursor: pointer;
 		border-radius: 50%;
+	}
+	.check {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		min-height: 44px;
+		margin-bottom: 8px;
+	}
+	.check input {
+		width: 20px;
+		height: 20px;
 	}
 	.line {
 		margin: 4px 0;

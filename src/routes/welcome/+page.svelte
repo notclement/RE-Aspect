@@ -13,6 +13,7 @@
 	let name = $state(profile.data.name);
 	let fullName = $state(profile.data.fullName || profile.data.name);
 	let ceaNo = $state(profile.data.ceaNo);
+	let notAgent = $state(profile.data.notAgent);
 	let errors = $state<Record<string, string>>({});
 	let busy = $state(false);
 
@@ -20,7 +21,7 @@
 		e.preventDefault();
 		const n = validateName(name);
 		const f = agent ? validateFullName(fullName) : null;
-		const c = agent ? validateCeaNo(ceaNo) : null;
+		const c = agent && !notAgent ? validateCeaNo(ceaNo) : null;
 		errors = {
 			...(n.ok ? {} : { name: n.error }),
 			...(f && !f.ok ? { fullName: f.error } : {}),
@@ -30,7 +31,7 @@
 		busy = true;
 		try {
 			if (n.value !== profile.data.name || !agent) await auth.saveName(n.value);
-			if (f?.ok && c?.ok) await auth.saveAgentInfo(f.value, c.value);
+			if (f?.ok && (notAgent || c?.ok)) await auth.saveAgentInfo(f.value, c?.ok ? c.value : '', notAgent);
 			goto('/', { replaceState: true });
 		} catch (err) {
 			errors = { form: err instanceof Error ? err.message : 'Could not save — please try again.' };
@@ -55,17 +56,32 @@
 			<input id="full" autocomplete="name" maxlength="80" bind:value={fullName} placeholder="Type here…" />
 			{#if errors.fullName}<span class="error">{errors.fullName}</span>{/if}
 		</div>
-		<div class="field">
-			<label for="cea">CEA registration number</label>
-			<input id="cea" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="12" bind:value={ceaNo} placeholder="e.g. R123456A" />
-			{#if errors.ceaNo}<span class="error">{errors.ceaNo}</span>{/if}
-		</div>
+		{#if !notAgent}
+			<div class="field">
+				<label for="cea">CEA registration number</label>
+				<input id="cea" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="12" bind:value={ceaNo} placeholder="e.g. R123456A" />
+				{#if errors.ceaNo}<span class="error">{errors.ceaNo}</span>{/if}
+			</div>
+		{/if}
+		<label class="check"><input type="checkbox" bind:checked={notAgent} /> I'm not a property agent (e.g. interior designer)</label>
 	{/if}
 	{#if errors.form}<p class="error">{errors.form}</p>{/if}
 	<button class="btn primary wide" type="submit" disabled={busy}>{busy ? 'Saving…' : 'Continue'}</button>
 </form>
 
 <style>
+	.check {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		min-height: 44px;
+		margin: 0 0 10px;
+		font-size: 15px;
+	}
+	.check input {
+		width: 20px;
+		height: 20px;
+	}
 	.wrap {
 		max-width: 400px;
 		margin: 0 auto;

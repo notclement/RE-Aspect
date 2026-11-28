@@ -83,6 +83,7 @@ class Auth {
 					disabled: data.disabled === true,
 					fullName: typeof data.full_name === 'string' ? data.full_name.slice(0, 80) : '',
 					ceaNo: typeof data.cea_no === 'string' && /^(R\d{6}[A-Z]|L\d{7}[A-Z])$/.test(data.cea_no) ? data.cea_no : '',
+					notAgent: data.not_agent === true,
 					extraProjects: Number.isInteger(data.extra_projects) ? Math.max(0, Math.min(1000, data.extra_projects)) : 0,
 					...(data.name ? { name: data.name } : {})
 				});
@@ -136,12 +137,13 @@ class Auth {
 	}
 
 	/** Save the already-validated full name + CEA number (shown on shared pages). Throws a readable message. */
-	async saveAgentInfo(fullName: string, ceaNo: string) {
-		if (this.status !== 'signed-in' || !this.userId) return void profile.update({ fullName, ceaNo });
+	async saveAgentInfo(fullName: string, ceaNo: string, notAgent = false) {
+		if (notAgent) ceaNo = '';
+		if (this.status !== 'signed-in' || !this.userId) return void profile.update({ fullName, ceaNo, notAgent });
 		const sb = await getSupabase();
-		const { error } = await sb.from('profiles').update({ full_name: fullName, cea_no: ceaNo }).eq('id', this.userId);
+		const { error } = await sb.from('profiles').update({ full_name: fullName, cea_no: ceaNo || null, not_agent: notAgent }).eq('id', this.userId);
 		if (error) throw new Error('Could not save — please check the details and try again.');
-		profile.update({ fullName, ceaNo });
+		profile.update({ fullName, ceaNo, notAgent });
 	}
 
 	async signInWithGoogle() {
