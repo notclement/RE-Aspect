@@ -229,7 +229,9 @@ export function walkingInput(
 	stick.addEventListener(
 		'pointerdown',
 		(e) => {
-			if (thumb !== -1) return;
+			// Fingers are handled by the touch events below (they work in every mobile browser and in-app
+			// browsers such as WhatsApp's, where touch pointer events on the stick can be cancelled).
+			if (e.pointerType === 'touch' || thumb !== -1) return;
 			e.preventDefault();
 			thumb = e.pointerId;
 			stick.setPointerCapture(thumb);
@@ -242,8 +244,11 @@ export function walkingInput(
 	);
 	function joystick(e: PointerEvent) {
 		if (thumb !== e.pointerId) return;
-		const dx = (e.clientX - ox) / 30,
-			dy = (oy - e.clientY) / 30,
+		steer(e.clientX, e.clientY);
+	}
+	function steer(cx: number, cy: number) {
+		const dx = (cx - ox) / 30,
+			dy = (oy - cy) / 30,
 			n = Math.max(1, Math.hypot(dx, dy));
 		axes.x = dx / n;
 		axes.y = dy / n;
@@ -258,9 +263,51 @@ export function walkingInput(
 		stick.style.removeProperty('--jy');
 	}
 	stick.addEventListener('pointermove', joystick, o);
-	stick.addEventListener('lostpointercapture', center, o);
+	stick.addEventListener('lostpointercapture', () => thumb >= 0 && thumb !== TOUCH && center(), o);
+	// Touch: the finger that started on the stick steers until it lifts, wherever it moves on screen.
+	let finger = -1;
+	const TOUCH = 1e9; // thumb value while a finger (not a pointer) is steering
+	const po = { signal: ac.signal, passive: false };
+	stick.addEventListener(
+		'touchstart',
+		(e) => {
+			if (finger !== -1) return;
+			const t = e.changedTouches[0];
+			if (!t) return;
+			e.preventDefault();
+			finger = t.identifier;
+			thumb = TOUCH;
+			const rect = stick.getBoundingClientRect();
+			ox = rect.left + rect.width / 2;
+			oy = rect.top + rect.height / 2;
+			steer(t.clientX, t.clientY);
+		},
+		po,
+	);
+	window.addEventListener(
+		'touchmove',
+		(e) => {
+			if (finger === -1) return;
+			for (const t of Array.from(e.changedTouches))
+				if (t.identifier === finger) {
+					e.preventDefault();
+					steer(t.clientX, t.clientY);
+				}
+		},
+		po,
+	);
+	const lift = (e: TouchEvent) => {
+		if (finger === -1) return;
+		if (Array.from(e.changedTouches).some((t) => t.identifier === finger)) {
+			finger = -1;
+			center();
+		}
+	};
+	window.addEventListener('touchend', lift, o);
+	window.addEventListener('touchcancel', lift, o);
 	function stop() {
 		keys.clear();
+		finger = -1;
 		center();
 		drag = -1;
 	}
